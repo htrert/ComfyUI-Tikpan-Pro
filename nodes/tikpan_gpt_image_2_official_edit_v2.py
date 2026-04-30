@@ -261,3 +261,4 @@ class TikpanGptImage2OfficialEditV2:
 
     def black_out(self, w=1024, h=1024):
         return torch.zeros((1,h,w,3), dtype=torch.float32)
+
