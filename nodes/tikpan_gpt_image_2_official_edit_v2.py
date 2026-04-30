@@ -1,15 +1,16 @@
 import uuid
 import math
 import base64
-import torch
-import numpy as np
+import traceback
 from io import BytesIO
-from PIL import Image, ImageOps
+
+import numpy as np
 import requests
+import torch
+import urllib3
+from PIL import Image, ImageOps
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-import traceback
-import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -25,13 +26,19 @@ class TikpanGptImage2OfficialEditV2:
                 "获取密钥请访问": (["👉 https://tikpan.com 官方授权获取Key"],),
                 "API_密钥": ("STRING", {"default": "sk-"}),
                 "主图像": ("IMAGE",),
-                "编辑指令": ("STRING", {
-                    "multiline": True,
-                    "default": "请根据要求编辑图像；如果提供了遮罩，仅修改遮罩区域并尽量保持未遮罩区域不变。"
-                }),
+                "编辑指令": (
+                    "STRING",
+                    {
+                        "multiline": True,
+                        "default": "请根据要求编辑图像；如果提供了遮罩，仅修改遮罩区域并尽量保持未遮罩区域不变。",
+                    },
+                ),
                 "生成张数": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1}),
                 "分辨率档位": (["Auto", "1K", "2K", "4K"], {"default": "2K"}),
-                "画面比例": (["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "21:9", "9:21"], {"default": "Auto"}),
+                "画面比例": (
+                    ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "21:9", "9:21"],
+                    {"default": "Auto"},
+                ),
                 "画质": (["auto", "low", "medium", "high"], {"default": "medium"}),
                 "背景模式": (["auto", "opaque", "transparent"], {"default": "auto"}),
                 "遮罩反相": ("BOOLEAN", {"default": False}),
@@ -43,9 +50,10 @@ class TikpanGptImage2OfficialEditV2:
                 "参考图2": ("IMAGE",),
                 "参考图3": ("IMAGE",),
                 "参考图4": ("IMAGE",),
+                "参考流": ("IMAGE",),
                 "遮罩掩码": ("MASK",),
                 "跳过错误": ("BOOLEAN", {"default": False}),
-            }
+            },
         }
 
     RETURN_TYPES = ("IMAGE", "STRING")
@@ -55,11 +63,11 @@ class TikpanGptImage2OfficialEditV2:
 
     def edit_image(self, **kwargs):
         w, h = 1024, 1024
-        skip_error = kwargs.get("跳过错误", False)
+        skip_error = bool(kwargs.get("跳过错误", False))
 
         try:
-            api_key = kwargs.get("API_密钥")
-            if not api_key or not str(api_key).startswith("sk-"):
+            api_key = str(kwargs.get("API_密钥", "")).strip()
+            if not api_key or not api_key.startswith("sk-"):
                 return (self.black_out(), "❌ API Key 格式错误")
 
             main_img = kwargs.get("主图像")
@@ -67,69 +75,75 @@ class TikpanGptImage2OfficialEditV2:
                 return (self.black_out(), "❌ 请提供主图像")
 
             mask_t = kwargs.get("遮罩掩码")
-            prompt = kwargs.get("编辑指令") or ""
+            prompt = str(kwargs.get("编辑指令") or "").strip()
             n = int(kwargs.get("生成张数", 1))
             res_tier = kwargs.get("分辨率档位", "2K")
             aspect = kwargs.get("画面比例", "Auto")
             quality = kwargs.get("画质", "medium")
             bg = kwargs.get("背景模式", "auto")
-            invert_mask = kwargs.get("遮罩反相", False)
-            boost_prompt = kwargs.get("提示增强", True)
+            invert_mask = bool(kwargs.get("遮罩反相", False))
+            boost_prompt = bool(kwargs.get("提示增强", True))
             timeout = int(kwargs.get("超时秒数", 300))
 
-            # 以主图决定目标尺寸
+            self.validate_image_tensor(main_img, "主图像")
             w, h = self.compute_size(main_img, res_tier, aspect)
-
-            # 主图 PIL
             main_pil = self.to_pil(main_img[0])
 
-            # 收集参考图
             ref_inputs = [
                 kwargs.get("参考图1"),
                 kwargs.get("参考图2"),
                 kwargs.get("参考图3"),
                 kwargs.get("参考图4"),
             ]
-            ref_pils = []
-            for ref in ref_inputs:
-                if ref is not None:
-                    ref_pils.extend(self.batch_to_pil(ref))
-            ref_pils = ref_pils[:15]
 
-            # 最多 16 张（主图 + 15参考）
-            all_pils = [main_pil] + ref_pils
+            ref_pils = []
+            for idx, ref in enumerate(ref_inputs, start=1):
+                if ref is not None:
+                    self.validate_image_tensor(ref, f"参考图{idx}")
+                    ref_pils.extend(self.batch_to_pil(ref))
+
+            ref_stream = kwargs.get("参考流")
+            ref_stream_pils = []
+            if ref_stream is not None:
+                self.validate_image_tensor(ref_stream, "参考流")
+                ref_stream_pils.extend(self.batch_to_pil(ref_stream))
+
+            extra_refs = ref_pils + ref_stream_pils
+            extra_refs = extra_refs[:15]
+            all_pils = [main_pil] + extra_refs
             all_pils = all_pils[:16]
 
             files = []
             total_bytes = 0
 
-            # 主图和参考图统一做：等比例缩放 + 补边
             for i, p in enumerate(all_pils):
                 prepared = self.fit_with_padding(p, w, h, bg=(255, 255, 255))
                 img_bytes = self.to_bytes(prepared)
                 total_bytes += len(img_bytes)
                 files.append(("image", (f"{i}.png", img_bytes, "image/png")))
 
-            if total_bytes > 50 * 1024 * 1024:
-                raise Exception(f"上传图片总大小 {total_bytes / 1024 / 1024:.2f}MB 超过50MB")
-
-            # 遮罩也必须使用和主图完全一致的变换
-            if mask_t is not None:
+            has_mask = mask_t is not None
+            if has_mask:
+                self.validate_mask_tensor(mask_t, "遮罩掩码")
                 mask_bytes = self.process_mask_with_main_geometry(
                     mask_t=mask_t,
                     main_pil=main_pil,
                     target_w=w,
                     target_h=h,
-                    invert=invert_mask
+                    invert=invert_mask,
                 )
+                total_bytes += len(mask_bytes)
                 files.append(("mask", ("mask.png", mask_bytes, "image/png")))
 
-            final_prompt = self.make_prompt(prompt, mask_t is not None, boost_prompt)
+            if total_bytes > 50 * 1024 * 1024:
+                raise Exception(f"上传图片总大小 {total_bytes / 1024 / 1024:.2f}MB 超过50MB")
+
+            final_prompt = self.make_prompt(prompt, has_mask, boost_prompt)
 
             headers = {
                 "Authorization": f"Bearer {api_key}",
                 "Idempotency-Key": str(uuid.uuid4()),
-                "Accept": "application/json"
+                "Accept": "application/json",
             }
 
             data = {
@@ -138,56 +152,90 @@ class TikpanGptImage2OfficialEditV2:
                 "n": str(n),
                 "quality": quality,
                 "size": f"{w}x{h}",
-                "background": bg
+                "background": bg,
             }
 
             with requests.Session() as sess:
                 sess.trust_env = False
-                sess.mount(
-                    "https://",
-                    HTTPAdapter(
-                        max_retries=Retry(
-                            total=3,
-                            backoff_factor=1,
-                            status_forcelist=[429, 500, 502, 503, 504],
-                            allowed_methods=["GET", "POST"]
-                        )
+
+                get_retry = Retry(
+                    total=2,
+                    connect=2,
+                    read=2,
+                    backoff_factor=1,
+                    status_forcelist=[500, 502, 503, 504],
+                    allowed_methods=frozenset(["GET"]),
+                    raise_on_status=False,
+                )
+                adapter = HTTPAdapter(max_retries=get_retry)
+                sess.mount("https://", adapter)
+                sess.mount("http://", adapter)
+
+                try:
+                    resp = sess.post(
+                        f"{API_HOST}/v1/images/edits",
+                        headers=headers,
+                        files=files,
+                        data=data,
+                        timeout=(15, timeout),
+                        verify=False,
                     )
-                )
+                except requests.exceptions.ConnectTimeout:
+                    raise Exception("连接上游超时：请检查本地网络环境，或稍后重试")
+                except requests.exceptions.ReadTimeout:
+                    raise Exception(f"上游处理超时：超过 {timeout} 秒未返回结果，建议降低分辨率、减少参考图数量或稍后重试")
+                except requests.exceptions.ProxyError as e:
+                    raise Exception(f"代理连接异常：{e}")
+                except requests.exceptions.SSLError as e:
+                    raise Exception(f"TLS/SSL 握手异常：{e}")
+                except requests.exceptions.ConnectionError as e:
+                    raise Exception(f"网络连接失败：{e}")
+                except requests.exceptions.RequestException as e:
+                    raise Exception(f"请求发送失败：{e}")
 
-                resp = sess.post(
-                    f"{API_HOST}/v1/images/edits",
-                    headers=headers,
-                    files=files,
-                    data=data,
-                    timeout=timeout,
-                    verify=False
-                )
+                if resp.status_code == 429:
+                    raise Exception("HTTP 429: 当前分组/通道限流或繁忙，请稍后再试，或切换更稳定的令牌分组")
+                elif resp.status_code == 401:
+                    raise Exception(f"HTTP 401: API Key 无效或鉴权失败。响应: {self.safe_text(resp.text)}")
+                elif resp.status_code == 403:
+                    raise Exception(f"HTTP 403: 当前令牌无权限访问该接口。响应: {self.safe_text(resp.text)}")
+                elif resp.status_code != 200:
+                    raise Exception(f"HTTP {resp.status_code}: {self.safe_text(resp.text)}")
 
-                if resp.status_code != 200:
-                    raise Exception(f"HTTP {resp.status_code}: {resp.text}")
+                try:
+                    resj = resp.json()
+                except Exception:
+                    raise Exception(f"接口返回不是合法 JSON：{self.safe_text(resp.text)}")
 
-                resj = resp.json()
                 imgs = self.parse_images(resj, sess)
 
             if not imgs:
-                raise Exception("❌ 未返回图片")
+                raise Exception("❌ 接口返回成功，但未解析到有效结果图")
 
             base_sz = imgs[0].size
             tlist = []
-            for im in imgs:
-                im = im.convert("RGB")
-                if im.size != base_sz:
-                    im = im.resize(base_sz, Image.Resampling.LANCZOS)
-                arr = np.array(im).astype(np.float32) / 255.0
-                tlist.append(torch.from_numpy(arr))
+            for i, im in enumerate(imgs):
+                try:
+                    im = im.convert("RGB")
+                    if im.size != base_sz:
+                        im = im.resize(base_sz, Image.Resampling.LANCZOS)
+                    arr = np.array(im).astype(np.float32) / 255.0
+                    tlist.append(torch.from_numpy(arr))
+                except Exception as e:
+                    raise Exception(f"第 {i + 1} 张结果图处理失败：{e}")
+
+            if not tlist:
+                raise Exception("❌ 未得到可用结果图")
 
             batch = torch.stack(tlist, dim=0)
 
             log = (
                 f"✅ 编辑成功 | 结果张数:{len(tlist)} | "
                 f"参考图:{len(ref_pils)} | "
+                f"参考流:{len(ref_stream_pils)} | "
+                f"遮罩:{'有' if has_mask else '无'} | "
                 f"目标尺寸:{w}x{h} | "
+                f"上传总大小:{total_bytes / 1024 / 1024:.2f}MB | "
                 f"预处理:等比例缩放+补边"
             )
             return (batch, log)
@@ -199,24 +247,42 @@ class TikpanGptImage2OfficialEditV2:
                 return (self.black_out(w, h), msg)
             raise Exception(msg)
 
-    # =========================
-    # Prompt
-    # =========================
     def make_prompt(self, p, has_mask, boost):
         base = (p or "").strip()
         if not boost:
             return base
         if has_mask:
             return (
-                base +
-                " 仅修改遮罩指定区域。未遮罩区域的文字内容、行数、位置、排版、字体风格、主体、构图、颜色和细节必须尽量保持不变，不要改动未遮罩区域。"
+                base
+                + " 仅修改遮罩指定区域。未遮罩区域的文字内容、行数、位置、排版、字体风格、主体、构图、颜色和细节必须尽量保持不变，不要改动未遮罩区域。"
             )
-        else:
-            return base + " 参考所有输入图像融合，但不要过度破坏主图主体结构。"
+        return base + " 参考所有输入图像融合，但不要过度破坏主图主体结构。"
 
-    # =========================
-    # Size
-    # =========================
+    def validate_image_tensor(self, img_t, name):
+        if not hasattr(img_t, "shape"):
+            raise Exception(f"{name} 不是有效图像张量")
+        if len(img_t.shape) != 4:
+            raise Exception(f"{name} 维度异常，应为 [B,H,W,C]")
+        bs, h, w, c = img_t.shape
+        if bs < 1:
+            raise Exception(f"{name} batch 为空")
+        if h < 1 or w < 1:
+            raise Exception(f"{name} 尺寸异常：{w}x{h}")
+        if c not in (3, 4):
+            raise Exception(f"{name} 通道数异常：{c}")
+
+    def validate_mask_tensor(self, mask_t, name):
+        if not hasattr(mask_t, "shape"):
+            raise Exception(f"{name} 不是有效遮罩张量")
+        if len(mask_t.shape) not in (2, 3):
+            raise Exception(f"{name} 维度异常，应为 [B,H,W] 或 [H,W]")
+
+    def safe_text(self, text, max_len=200):
+        text = "" if text is None else str(text)
+        if len(text) > max_len:
+            return text[:max_len] + "..."
+        return text
+
     def compute_size(self, img_t, tier, asp):
         bs, h, w, c = img_t.shape
 
@@ -225,7 +291,7 @@ class TikpanGptImage2OfficialEditV2:
                 return self.legalize(w, h)
             rw, rh = map(int, asp.split(":"))
             ratio = rw / rh
-            pixels = w * h
+            pixels = max(1, w * h)
             hh = math.sqrt(pixels / ratio)
             ww = hh * ratio
             return self.legalize(int(ww), int(hh))
@@ -260,7 +326,7 @@ class TikpanGptImage2OfficialEditV2:
 
         pixels = w * h
         if pixels < 655360:
-            sc = (655360 / pixels) ** 0.5
+            sc = (655360 / max(1, pixels)) ** 0.5
             w = int(w * sc)
             h = int(h * sc)
             w = max(16, int(round(w / 16) * 16))
@@ -282,10 +348,12 @@ class TikpanGptImage2OfficialEditV2:
         h = max(16, int(round(h / 16) * 16))
         return w, h
 
-    # =========================
-    # Geometry / Padding
-    # =========================
     def get_fit_params(self, src_w, src_h, target_w, target_h):
+        if src_w <= 0 or src_h <= 0:
+            raise Exception(f"原图尺寸非法：{src_w}x{src_h}")
+        if target_w <= 0 or target_h <= 0:
+            raise Exception(f"目标尺寸非法：{target_w}x{target_h}")
+
         scale = min(target_w / src_w, target_h / src_h)
         new_w = max(1, int(round(src_w * scale)))
         new_h = max(1, int(round(src_h * scale)))
@@ -297,25 +365,16 @@ class TikpanGptImage2OfficialEditV2:
         img = img.convert("RGB")
         src_w, src_h = img.size
         new_w, new_h, x, y = self.get_fit_params(src_w, src_h, target_w, target_h)
-
         resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
         canvas = Image.new("RGB", (target_w, target_h), bg)
         canvas.paste(resized, (x, y))
         return canvas
 
-    # =========================
-    # Mask
-    # =========================
     def process_mask_with_main_geometry(self, mask_t, main_pil, target_w, target_h, invert=False):
-        """
-        让 mask 和主图使用完全相同的缩放 + 补边参数，避免错位。
-        最终输出 RGBA PNG，alpha 表示可编辑区域。
-        """
-        m_np = mask_t.cpu().numpy()
+        m_np = mask_t.detach().cpu().numpy()
         if len(m_np.shape) == 3:
             m_np = m_np[0]
 
-        # 原始 mask（默认和主图同分辨率）
         pil_mask = Image.fromarray(np.clip(m_np * 255, 0, 255).astype(np.uint8)).convert("L")
 
         src_w, src_h = main_pil.size
@@ -323,23 +382,15 @@ class TikpanGptImage2OfficialEditV2:
 
         resized_mask = pil_mask.resize((new_w, new_h), Image.Resampling.LANCZOS)
 
-        # 先构造整张遮罩画布
-        # 注意：这里先做“语义上的遮罩图”，再按 invert 决定 alpha
         canvas_mask = Image.new("L", (target_w, target_h), 0)
         canvas_mask.paste(resized_mask, (x, y))
 
-        # 兼容你原来逻辑：
-        # inv=True  -> alpha = mask本身
-        # inv=False -> alpha = 反相mask
         alpha = canvas_mask if invert else ImageOps.invert(canvas_mask)
 
         rgba = Image.new("RGBA", (target_w, target_h), (255, 255, 255, 255))
         rgba.putalpha(alpha)
         return self.to_bytes(rgba)
 
-    # =========================
-    # PIL / Tensor / Bytes
-    # =========================
     def to_bytes(self, p):
         b = BytesIO()
         p.save(b, "PNG")
@@ -356,25 +407,31 @@ class TikpanGptImage2OfficialEditV2:
             b = b.unsqueeze(0)
         return [self.to_pil(b[i]) for i in range(b.shape[0])]
 
-    # =========================
-    # Response Parse
-    # =========================
     def parse_images(self, resj, sess):
         out = []
-        for d in resj.get("data", []):
+        items = resj.get("data", [])
+        if not isinstance(items, list):
+            return out
+
+        for d in items:
+            if not isinstance(d, dict):
+                continue
             b64 = d.get("b64_json")
             url = d.get("url")
             if b64:
-                b64_clean = str(b64).split("base64,")[-1]
-                out.append(Image.open(BytesIO(base64.b64decode(b64_clean))).convert("RGB"))
+                try:
+                    b64_clean = str(b64).split("base64,")[-1]
+                    out.append(Image.open(BytesIO(base64.b64decode(b64_clean))).convert("RGB"))
+                except Exception as e:
+                    print(f"Base64 图片解析失败: {e}")
             elif url:
-                resp = sess.get(url, timeout=30, verify=False)
-                resp.raise_for_status()
-                out.append(Image.open(BytesIO(resp.content)).convert("RGB"))
+                try:
+                    resp = sess.get(url, timeout=(5, 30), verify=False)
+                    resp.raise_for_status()
+                    out.append(Image.open(BytesIO(resp.content)).convert("RGB"))
+                except Exception as e:
+                    print(f"URL 图片下载失败 ({url}): {e}")
         return out
 
-    # =========================
-    # Fallback
-    # =========================
     def black_out(self, w=1024, h=1024):
         return torch.zeros((1, h, w, 3), dtype=torch.float32)
