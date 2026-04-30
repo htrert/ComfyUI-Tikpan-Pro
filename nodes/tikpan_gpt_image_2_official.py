@@ -19,7 +19,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 # 屏蔽 verify=False 告警
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# ✅ 固定绑定你的中转站
+# 固定绑定你的中转站
 API_BASE_URL = "https://tikpan.com"
 
 
@@ -49,7 +49,17 @@ class TikpanGptImage2OfficialNode:
                 ),
 
                 "画面比例": (
-                    ["1:1", "16:9", "9:16", "4:3", "3:4", "21:9", "9:21"],
+                    [
+                        "1:1",
+                        "3:2",
+                        "2:3",
+                        "4:3",
+                        "3:4",
+                        "16:9",
+                        "9:16",
+                        "21:9",
+                        "9:21"
+                    ],
                     {"default": "1:1"}
                 ),
 
@@ -89,9 +99,6 @@ class TikpanGptImage2OfficialNode:
     FUNCTION = "generate"
     CATEGORY = "👑 Tikpan 官方独家节点"
 
-    # -----------------------------
-    # 主逻辑
-    # -----------------------------
     def generate(self, **kwargs):
         start_time = time.time()
 
@@ -110,14 +117,12 @@ class TikpanGptImage2OfficialNode:
         width, height = 1024, 1024
 
         try:
-            # 1) 输入校验
             if not api_key or api_key == "sk-":
                 return (self.black_image(width, height), "❌ 错误：API 密钥为空，请填写有效密钥")
 
             if not prompt:
                 return (self.black_image(width, height), "❌ 错误：生成指令不能为空")
 
-            # 2) 枚举值兜底，防止脏工作流参数污染
             if model not in {"gpt-image-2"}:
                 model = "gpt-image-2"
 
@@ -137,10 +142,8 @@ class TikpanGptImage2OfficialNode:
             )
             pbar.update(5)
 
-            # 3) Session
             session = self.create_session()
 
-            # 4) 计算目标尺寸
             width, height, target_res = self.compute_target_resolution(
                 tier=tier,
                 aspect_ratio=aspect_ratio
@@ -148,14 +151,12 @@ class TikpanGptImage2OfficialNode:
             print(f"[Tikpan-Gen] 📐 物理输出尺寸: {target_res}", flush=True)
             pbar.update(15)
 
-            # 5) 动态超时策略
             connect_timeout, read_timeout = self.compute_timeout_by_tier(tier)
             print(
                 f"[Tikpan-Gen] ⏱️ 网络策略: 握手 {connect_timeout}s | 最大等待 {read_timeout}s",
                 flush=True
             )
 
-            # 6) 构建请求体
             raw_payload = {
                 "model": model,
                 "prompt": prompt,
@@ -166,7 +167,6 @@ class TikpanGptImage2OfficialNode:
                 "seed": seed & 0x7fffffff
             }
 
-            # ✅ 白名单过滤，避免多上游兼容问题
             allowed_keys = {
                 "model",
                 "prompt",
@@ -184,7 +184,6 @@ class TikpanGptImage2OfficialNode:
             url = f"{API_BASE_URL}/v1/images/generations"
             pbar.update(25)
 
-            # 7) 发起请求
             response = session.post(
                 url,
                 json=payload,
@@ -198,7 +197,6 @@ class TikpanGptImage2OfficialNode:
             )
             pbar.update(70)
 
-            # 8) 非 200 错误处理
             if response.status_code != 200:
                 err_text = self.safe_response_text(response)
                 err_lower = err_text.lower()
@@ -219,7 +217,6 @@ class TikpanGptImage2OfficialNode:
                     raise RuntimeError(msg)
                 return (self.black_image(width, height), msg)
 
-            # 9) 解析 JSON
             try:
                 res_json = response.json()
             except Exception:
@@ -229,7 +226,6 @@ class TikpanGptImage2OfficialNode:
                     raise RuntimeError(msg)
                 return (self.black_image(width, height), msg)
 
-            # 10) 处理 200 但 body 里带 error 的情况
             if isinstance(res_json, dict) and res_json.get("error"):
                 err_obj = res_json.get("error")
                 if isinstance(err_obj, dict):
@@ -254,7 +250,6 @@ class TikpanGptImage2OfficialNode:
 
             pbar.update(80)
 
-            # 11) 提取图片结果
             img_raw, raw_type = self.extract_image_result(res_json)
             if not img_raw:
                 msg = "⚠️ 未找到有效图像数据。可能原因：审核拦截、上游返回结构异常或渠道兼容性问题。"
@@ -263,7 +258,6 @@ class TikpanGptImage2OfficialNode:
                     raise RuntimeError(msg)
                 return (self.black_image(width, height), msg)
 
-            # 12) 下载 / 解码图片
             final_pil = self.load_result_image(session, img_raw, raw_type).convert("RGB")
             pbar.update(92)
 
@@ -290,14 +284,10 @@ class TikpanGptImage2OfficialNode:
                 raise
             return (self.black_image(width, height), err_msg)
 
-    # -----------------------------
-    # 工具函数
-    # -----------------------------
     def create_session(self):
         session = requests.Session()
         session.trust_env = False
 
-        # ✅ 避免 POST 自动重试造成重复任务 / 重复扣费
         retries = Retry(
             total=3,
             connect=3,
@@ -318,7 +308,6 @@ class TikpanGptImage2OfficialNode:
         return session
 
     def compute_target_resolution(self, tier, aspect_ratio):
-        # 面积预算
         target_pixels = 1048576
         if "2K" in tier:
             target_pixels = 4194304
@@ -329,7 +318,11 @@ class TikpanGptImage2OfficialNode:
 
         try:
             wr, hr = aspect_ratio.split(":")
-            final_ratio = float(wr) / float(hr)
+            wr = float(wr)
+            hr = float(hr)
+            if wr <= 0 or hr <= 0:
+                raise ValueError("invalid ratio")
+            final_ratio = wr / hr
         except Exception:
             final_ratio = 1.0
 
@@ -363,7 +356,6 @@ class TikpanGptImage2OfficialNode:
         return width, height, f"{width}x{height}"
 
     def compute_timeout_by_tier(self, tier):
-        # ✅ 当前按“稳定优先”策略
         connect_timeout = 15
 
         if "4K" in tier:
@@ -382,7 +374,6 @@ class TikpanGptImage2OfficialNode:
             return "无法解析上游响应"
 
     def extract_image_result(self, res_json):
-        # 兼容 data[0].url / b64_json / image_base64
         data = res_json.get("data", [])
         if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
             item = data[0]
@@ -390,14 +381,12 @@ class TikpanGptImage2OfficialNode:
             if img_raw:
                 return img_raw, "url" if item.get("url") else "b64"
 
-        # 兼容 result.url / b64_json / image_base64
         if isinstance(res_json.get("result"), dict):
             item = res_json["result"]
             img_raw = item.get("url") or item.get("b64_json") or item.get("image_base64")
             if img_raw:
                 return img_raw, "url" if item.get("url") else "b64"
 
-        # 兼容顶层 url / b64_json / image_base64
         img_raw = res_json.get("url") or res_json.get("b64_json") or res_json.get("image_base64")
         if img_raw:
             return img_raw, "url" if res_json.get("url") else "b64"
