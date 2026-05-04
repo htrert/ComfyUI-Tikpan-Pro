@@ -1,13 +1,16 @@
 [project]
 name = "comfyui-tikpan-pro"
-# 保持和你 GitHub 打的 Tag 一致，比如你最新的是 0.0.2
-version = "0.0.7"
+# 记得每次提交时把版本号加 1，比如这次咱们打 v0.0.8 标签
+version = "0.0.8"
 description = "Tikpan 官方独家节点：支持 GPT-Image-2 高级多图编辑与视频生成"
 readme = "README.md"
-# 你的名字或网名
 authors = [{ name = "htrert" }]
-# 你仓库的 GitHub 链接
-urls = { repository = "https://github.com/htrert/ComfyUI-Tikpan-Pro" }
+# 新增一行开源协议声明，避免机器人报黄字警告
+license = {text = "MIT"}
+
+# 【修改重点】把网址单独拆解成下面这种格式
+[project.urls]
+repository = "https://github.com/htrert/ComfyUI-Tikpan-Pro"
 
 [tool.comfy]
 PublisherId = "htrert"
