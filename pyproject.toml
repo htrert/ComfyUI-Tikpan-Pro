@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-tikpan-pro"
 # 保持和你 GitHub 打的 Tag 一致，比如你最新的是 0.0.2
-version = "0.0.4"
+version = "0.0.5"
 description = "Tikpan 官方独家节点：支持 GPT-Image-2 高级多图编辑与视频生成"
 readme = "README.md"
 # 你的名字或网名
