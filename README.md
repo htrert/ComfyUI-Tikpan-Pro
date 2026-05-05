@@ -1,3 +1,6 @@
+
+---
+
 # ComfyUI-Tikpan-Pro | 攀升AI官方插件
 
 <p align="center">
@@ -57,3 +60,5 @@
 
 本项目采用 [MIT License](https://opensource.org/licenses/MIT)。
 *“技术应当服务于效率，攀升 AI 助力每一位中国出海卖家。”*
+
+---
