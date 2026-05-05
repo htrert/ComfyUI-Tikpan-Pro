@@ -12,7 +12,7 @@
   <img src="[https://img.shields.io/badge/License-MIT-orange](https://img.shields.io/badge/License-MIT-orange)" alt="License">
 </p>
 
-**ComfyUI-Tikpan-Pro** 是由 [攀升AI聚合平台](https://github.com/htrert) 官方开发的深度集成插件。专为 TikTok 电商运营、高阶内容创作及 AI 自动化工作流设计，提供极其稳定的云端模型调用能力。
+**ComfyUI-Tikpan-Pro** 是由 [攀升AI聚合平台]([https://github.com/htrert](https://tikpan.com/)) 官方开发的深度集成插件。专为 TikTok 电商运营、高阶内容创作及 AI 自动化工作流设计，提供极其稳定的云端模型调用能力。
 
 ---
 
