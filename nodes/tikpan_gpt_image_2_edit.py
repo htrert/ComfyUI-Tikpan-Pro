@@ -130,7 +130,3 @@ class TikpanGptImage2EditNode:
 
     def black_image(self, w, h):
         return torch.zeros((1, h, w, 3))
-
-# 注册映射
-NODE_CLASS_MAPPINGS = {"TikpanGptImage2EditNode": TikpanGptImage2EditNode}
-NODE_DISPLAY_NAME_MAPPINGS = {"TikpanGptImage2EditNode": "💉 Tikpan: GPT-Image-2 视觉整形师(修改)"}

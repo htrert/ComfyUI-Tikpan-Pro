@@ -137,7 +137,3 @@ class TikpanGptImage2GenNode:
 
     def black_image(self):
         return torch.zeros((1, 512, 512, 3))
-
-# 注册映射
-NODE_CLASS_MAPPINGS = {"TikpanGptImage2GenNode": TikpanGptImage2GenNode}
-NODE_DISPLAY_NAME_MAPPINGS = {"TikpanGptImage2GenNode": "🎨 Tikpan: GPT-Image-2 视觉建筑师(生成)"}

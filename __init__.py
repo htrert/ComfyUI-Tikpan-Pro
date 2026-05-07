@@ -11,6 +11,10 @@ from .nodes.tikpan_gpt_image_2_gen import TikpanGptImage2GenNode
 from .nodes.tikpan_gpt_image_2_edit import TikpanGptImage2EditNode
 from .nodes.tikpan_gpt_image_2_official import TikpanGptImage2OfficialNode
 from .nodes.tikpan_gpt_image_2_official_edit_v2 import TikpanGptImage2OfficialEditV2
+from .nodes.tikpan_grok_videos import TikpanGrokVideoNode
+from .nodes.tikpan_suno_music import TikpanSunoMusicNode
+from .nodes.tikpan_doubao_image import TikpanDoubaoImageNode
+from .nodes.tikpan_nano_banana_pro import TikpanNanoBananaProNode
 
 # 2. 建立内部类名映射
 NODE_CLASS_MAPPINGS = {
@@ -24,6 +28,10 @@ NODE_CLASS_MAPPINGS = {
     "TikpanGptImage2EditNode": TikpanGptImage2EditNode,
     "TikpanGptImage2OfficialNode": TikpanGptImage2OfficialNode,
     "TikpanGptImage2OfficialEditV2": TikpanGptImage2OfficialEditV2,
+    "TikpanGrokVideoNode": TikpanGrokVideoNode,
+    "TikpanSunoMusicNode": TikpanSunoMusicNode,
+    "TikpanDoubaoImageNode": TikpanDoubaoImageNode,
+    "TikpanNanoBananaProNode": TikpanNanoBananaProNode,
 }
 
 # 3. 设置 ComfyUI 界面显示的华丽名称
@@ -37,7 +45,11 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanGptImage2GenNode": "🎨 Tikpan: GPT-Image-2-all 视觉建筑师(生成)",
     "TikpanGptImage2EditNode": "💉 Tikpan: GPT-Image-2-all 视觉整形师(修改)",
     "TikpanGptImage2OfficialNode": "💎 Tikpan: GPT-Image-2 官方正式版(生图)",
-    "TikpanGptImage2OfficialEditV2": "💎 Tikpan: GPT-Image-2 官方正式版(修图) V2"
+    "TikpanGptImage2OfficialEditV2": "💎 Tikpan: GPT-Image-2 官方正式版(修图) V2",
+    "TikpanGrokVideoNode": "🎬 Tikpan: Grok-Videos 视频生成",
+    "TikpanSunoMusicNode": "🎵 Tikpan: Suno 音乐生成",
+    "TikpanDoubaoImageNode": "🎨 Tikpan: 豆包图像生成",
+    "TikpanNanoBananaProNode": "🍌 Tikpan: Nano Banana Pro",
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']

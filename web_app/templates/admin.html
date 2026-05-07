@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台 - Tikpan AI Studio</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0b;color:#e4e4e7;padding:0}
+.header{background:#18181b;border-bottom:1px solid #27272a;padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:18px;font-weight:700;background:linear-gradient(135deg,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header a{color:#71717a;font-size:13px;text-decoration:none;margin-left:16px}
+.header a:hover{color:#e4e4e7}
+.container{display:flex;gap:0;min-height:calc(100vh-64px)}
+.sidebar{width:220px;background:#121214;border-right:1px solid #27272a;padding:16px 0;flex-shrink:0}
+.sidebar a{display:block;padding:10px 20px;font-size:13px;color:#71717a;text-decoration:none;cursor:pointer;border-left:3px solid transparent}
+.sidebar a:hover,.sidebar a.active{background:#18181b;color:#e4e4e7;border-left-color:#818cf8}
+.main{flex:1;padding:24px 32px}
+h2{font-size:20px;font-weight:600;margin-bottom:16px}
+.card{background:#18181b;border:1px solid #27272a;border-radius:12px;padding:20px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:600;color:#52525b;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #27272a}
+th{color:#52525b;font-weight:600;font-size:11px;text-transform:uppercase}
+td{color:#d4d4d8}
+tr:hover td{background:#1e1e24}
+.btn{padding:6px 14px;border:none;border-radius:6px;font-size:12px;cursor:pointer;transition:all.15s}
+.btn-primary{background:#6366f1;color:#fff}
+.btn-primary:hover{background:#4f46e5}
+.btn-danger{background:#ef4444;color:#fff}
+.btn-danger:hover{background:#dc2626}
+.btn-sm{padding:4px 10px;font-size:11px}
+.btn-edit{background:#27272a;color:#d4d4d8;margin-right:4px}
+.btn-edit:hover{background:#3f3f46}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px}
+.tag-active{background:rgba(34,197,94,0.15);color:#4ade80}
+.tag-inactive{background:rgba(239,68,68,0.15);color:#fca5a5}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+label{display:block;font-size:12px;color:#71717a;margin-bottom:4px}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid #27272a;border-radius:8px;font-size:13px;background:#121214;color:#e4e4e7;font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#818cf8}
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;z-index:999}
+.modal.show{display:flex}
+.modal-content{background:#18181b;border:1px solid #27272a;border-radius:16px;padding:28px;width:600px;max-height:80vh;overflow-y:auto}
+.modal-content h3{font-size:17px;font-weight:600;margin-bottom:16px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;background:#27272a;color:#71717a;margin-left:4px}
+.empty{text-align:center;padding:40px;color:#52525b;font-size:13px}
+.notice{background:#1e1e2e;border:1px solid #31314a;border-radius:8px;padding:12px 16px;font-size:12px;color:#a5b4fc;margin-bottom:16px}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>⚙️ 管理后台</h1>
+  <div>
+    <a href="/" target="_blank">🏠 前台</a>
+    <a href="#" onclick="logout()">🚪 退出</a>
+  </div>
+</div>
+
+<div class="container">
+  <div class="sidebar">
+    <a class="active" onclick="showTab('categories')">📂 分类管理</a>
+    <a onclick="showTab('models')">🧬 模型管理</a>
+    <a onclick="showTab('fields')">📋 字段管理</a>
+    <a onclick="showTab('about')">ℹ️ 关于</a>
+  </div>
+
+  <div class="main" id="main-content"></div>
+</div>
+
+<script>
+let categories = [];
+let models = [];
+let selectedModelId = null;
+
+async function api(url, method='GET', body=null) {
+  const opts = {method, headers:{}};
+  if (body) { opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(body); }
+  const resp = await fetch(url, opts);
+  if (!resp.ok) throw await resp.json();
+  return resp.json();
+}
+
+async function logout() {
+  await fetch('/admin/logout');
+  location.href='/admin';
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.sidebar a').forEach(a=>a.classList.remove('active'));
+  event.target.classList.add('active');
+  if (tab==='categories') renderCategories();
+  else if (tab==='models') renderModels();
+  else if (tab==='fields') renderFields();
+  else if (tab==='about') renderAbout();
+}
+
+// ===== Categories =====
+async function renderCategories() {
+  categories = await api('/admin/api/categories');
+  const h = [`<div class="notice">💡 分类是模型的容器，例如"图像生成"、"音乐生成"。新增一个分类后，就可以在其中添加模型。</div>`];
+  h.push(`<div class="card"><div class="card-title"><span>📂 全部分类 (${categories.length})</span><button class="btn btn-primary btn-sm" onclick="showAddCat()">+ 新增分类</button></div>`);
+  if (categories.length===0) h.push('<div class="empty">暂无分类</div>');
+  else {
+    h.push('<table><tr><th>排序</th><th>标识</th><th>名称</th><th>图标</th><th>操作</th></tr>');
+    for (const c of categories) {
+      h.push(`<tr><td>${c.sort_order||'-'}</td><td><code style="color:#818cf8;font-size:12px;">${c.key}</code></td><td>${c.name}</td><td>${c.icon||'📦'}</td>
+        <td><button class="btn btn-sm btn-edit" onclick="editCat(${c.id})">编辑</button><button class="btn btn-sm btn-danger" onclick="delCat(${c.id})">删除</button></td></tr>`);
+    }
+    h.push('</table>');
+  }
+  h.push('</div>');
+  document.getElementById('main-content').innerHTML = h.join('');
+}
+
+function showAddCat() { showCatForm(null); }
+function editCat(id) { showCatForm(categories.find(c=>c.id===id)); }
+
+function showCatForm(cat) {
+  const isEdit = !!cat;
+  document.getElementById('main-content').innerHTML = `
+    <h2>${isEdit?'编辑':'新增'}分类</h2>
+    <div class="card">
+      <div class="form-row">
+        <div><label>标识 key</label><input id="cat-key" value="${cat?.key||''}" ${isEdit?'readonly style="opacity:0.5"':''} placeholder="如：image_generation"></div>
+        <div><label>名称</label><input id="cat-name" value="${cat?.name||''}" placeholder="如：🖼️ 图像生成"></div>
+      </div>
+      <div class="form-row">
+        <div><label>图标</label><input id="cat-icon" value="${cat?.icon||'📦'}" placeholder="如：🖼️"></div>
+        <div><label>排序</label><input id="cat-sort" type="number" value="${cat?.sort_order||0}"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-edit" onclick="showTab('categories')">取消</button>
+        <button class="btn btn-primary" onclick="saveCat('${isEdit?cat.id:''}')">保存</button>
+      </div>
+    </div>`;
+}
+
+async function saveCat(id) {
+  const data = { key: document.getElementById('cat-key').value, name: document.getElementById('cat-name').value,
+    icon: document.getElementById('cat-icon').value, sort_order: parseInt(document.getElementById('cat-sort').value) };
+  if (id) await api(`/admin/api/categories/${id}`, 'PUT', data);
+  else await api('/admin/api/categories', 'POST', data);
+  renderCategories();
+}
+
+async function delCat(id) {
+  if (!confirm('确定删除此分类？')) return;
+  await api(`/admin/api/categories/${id}`, 'DELETE');
+  renderCategories();
+}
+
+// ===== Models =====
+async function renderModels() {
+  categories = await api('/admin/api/categories');
+  models = await api('/admin/api/models');
+  const h = [`<div class="notice">💡 模型是具体的 AI 能力，如"Gemini 3 Pro Image"。每个模型需要关联到某个分类下。</div>`];
+  h.push(`<div class="card"><div class="card-title"><span>🧬 全部模型 (${models.length})</span><button class="btn btn-primary btn-sm" onclick="showAddModel()">+ 新增模型</button></div>`);
+  if (models.length===0) h.push('<div class="empty">暂无模型</div>');
+  else {
+    h.push('<table><tr><th>排序</th><th>模型ID</th><th>名称</th><th>分类</th><th>API类型</th><th>状态</th><th>操作</th></tr>');
+    for (const m of models) {
+      const cat = categories.find(c=>c.key===m.category_key);
+      h.push(`<tr><td>${m.sort_order||'-'}</td><td><code style="color:#818cf8;font-size:11px;">${m.id}</code></td><td>${m.name}</td>
+        <td>${cat?cat.name:m.category_key}</td><td><span class="tag" style="background:rgba(99,102,241,0.1);color:#a5b4fc">${m.api_type}</span></td>
+        <td><span class="tag ${m.is_active?'tag-active':'tag-inactive'}">${m.is_active?'上线':'下线'}</span></td>
+        <td>
+          <button class="btn btn-sm btn-edit" onclick="editModel('${m.id}')">编辑</button>
+          <button class="btn btn-sm btn-edit" onclick="manageFields('${m.id}')">字段</button>
+          <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">删除</button>
+        </td></tr>`);
+    }
+    h.push('</table>');
+  }
+  h.push('</div>');
+  document.getElementById('main-content').innerHTML = h.join('');
+}
+
+function showAddModel() { showModelForm(null); }
+function editModel(id) { showModelForm(models.find(m=>m.id===id)); }
+
+async function showModelForm(model) {
+  categories = await api('/admin/api/categories');
+  const isEdit = !!model;
+  const catOpts = categories.map(c => `<option value="${c.key}" ${model?.category_key===c.key?'selected':''}>${c.name}</option>`).join('');
+  document.getElementById('main-content').innerHTML = `
+    <h2>${isEdit?'编辑':'新增'}模型</h2>
+    <div class="card">
+      <div class="form-row">
+        <div><label>模型ID</label><input id="m-id" value="${model?.id||''}" ${isEdit?'readonly style="opacity:0.5"':''} placeholder="如：my-new-model"></div>
+        <div><label>名称</label><input id="m-name" value="${model?.name||''}" placeholder="如：My New Model"></div>
+      </div>
+      <div class="form-row">
+        <div><label>分类</label><select id="m-cat">${catOpts}</select></div>
+        <div><label>供应商</label><input id="m-provider" value="${model?.provider||''}" placeholder="如：Google / Tikpan"></div>
+      </div>
+      <div class="form-row">
+        <div><label>API 类型</label><select id="m-api">
+          <option value="gemini_native" ${model?.api_type==='gemini_native'?'selected':''}>Gemini原生</option>
+          <option value="doubao" ${model?.api_type==='doubao'?'selected':''}>豆包</option>
+          <option value="suno" ${model?.api_type==='suno'?'selected':''}>Suno音乐</option>
+          <option value="grok_video" ${model?.api_type==='grok_video'?'selected':''}>Grok视频</option>
+        </select></div>
+        <div><label>API 端点</label><input id="m-endpoint" value="${model?.endpoint||''}" placeholder="如：/v1beta/models/xxx:generateContent"></div>
+      </div>
+      <div><label>描述</label><input id="m-desc" value="${model?.description||''}" placeholder="模型简介..."></div>
+      <div class="form-row">
+        <div><label>排序</label><input id="m-sort" type="number" value="${model?.sort_order||0}"></div>
+        <div><label>状态</label><select id="m-active">
+          <option value="1" ${model?.is_active===1||model?.is_active===undefined?'selected':''}>上线</option>
+          <option value="0" ${model?.is_active===0?'selected':''}>下线</option>
+        </select></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-edit" onclick="renderModels()">取消</button>
+        <button class="btn btn-primary" onclick="saveModel('${isEdit?model.id:''}')">保存</button>
+      </div>
+    </div>`;
+}
+
+async function saveModel(id) {
+  const data = {
+    id: document.getElementById('m-id').value,
+    category_key: document.getElementById('m-cat').value,
+    name: document.getElementById('m-name').value,
+    provider: document.getElementById('m-provider').value,
+    description: document.getElementById('m-desc').value,
+    api_type: document.getElementById('m-api').value,
+    endpoint: document.getElementById('m-endpoint').value,
+    sort_order: parseInt(document.getElementById('m-sort').value),
+    is_active: parseInt(document.getElementById('m-active').value),
+  };
+  if (id) await api(`/admin/api/models/${id}`, 'PUT', data);
+  else await api('/admin/api/models', 'POST', data);
+  renderModels();
+}
+
+async function delModel(id) {
+  if (!confirm(`确定删除模型"${id}"？其所有字段也将被删除。`)) return;
+  await api(`/admin/api/models/${id}`, 'DELETE');
+  renderModels();
+}
+
+// ===== Fields =====
+async function renderFields() {
+  categories = await api('/admin/api/categories');
+  models = await api('/admin/api/models');
+  let h = [`<div class="notice">💡 字段是模型表单中的输入控件。选择一个模型来管理它的字段。</div>`];
+  h.push(`<div class="card"><div class="card-title"><span>📋 字段管理</span></div>`);
+  h.push(`<div class="form-row"><div><label>选择模型</label><select onchange="loadFields(this.value)" style="width:100%"><option value="">-- 请选择 --</option>`);
+  for (const m of models) h.push(`<option value="${m.id}" ${m.id===selectedModelId?'selected':''}>${m.name} (${m.id})</option>`);
+  h.push('</select></div></div></div>');
+
+  if (selectedModelId) {
+    const fields = await api(`/admin/api/models/${selectedModelId}/fields`);
+    h.push(`<div class="card"><div class="card-title"><span>${selectedModelId} 的字段 (${fields.length})</span><button class="btn btn-primary btn-sm" onclick="showAddField()">+ 新增字段</button></div>`);
+    if (fields.length===0) h.push('<div class="empty">暂无字段</div>');
+    else {
+      h.push('<table><tr><th>排序</th><th>字段Key</th><th>类型</th><th>标签</th><th>必填</th><th>默认值</th><th>操作</th></tr>');
+      for (const f of fields) {
+        h.push(`<tr><td>${f.sort_order||'-'}</td><td><code style="color:#818cf8;font-size:11px;">${f.field_key}</code></td>
+          <td><span class="tag" style="background:rgba(99,102,241,0.1);color:#a5b4fc">${f.field_type}</span></td>
+          <td>${f.label}</td><td>${f.required?'✅':'❌'}</td><td style="max-width:150px;overflow:hidden;text-overflow:ellipsis">${f.default_value||'-'}</td>
+          <td><button class="btn btn-sm btn-edit" onclick="editField(${f.id})">编辑</button><button class="btn btn-sm btn-danger" onclick="delField(${f.id})">删除</button></td></tr>`);
+      }
+      h.push('</table>');
+    }
+    h.push('</div>');
+  }
+  document.getElementById('main-content').innerHTML = h.join('');
+}
+
+function loadFields(modelId) {
+  selectedModelId = modelId;
+  renderFields();
+}
+
+function showAddField() { showFieldForm(null); }
+
+async function editField(id) {
+  const fields = await api(`/admin/api/models/${selectedModelId}/fields`);
+  showFieldForm(fields.find(f=>f.id===id));
+}
+
+function showFieldForm(field) {
+  const isEdit = !!field;
+  const extra = field?.field_type==='select' ? JSON.parse(field?.options_json||'[]') : [];
+  document.getElementById('main-content').innerHTML = `
+    <h2>${isEdit?'编辑':'新增'}字段</h2>
+    <div class="card">
+      <div class="form-row">
+        <div><label>字段Key</label><input id="f-key" value="${field?.field_key||''}" ${isEdit?'readonly style="opacity:0.5"':''} placeholder="如：prompt"></div>
+        <div><label>标签</label><input id="f-label" value="${field?.label||''}" placeholder="如：📝 提示词"></div>
+      </div>
+      <div class="form-row">
+        <div><label>类型</label>
+          <select id="f-type" onchange="toggleFieldOpts()">
+            <option value="textarea" ${field?.field_type==='textarea'?'selected':''}>多行文本</option>
+            <option value="text" ${field?.field_type==='text'?'selected':''}>单行文本</option>
+            <option value="select" ${field?.field_type==='select'?'selected':''}>下拉选择</option>
+            <option value="number" ${field?.field_type==='number'?'selected':''}>数字</option>
+            <option value="checkbox" ${field?.field_type==='checkbox'?'selected':''}>复选框</option>
+            <option value="file_image" ${field?.field_type==='file_image'?'selected':''}>上传图片</option>
+            <option value="select_group" ${field?.field_type==='select_group'?'selected':''}>分组选择器</option>
+          </select>
+        </div>
+        <div><label>排序</label><input id="f-sort" type="number" value="${field?.sort_order||0}"></div>
+      </div>
+      <div class="form-row">
+        <div><label>占位文本</label><input id="f-placeholder" value="${field?.placeholder||''}"></div>
+        <div><label>默认值</label><input id="f-default" value="${field?.default_value||''}"></div>
+      </div>
+      <div class="form-row">
+        <div><label>必填</label><select id="f-required"><option value="1" ${field?.required?'selected':''}>是</option><option value="0" ${!field?.required?'selected':''}>否</option></select></div>
+        <div><label>行数 (多行文本)</label><input id="f-rows" type="number" value="${field?.rows||4}"></div>
+      </div>
+      <div id="f-select-opts" style="${(field?.field_type||'textarea')==='select'||(field?.field_type||'')==='file_image'?'':'display:none'}">
+        <div><label>选项（每行一个）</label>
+        <textarea id="f-options" rows="4" placeholder="每行一个选项">${extra.join('\n')}</textarea></div>
+      </div>
+      <div id="f-file-opts" style="${(field?.field_type||'')==='file_image'?'':'display:none'}">
+        <div class="form-row">
+          <div><label>最大文件数</label><input id="f-maxcount" type="number" value="${field?.max_count||14}"></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-edit" onclick="renderFields()">取消</button>
+        <button class="btn btn-primary" onclick="saveField('${isEdit?field.id:''}')">保存</button>
+      </div>
+    </div>`;
+}
+
+function toggleFieldOpts() {
+  const t = document.getElementById('f-type').value;
+  document.getElementById('f-select-opts').style.display = t==='select'||t==='file_image'?'':'none';
+  document.getElementById('f-file-opts').style.display = t==='file_image'?'':'none';
+}
+
+async function saveField(id) {
+  const data = {
+    field_key: document.getElementById('f-key').value,
+    field_type: document.getElementById('f-type').value,
+    label: document.getElementById('f-label').value,
+    placeholder: document.getElementById('f-placeholder').value,
+    default_value: document.getElementById('f-default').value,
+    required: parseInt(document.getElementById('f-required').value),
+    rows: parseInt(document.getElementById('f-rows').value),
+    sort_order: parseInt(document.getElementById('f-sort').value),
+    options: [],
+    max_count: 0,
+  };
+  if (data.field_type==='select') {
+    data.options = document.getElementById('f-options').value.split('\n').filter(s=>s.trim());
+  }
+  if (data.field_type==='file_image') {
+    data.max_count = parseInt(document.getElementById('f-maxcount').value);
+    data.multiple = true;
+  }
+  if (id) await api(`/admin/api/fields/${id}`, 'PUT', data);
+  else await api(`/admin/api/models/${selectedModelId}/fields`, 'POST', data);
+  renderFields();
+}
+
+async function delField(id) {
+  if (!confirm('确定删除此字段？')) return;
+  await api(`/admin/api/fields/${id}`, 'DELETE');
+  renderFields();
+}
+
+// ===== About =====
+function renderAbout() {
+  document.getElementById('main-content').innerHTML = `
+    <h2>ℹ️ 关于</h2>
+    <div class="card">
+      <p style="color:#71717a;font-size:14px;line-height:1.8;">
+      <strong style="color:#e4e4e7;">Tikpan AI Studio</strong><br><br>
+      一个可自由配置的 AI 生成工具平台。<br>
+      <strong>前端</strong>：从数据库动态加载模型配置，自动渲染表单<br>
+      <strong>管理后台</strong>：随时新增/编辑/删除模型、字段、分类<br>
+      <strong>API 层</strong>：对接 tikpan.com 中转站，支持 Gemini/豆包/Suno/Grok<br><br>
+      🔐 后台密码: <code style="color:#818cf8;">admin123</code><br>
+      ⚙️ <a href="/admin/api/seed" style="color:#fca5a5;" onclick="return confirm('确定重置所有数据为默认值？')">重置数据为默认值</a>
+      </p>
+    </div>`;
+}
+
+// Init
+renderCategories();
+</script>
+</body>
+</html>

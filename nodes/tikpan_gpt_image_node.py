@@ -92,12 +92,3 @@ class TikpanGptImage2Node:
     def empty_image(self):
         """生成一个黑色占位图防止节点红屏"""
         return torch.zeros((1, 1024, 1024, 3))
-
-# 注册节点映射
-NODE_CLASS_MAPPINGS = {
-    "TikpanGptImage2Node": TikpanGptImage2Node
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "TikpanGptImage2Node": "Tikpan: GPT-Image-2 高清绘图"
-}
