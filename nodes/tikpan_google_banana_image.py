@@ -76,7 +76,8 @@ class TikpanGoogleBananaImageNode:
             # 🛠️ 针对 429 错误（额度限制）的特殊友好提示
             if response.status_code == 429:
                 wait_time = "稍后再试"
-                if "retryDelay" in str(res_json):
+                res_json_str = json.dumps(res_json) if isinstance(res_json, dict) else str(res_json)
+                if "retryDelay" in res_json_str:
                     wait_time = "30-60秒"
                 return (self.black_image(), f"❌ API 额度超限 (429)：你跑太快了！请等待 {wait_time} 再点运行。")
 

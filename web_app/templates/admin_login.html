@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台登录 - Tikpan AI Studio</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:#0a0a0b;color:#e4e4e7;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.login-card{background:#18181b;border:1px solid #27272a;border-radius:16px;padding:40px;width:380px;text-align:center}
+h1{font-size:22px;font-weight:700;background:linear-gradient(135deg,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+p{font-size:13px;color:#52525b;margin-bottom:24px}
+input{width:100%;padding:12px 14px;border:1px solid #27272a;border-radius:10px;font-size:14px;background:#121214;color:#e4e4e7;margin-bottom:16px;font-family:inherit}
+input:focus{outline:none;border-color:#818cf8;box-shadow:0 0 0 3px rgba(129,140,248,0.12)}
+button{width:100%;padding:12px;background:linear-gradient(135deg,#818cf8,#6366f1);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all.2s}
+button:hover{box-shadow:0 4px 20px rgba(99,102,241,0.35)}
+.error{color:#fca5a5;font-size:13px;margin-top:12px;display:none}
+</style>
+</head>
+<body>
+<div class="login-card">
+  <h1>Tikpan AI Studio</h1>
+  <p>管理后台 · 请输入密码</p>
+  <input type="password" id="password" placeholder="管理员密码" autofocus>
+  <button onclick="login()">登录</button>
+  <div class="error" id="error">密码错误</div>
+</div>
+<script>
+async function login(){
+  const pw = document.getElementById('password').value;
+  const resp = await fetch('/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+  if(resp.ok) location.href='/admin';
+  else document.getElementById('error').style.display='block';
+}
+document.getElementById('password').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+</script>
+</body>
+</html>

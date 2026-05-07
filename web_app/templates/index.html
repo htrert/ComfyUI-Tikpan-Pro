@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tikpan AI Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f5f7;
+  --bg-card: #ffffff;
+  --text: #1d1d1f;
+  --text2: #86868b;
+  --text3: #aeaeb2;
+  --border: #e5e5ea;
+  --border2: #d2d2d7;
+  --accent: #0071e3;
+  --accent-h: #0077ed;
+  --accent-l: rgba(0,113,227,0.08);
+  --green: #34c759;
+  --side-w: 220px;
+  --radius: 10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;height:100vh;overflow:hidden}
+
+/* ===== Top Nav ===== */
+.nav{background:rgba(255,255,255,0.9);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);height:48px;display:flex;align-items:center;padding:0 20px;position:relative;z-index:100}
+.nav-brand{font-size:15px;font-weight:700;letter-spacing:-0.2px;display:flex;align-items:center;gap:5px;margin-right:24px;cursor:pointer}
+.nav-brand span{background:linear-gradient(135deg,#0071e3,#5856d6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{display:flex;gap:2px}
+.nav-links a{padding:4px 12px;font-size:12px;color:var(--text2);border-radius:6px;cursor:pointer;transition:all.15s}
+.nav-links a:hover{color:var(--text);background:var(--accent-l)}
+.nav-more{position:relative}
+.nav-more-drop{display:none;position:absolute;top:100%;left:0;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,0.08);padding:6px;min-width:140px;z-index:200}
+.nav-more-drop.show{display:block}
+.nav-more-drop a{display:block;padding:8px 12px;font-size:12px;color:var(--text2);border-radius:6px;white-space:nowrap}
+.nav-more-drop a:hover{background:var(--accent-l);color:var(--accent)}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.nav-badge{font-size:10px;color:var(--text3);background:var(--bg);padding:2px 10px;border-radius:12px}
+
+/* ===== Layout ===== */
+.app{display:flex;height:calc(100vh-48px)}
+
+/* ===== Left Sidebar ===== */
+.side{width:var(--side-w);background:var(--bg-card);border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0;padding:8px 0}
+.side::-webkit-scrollbar{width:3px}
+.side::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.side-cat{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;padding:12px 16px 4px}
+.side-item{display:flex;align-items:center;gap:8px;padding:8px 16px;cursor:pointer;font-size:12px;color:var(--text2);border-left:3px solid transparent;transition:all.12s}
+.side-item:hover{background:var(--bg)}
+.side-item.active{background:var(--accent-l);color:var(--accent);border-left-color:var(--accent)}
+.side-item .dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.dot.blue{background:#0071e3}
+.dot.pink{background:#ff2d55}
+.dot.green{background:#34c759}
+
+/* ===== Center ===== */
+.center{flex:1;overflow-y:auto;padding:24px 28px;min-width:0}
+.center::-webkit-scrollbar{width:4px}
+.center::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+.model-hdr{margin-bottom:16px}
+.model-hdr h1{font-size:18px;font-weight:700}
+.model-hdr p{font-size:12px;color:var(--text2);margin-top:2px}
+
+.key-row{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:16px}
+.key-row label{font-size:11px;font-weight:600;white-space:nowrap}
+.key-row input{flex:1;border:none;background:transparent;font-size:12px;font-family:monospace;color:var(--text);min-width:0}
+.key-row input:focus{outline:none}
+.key-row .eye{cursor:pointer;font-size:13px;color:var(--text3);background:none;border:none;padding:2px}
+.key-row .tip{font-size:10px;color:var(--text3);white-space:nowrap}
+
+.field{margin-bottom:14px}
+.field:last-of-type{margin-bottom:0}
+.field label{display:block;font-size:11px;font-weight:600;margin-bottom:4px}
+.field label .req{color:#ff3b30}
+
+textarea,input[type="text"],input[type="number"],select{
+  width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;
+  font-size:13px;color:var(--text);background:var(--bg-card);transition:all.12s;font-family:inherit;
+  -webkit-appearance:none;appearance:none;
+}
+textarea:focus,input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-l)}
+textarea{resize:vertical;min-height:72px;line-height:1.5}
+select{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent)}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* File Upload */
+.up-zone{border:2px dashed var(--border);border-radius:7px;padding:14px;text-align:center;cursor:pointer;transition:all.12s}
+.up-zone:hover{border-color:var(--accent);background:var(--accent-l)}
+.up-zone .ico{font-size:18px}
+.up-zone .txt{font-size:11px;color:var(--text2)}
+.up-pre{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.up-pre-item{width:48px;height:48px;border-radius:5px;overflow:hidden;border:1px solid var(--border)}
+.up-pre-item img{width:100%;height:100%;object-fit:cover}
+
+/* Sub Fields */
+.sub-f{margin-top:8px;padding:10px;background:var(--bg);border-radius:7px}
+.sub-d{font-size:10px;color:var(--text3);margin-bottom:4px}
+
+/* Form Actions */
+.form-actions{margin-top:16px}
+.btn-go{width:100%;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all.15s;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-go:hover{background:var(--accent-h);box-shadow:0 4px 14px rgba(0,113,227,0.25)}
+.btn-go:disabled{opacity:0.4;cursor:not-allowed;box-shadow:none}
+.btn-go .sp{display:none;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin.7s linear infinite}
+.btn-go.loading .sp{display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ===== Right Result ===== */
+.result{width:380px;background:var(--bg-card);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.result-header{padding:14px 16px;font-size:12px;font-weight:600;color:var(--text2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.result-body{flex:1;overflow-y:auto;padding:16px;display:flex;align-items:center;justify-content:center}
+.result-body .empty{text-align:center;color:var(--text3);font-size:12px}
+.result-body .empty .ico{font-size:32px;margin-bottom:8px}
+.result-img{max-width:100%;max-height:calc(100vh-180px);border-radius:8px;object-fit:contain}
+.result-meta{padding:10px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);display:flex;align-items:center;justify-content:space-between}
+.btn-dl{padding:4px 12px;background:var(--green);color:#fff;border:none;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer;transition:all.12s}
+.btn-dl:hover{background:#2db84e}
+.err-box{padding:12px 14px;background:#fff2f0;border:1px solid #ffccc7;border-radius:7px;color:#cf1322;font-size:12px;white-space:pre-wrap;margin:12px}
+
+@media(max-width:900px){
+  .result{width:300px}
+  .side{width:180px}
+}
+@media(max-width:700px){
+  .result{display:none}
+  .side{width:140px}
+}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-brand">✦ <span>Tikpan</span></div>
+  <div class="nav-links">
+    <a onclick="scrollCat('image_generation')">🎨 图像</a>
+    <a onclick="scrollCat('music_generation')">🎵 音乐</a>
+    <a onclick="scrollCat('video_generation')">🎬 视频</a>
+    <div class="nav-more">
+      <a onclick="toggleMore()">更多 ▾</a>
+      <div class="nav-more-drop" id="more-drop">
+        <a>🤖 AI 对话（即将上线）</a>
+        <a>📄 AI 文档（即将上线）</a>
+        <a>🧠 AI 智能体（即将上线）</a>
+      </div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <span class="nav-badge" id="badge"></span>
+    <a href="/admin" target="_blank" style="font-size:11px;color:var(--text3);">⚙</a>
+  </div>
+</nav>
+
+<div class="app">
+  <!-- Left Sidebar -->
+  <div class="side" id="sidebar"></div>
+
+  <!-- Center -->
+  <div class="center" id="center">
+    <div class="model-hdr" id="model-hdr">
+      <h1 id="m-title">选择一个模型</h1>
+      <p id="m-desc">从左侧列表中选择一个 AI 模型开始</p>
+    </div>
+    <div id="form-area" style="display:none">
+      <div class="key-row">
+        <label>🔑 API Key</label>
+        <input type="password" id="api-key" placeholder="sk-..." autocomplete="off">
+        <button class="eye" id="key-eye" onclick="toggleKey()">👁</button>
+        <span class="tip">tikpan.com 获取</span>
+      </div>
+      <form id="form" enctype="multipart/form-data">
+        <input type="hidden" name="model_id" id="model-id">
+        <div id="form-fields"></div>
+        <div class="form-actions">
+          <button type="submit" class="btn-go" id="btn-go">
+            <span class="sp"></span>
+            <span id="btn-txt">✨ 开始生成</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right Result -->
+  <div class="result" id="result-panel">
+    <div class="result-header"><span>📋 生成结果</span><span style="font-size:10px;color:var(--text3)" id="r-status">等待生成</span></div>
+    <div class="result-body" id="r-body">
+      <div class="empty" id="r-empty">
+        <div class="ico">🎨</div>
+        <div>生成结果将在这里显示</div>
+      </div>
+    </div>
+    <div class="result-meta" id="r-meta" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+let data = null;
+let curModel = null;
+let allModels = [];
+
+// Init
+(async function(){
+  const r = await fetch('/api/models');
+  data = await r.json();
+  buildSidebar();
+  countModels();
+  const saved = localStorage.getItem('tikpan_key');
+  if (saved) document.getElementById('api-key').value = saved;
+})();
+
+function countModels(){
+  let t=0;
+  for(const cat of Object.values(data)) t+=cat.models.length;
+  document.getElementById('badge').textContent = `✦ ${t}`;
+}
+
+function toggleMore(){
+  document.getElementById('more-drop').classList.toggle('show');
+}
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.nav-more')) document.getElementById('more-drop').classList.remove('show');
+});
+
+// ===== Sidebar =====
+function buildSidebar(){
+  const s = document.getElementById('sidebar');
+  s.innerHTML = '';
+  const colors = {image_generation:'blue',music_generation:'pink',video_generation:'green'};
+  for(const [key,cat] of Object.entries(data)){
+    s.innerHTML += `<div class="side-cat">${cat.name}</div>`;
+    for(const m of cat.models){
+      allModels.push(m);
+      const c = colors[key]||'blue';
+      s.innerHTML += `<div class="side-item" data-id="${m.id}" onclick="selectModel('${m.id}')">
+        <div class="dot ${c}"></div>${m.name}</div>`;
+    }
+  }
+  // auto select first
+  const first = document.querySelector('.side-item');
+  if(first) first.click();
+}
+
+// ===== Select Model =====
+function selectModel(id){
+  document.querySelectorAll('.side-item').forEach(el=>el.classList.remove('active'));
+  const item = document.querySelector(`.side-item[data-id="${id}"]`);
+  if(item) item.classList.add('active');
+
+  curModel = null;
+  for(const m of allModels){ if(m.id===id){ curModel=m; break; } }
+  if(!curModel) return;
+
+  document.getElementById('m-title').textContent = curModel.name;
+  document.getElementById('m-desc').textContent = curModel.description||'';
+  document.getElementById('model-id').value = id;
+  document.getElementById('form-area').style.display = 'block';
+
+  // clear result
+  document.getElementById('r-body').innerHTML = '<div class="empty" id="r-empty"><div class="ico">🎨</div><div>生成结果将在这里显示</div></div>';
+  document.getElementById('r-meta').style.display = 'none';
+  document.getElementById('r-status').textContent = '等待生成';
+
+  renderFields(curModel);
+}
+
+function scrollCat(key){
+  const el = document.querySelector(`.side-item[data-id]`);
+  if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+// ===== Render Fields =====
+function renderFields(config){
+  const c = document.getElementById('form-fields');
+  c.innerHTML = '';
+  for(const f of config.fields){
+    const g = document.createElement('div');
+    g.className = 'field';
+    if(f.type==='textarea'){
+      g.innerHTML = `<label>${f.label}${f.required?'<span class="req">*</span>':''}</label>
+        <textarea name="${f.key}" placeholder="${f.placeholder||''}" rows="${f.rows||4}" ${f.required?'required':''}>${f.default||''}</textarea>`;
+    } else if(f.type==='select'){
+      const opts = (f.options||[]).map(o=>`<option value="${o}" ${o===(f.default||f.options[0])?'selected':''}>${o}</option>`).join('');
+      g.innerHTML = `<label>${f.label}</label><select name="${f.key}">${opts}</select>`;
+    } else if(f.type==='select_group'){
+      const opts = (f.options||[]).map(o=>`<option value="${o}" ${o===f.default?'selected':''}>${o}</option>`).join('');
+      g.innerHTML = `<label>${f.label}</label>
+        <select name="${f.key}" class="m-sel" data-g='${JSON.stringify(f.groups||{})}'>${opts}</select>
+        <div class="sub-f" id="sub-${f.key}"></div>`;
+    } else if(f.type==='number'){
+      g.innerHTML = `<label>${f.label}</label><input type="number" name="${f.key}" value="${f.default||0}">`;
+    } else if(f.type==='text'){
+      g.innerHTML = `<label>${f.label}</label><input type="text" name="${f.key}" placeholder="${f.placeholder||''}" value="${f.default||''}">`;
+    } else if(f.type==='checkbox'){
+      g.innerHTML = `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" name="${f.key}" value="true" ${f.default?'checked':''}> ${f.label}</label>`;
+    } else if(f.type==='file_image'){
+      g.innerHTML = `<label>${f.label}</label>
+        <div class="up-zone" id="z-${f.key}"><div class="ico">🖼</div><div class="txt">点击上传${f.max_count?`（最多${f.max_count}张）`:''}</div></div>
+        <input type="file" id="fi-${f.key}" name="${f.key}" accept="image/*" ${f.multiple?'multiple':''} style="display:none">
+        <div class="up-pre" id="pv-${f.key}"></div>`;
+      const zone = g.querySelector(`#z-${f.key}`);
+      const inp = g.querySelector(`#fi-${f.key}`);
+      zone.addEventListener('click', ()=>inp.click());
+      inp.addEventListener('change', function(){
+        const max = f.max_count||999;
+        const files = Array.from(this.files).slice(0,max);
+        const pv = document.getElementById(`pv-${f.key}`);
+        pv.innerHTML = '';
+        files.forEach(file=>{
+          const r = new FileReader();
+          r.onload = e => {
+            const d = document.createElement('div');
+            d.className = 'up-pre-item';
+            d.innerHTML = `<img src="${e.target.result}">`;
+            pv.appendChild(d);
+          };
+          r.readAsDataURL(file);
+        });
+      });
+    }
+    c.appendChild(g);
+  }
+  // select_group
+  c.querySelectorAll('.m-sel').forEach(el=>{
+    const sub = document.getElementById(`sub-${el.name}`);
+    if(!sub) return;
+    renderSub(el,sub);
+    el.addEventListener('change', ()=>renderSub(el,sub));
+  });
+}
+
+function renderSub(sel,container){
+  try{
+    const grp = JSON.parse(sel.dataset.g||'{}');
+    const g = grp[sel.value];
+    if(!g||!g.fields_extra){ container.innerHTML=''; return; }
+    container.innerHTML = `<div class="sub-d">${g.desc||''}</div>`;
+    for(const f of g.fields_extra){
+      const d = document.createElement('div');
+      d.style.marginBottom='8px';
+      if(f.type==='textarea'){
+        d.innerHTML = `<label style="font-size:11px;font-weight:500;display:block;margin-bottom:2px;">${f.label}</label>
+          <textarea name="suno_${f.key}" placeholder="${f.placeholder||''}" rows="2" style="width:100%;padding:6px 8px;border:1px solid var(--border2);border-radius:6px;font-size:12px;font-family:inherit;background:var(--bg-card);color:var(--text);">${f.default||''}</textarea>`;
+      } else if(f.type==='text'){
+        d.innerHTML = `<label style="font-size:11px;font-weight:500;display:block;margin-bottom:2px;">${f.label}</label>
+          <input type="text" name="suno_${f.key}" value="${f.default||''}" placeholder="${f.placeholder||''}" style="width:100%;padding:6px 8px;border:1px solid var(--border2);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);">`;
+      } else if(f.type==='number'){
+        d.innerHTML = `<label style="font-size:11px;font-weight:500;display:block;margin-bottom:2px;">${f.label}</label>
+          <input type="number" name="suno_${f.key}" value="${f.default||0}" style="width:100%;padding:6px 8px;border:1px solid var(--border2);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);">`;
+      } else if(f.type==='checkbox'){
+        d.innerHTML = `<label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" name="suno_${f.key}" value="true" ${f.default?'checked':''}> ${f.label}</label>`;
+      } else if(f.type==='select'){
+        d.innerHTML = `<label style="font-size:11px;font-weight:500;display:block;margin-bottom:2px;">${f.label}</label>
+          <select name="suno_${f.key}" style="width:100%;padding:6px 8px;border:1px solid var(--border2);border-radius:6px;font-size:12px;background:var(--bg-card);color:var(--text);">
+          ${(f.options||[]).map(o=>`<option value="${o}" ${o===f.default?'selected':''}>${o}</option>`).join('')}</select>`;
+      }
+      container.appendChild(d);
+    }
+  } catch(e){ container.innerHTML=''; }
+}
+
+// ===== Key Toggle =====
+function toggleKey(){
+  const i = document.getElementById('api-key');
+  const b = document.getElementById('key-eye');
+  if(i.type==='password'){ i.type='text'; b.textContent='🙈'; }
+  else{ i.type='password'; b.textContent='👁'; }
+}
+
+// ===== Submit =====
+document.getElementById('form').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const btn = document.getElementById('btn-go');
+  const bt = document.getElementById('btn-txt');
+  const rBody = document.getElementById('r-body');
+  const rMeta = document.getElementById('r-meta');
+  const rStatus = document.getElementById('r-status');
+
+  const key = document.getElementById('api-key').value.trim();
+  localStorage.setItem('tikpan_key', key);
+
+  btn.classList.add('loading');
+  bt.textContent = '生成中...';
+  btn.disabled = true;
+  rStatus.textContent = '⏳ 生成中...';
+  rMeta.style.display = 'none';
+
+  try{
+    const fd = new FormData(this);
+    fd.set('api_key',key);
+    const resp = await fetch('/api/generate',{method:'POST',body:fd});
+    const d = await resp.json();
+    if(d.error){
+      rBody.innerHTML = `<div class="err-box">${d.error}</div>`;
+      rStatus.textContent = '❌ 失败';
+      return;
+    }
+    const r = d.result;
+    rStatus.textContent = '✅ 成功';
+    let html, meta='';
+    if(r.image_b64){
+      html = `<img src="data:image/jpeg;base64,${r.image_b64}" class="result-img" alt="结果">`;
+      meta = `<span>${r.width}×${r.height}${r.filename?' · '+r.filename:''}</span>
+        <a href="data:image/jpeg;base64,${r.image_b64}" download="output.jpg" class="btn-dl">下载</a>`;
+    } else if(r.audio_url){
+      html = `<div style="text-align:center;padding:10px;">
+        ${r.image_url?`<img src="${r.image_url}" style="width:130px;border-radius:8px;margin-bottom:8px;">`:''}
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px;">${r.title||''}</div>
+        ${r.lyric?`<div style="font-size:10px;color:var(--text3);max-height:80px;overflow:auto;margin:4px 0;">${r.lyric}</div>`:''}
+        <audio src="${r.audio_url}" controls style="width:100%;"></audio></div>`;
+      meta = `<span>🎵 已生成</span><a href="${r.audio_url}" target="_blank" class="btn-dl">打开</a>`;
+    } else if(r.video_url){
+      html = `<video src="${r.video_url}" controls style="width:100%;border-radius:8px;"></video>`;
+      meta = `<span>🎬 已生成</span><a href="${r.video_url}" target="_blank" class="btn-dl">打开</a>`;
+    }
+    rBody.innerHTML = html;
+    rMeta.innerHTML = meta;
+    rMeta.style.display = 'flex';
+  } catch(err){
+    rBody.innerHTML = `<div class="err-box">请求失败: ${err.message}</div>`;
+    rStatus.textContent = '❌ 错误';
+  } finally {
+    btn.classList.remove('loading');
+    bt.textContent = '✨ 开始生成';
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
