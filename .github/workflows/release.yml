@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    # 当推送符合 v* 格式的tag时触发
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Extract version from pyproject.toml
+        id: get_version_from_file
+        run: |
+          VERSION=$(grep -E "^version\s*=" pyproject.toml | cut -d'"' -f2)
+          echo "PYPROJECT_VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Verify versions match
+        run: |
+          if [ "${{ steps.get_version.outputs.VERSION }}" != "${{ steps.get_version_from_file.outputs.PYPROJECT_VERSION }}" ]; then
+            echo "❌ Version mismatch!"
+            echo "   Tag version: ${{ steps.get_version.outputs.VERSION }}"
+            echo "   pyproject.toml version: ${{ steps.get_version_from_file.outputs.PYPROJECT_VERSION }}"
+            echo ""
+            echo "请确保 pyproject.toml 中的 version 与 tag 版本一致"
+            echo "例如: git tag -a v${{ steps.get_version_from_file.outputs.PYPROJECT_VERSION }} -m 'Release v${{ steps.get_version_from_file.outputs.PYPROJECT_VERSION }}'"
+            exit 1
+          fi
+          echo "✅ 版本匹配: ${{ steps.get_version.outputs.VERSION }}"
+
+      - name: Create Release Notes
+        id: create_release_body
+        run: |
+          # 生成简单的release notes
+          cat > release_body.md << 'EOF'
+          # Tikpan Pro for ComfyUI
+          
+          ## 安装说明
+          
+          在 ComfyUI Manager 中搜索 `Tikpan-Pro` 或通过自定义节点URL安装:
+          ```
+          https://github.com/你的用户名/ComfyUI-Tikpan-Pro
+          ```
+          
+          ## 更新日志
+          
+          查看 [CHANGELOG](CHANGELOG.md) 了解详情
+          EOF
+          echo "body_file=release_body.md" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: ${{ steps.create_release_body.outputs.body_file }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Success notification
+        run: |
+          echo ""
+          echo "🎉 Release ${{ steps.get_version.outputs.VERSION }} 创建成功!"
+          echo ""
+          echo "下一步:"
+          echo "1. 访问 https://github.com/你的用户名/ComfyUI-Tikpan-Pro/releases 查看"
+          echo "2. ComfyUI Manager 会在几分钟内检测到新版本"
