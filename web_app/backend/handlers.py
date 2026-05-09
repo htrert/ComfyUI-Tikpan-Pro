@@ -1,50 +1,22 @@
 """
-🎯 Tikpan Web UI - 主后端（数据库驱动版）
+📡 API 调用处理器
+从 app.py 中分离出来的所有 API 调用函数
 """
 import base64
 import json
 import os
 import re
 import time
-import traceback
 from io import BytesIO
-from flask import Flask, request, jsonify, render_template, session
 from PIL import Image
 import requests
 import urllib3
+import uuid
 
-from database import get_full_model_tree, get_model, get_fields, seed_default_data
-from admin import admin_bp
+from config import API_BASE_URL, API_KEY
+from backend.storage import save_image
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-app = Flask(__name__, template_folder="../templates", static_folder="../static")
-app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
-app.secret_key = os.environ.get("SECRET_KEY", "tikpan-secret-key-change-me")
-
-API_BASE_URL = "https://tikpan.com"
-API_KEY = os.environ.get("TIKPAN_API_KEY", "sk-xxx")
-
-# 输出目录
-OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "outputs")
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-
-def save_output_image(img, fmt="PNG"):
-    """保存生成图片到 outputs/ 目录，返回文件名"""
-    ts = time.strftime("%Y%m%d_%H%M%S")
-    import random
-    seq = random.randint(1000, 9999)
-    filename = f"tikpan_{ts}_{seq}.{fmt.lower()}"
-    filepath = os.path.join(OUTPUT_DIR, filename)
-    img.save(filepath, format=fmt)
-    return filepath, filename
-
-# 注册管理后台蓝图
-app.register_blueprint(admin_bp)
-
-# 初始化数据库
-seed_default_data()
 
 
 # ==================== 工具函数 ====================
@@ -80,7 +52,6 @@ def decode_base64_to_image(b64_data):
 # ==================== API 调用 ====================
 
 def call_gemini_native(model_id, prompt, resolution, aspect_ratio, reference_images, seed, api_key=None):
-    """调用 Gemini 原生端点"""
     key = api_key or API_KEY
     parts = [{"text": prompt}]
     for img_file in reference_images:
@@ -111,7 +82,7 @@ def call_gemini_native(model_id, prompt, resolution, aspect_ratio, reference_ima
                 inline = part.get("inlineData") or part.get("inline_data")
                 if inline and inline.get("data"):
                     img = decode_base64_to_image(inline["data"])
-                    filepath, filename = save_output_image(img)
+                    filepath, filename = save_image(img)
                     text_summary = "".join(p.get("text", "") for p in parts_data if "text" in p)
                     return {"image_b64": image_to_base64(img), "width": img.width, "height": img.height,
                             "filename": filename, "filepath": filepath,
@@ -122,7 +93,6 @@ def call_gemini_native(model_id, prompt, resolution, aspect_ratio, reference_ima
 
 
 def call_doubao(prompt, model_variant, size, reference_images, n, api_key=None):
-    """调用豆包图像端点"""
     key = api_key or API_KEY
     payload = {"model": model_variant, "prompt": prompt, "size": size, "n": int(n)}
     if reference_images:
@@ -151,7 +121,7 @@ def call_doubao(prompt, model_variant, size, reference_images, n, api_key=None):
                     else:
                         b64 = clean_base64(val)
                     img = decode_base64_to_image(b64)
-                    filepath, filename = save_output_image(img)
+                    filepath, filename = save_image(img)
                     return {"image_b64": b64, "width": img.width, "height": img.height,
                             "filename": filename, "filepath": filepath}, None
     except Exception:
@@ -160,7 +130,6 @@ def call_doubao(prompt, model_variant, size, reference_images, n, api_key=None):
 
 
 def call_suno(mode, prompt, model_version, extra_params, api_key=None):
-    """调用 Suno 音乐"""
     key = api_key or API_KEY
     payload = {"model": model_version}
     if mode == "灵感模式":
@@ -211,7 +180,6 @@ def call_suno(mode, prompt, model_version, extra_params, api_key=None):
 
 
 def call_grok_video(prompt, duration, api_key=None):
-    """调用 Grok 视频"""
     key = api_key or API_KEY
     payload = {"model": "grok-video", "prompt": prompt, "duration": duration}
     url = f"{API_BASE_URL}/v1/video/grok"
@@ -228,116 +196,10 @@ def call_grok_video(prompt, duration, api_key=None):
     return None, f"未提取到视频: {json.dumps(res_json, ensure_ascii=False)[:500]}"
 
 
-@app.route("/outputs/<filename>")
-def serve_output(filename):
-    """提供已保存的生成图片访问"""
-    from flask import send_from_directory
-    return send_from_directory(OUTPUT_DIR, filename)
-
-
+# 调用分发表
 API_DISPATCH = {
     "gemini_native": call_gemini_native,
     "doubao": call_doubao,
     "suno": call_suno,
     "grok_video": call_grok_video,
 }
-
-
-# ==================== 路由 ====================
-
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-
-@app.route("/api/models")
-def api_models():
-    """返回完整的模型树（前端渲染用）"""
-    return jsonify(get_full_model_tree())
-
-
-@app.route("/api/generate", methods=["POST"])
-def generate():
-    """生成入口"""
-    data = request.form.to_dict()
-    files = request.files
-    model_id = data.get("model_id")
-
-    config = get_model(model_id)
-    if not config:
-        return jsonify({"error": f"未知模型: {model_id}"}), 400
-
-    # 收集参考图
-    reference_images = []
-    for key in files:
-        if key.startswith("reference_images"):
-            for f in request.files.getlist(key):
-                if f and f.filename:
-                    reference_images.append(f)
-
-    # 获取 API Key（优先用用户自己的）
-    user_api_key = data.get("api_key", "").strip() or None
-
-    api_type = config["api_type"]
-    handler = API_DISPATCH.get(api_type)
-
-    if not handler:
-        return jsonify({"error": f"未知 API 类型: {api_type}"}), 500
-
-    try:
-        if api_type == "gemini_native":
-            result, error = handler(
-                model_id,
-                data.get("prompt", ""),
-                data.get("resolution", "2K"),
-                data.get("aspect_ratio", "1:1"),
-                reference_images,
-                int(data.get("seed", 0)),
-                user_api_key,
-            )
-        elif api_type == "doubao":
-            result, error = handler(
-                data.get("prompt", ""),
-                data.get("model_variant", "doubao-seedream-5-0"),
-                data.get("size", "1024x1024"),
-                reference_images,
-                int(data.get("n", 1)),
-                user_api_key,
-            )
-        elif api_type == "suno":
-            extra = {}
-            for key in data:
-                if key.startswith("suno_"):
-                    extra[key.replace("suno_", "")] = data[key]
-            result, error = handler(
-                data.get("mode", "灵感模式"),
-                data.get("prompt", ""),
-                data.get("model_version", "chirp-v5"),
-                extra,
-                user_api_key,
-            )
-        elif api_type == "grok_video":
-            result, error = handler(
-                data.get("prompt", ""),
-                data.get("duration", "5s"),
-                user_api_key,
-            )
-        else:
-            result, error = None, f"未实现的 API 类型: {api_type}"
-
-        if error:
-            return jsonify({"error": error}), 500
-        return jsonify({"success": True, "result": result})
-
-    except Exception as e:
-        tb = traceback.format_exc()
-        print(tb, flush=True)
-        return jsonify({"error": f"服务器异常: {str(e)[:500]}"}), 500
-
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    print(f"🚀 Tikpan AI Studio 启动于 http://localhost:{port}")
-    print(f"🔐 管理后台: http://localhost:{port}/admin (密码: admin123)")
-    print(f"💡 请设置环境变量 TIKPAN_API_KEY")
-    app.run(host="0.0.0.0", port=port, debug=True)

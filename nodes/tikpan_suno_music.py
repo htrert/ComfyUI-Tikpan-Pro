@@ -110,7 +110,7 @@ class TikpanSunoMusicNode:
 
     def parse_status_payload(self, status_json):
         """
-        尽量兼容多种返回结构，统一提取:
+        兼容多种返回结构，统一提取:
         - state
         - clips
         - fail_reason
@@ -123,6 +123,25 @@ class TikpanSunoMusicNode:
             return state, clips, fail_reason
 
         data_field = status_json.get("data")
+
+        # 🔑 关键修复：data 可能是数组（如 tikpan 中转站返回格式）
+        if isinstance(data_field, list):
+            clips = data_field
+            if clips and isinstance(clips[0], dict):
+                state = str(
+                    clips[0].get("status")
+                    or clips[0].get("state")
+                    or ""
+                ).lower().strip()
+                fail_reason = str(
+                    clips[0].get("error_message")
+                    or clips[0].get("failReason")
+                    or clips[0].get("msg")
+                    or ""
+                ).strip()
+            return state, clips, fail_reason
+
+        # 处理 data 是 dict 的情况
         candidates = [status_json]
 
         if isinstance(data_field, dict):
@@ -161,7 +180,7 @@ class TikpanSunoMusicNode:
 
     def build_payload(self, mode, title, prompt, tags, mv, make_instrumental, continue_clip_id, continue_at, persona_id, artist_clip_id):
         payload = {
-            "mv": mv,
+            "model": mv,
             "make_instrumental": make_instrumental,
         }
 
@@ -207,7 +226,7 @@ class TikpanSunoMusicNode:
                 "chirp-v4": "chirp-v4-tau",
                 "chirp-v5": "chirp-v5-tau",
             }
-            payload["mv"] = tau_map.get(mv, mv)
+            payload["model"] = tau_map.get(mv, mv)
 
         else:
             raise ValueError(f"不支持的生成模式: {mode}")

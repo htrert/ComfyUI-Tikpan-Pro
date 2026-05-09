@@ -1,6 +1,10 @@
 # __init__.py - Tikpan Pro 终极节点管理器
 
 # 1. 导入所有逻辑文件
+from .nodes.tikpan_happyhorse_i2v import TikpanHappyHorseI2VNode
+from .nodes.tikpan_happyhorse_t2v import TikpanHappyHorseT2VNode
+from .nodes.tikpan_happyhorse_r2v import TikpanHappyHorseR2VNode
+from .nodes.tikpan_happyhorse_video_edit import TikpanHappyHorseVideoEditNode
 from .nodes.tikpan_grok_video import TikpanExclusiveVideoNode
 from .nodes.tikpan_gemini_image import TikpanGeminiImageMaxNode
 from .nodes.tikpan_gemini_video_analyst import TikpanGeminiVideoAnalystNode
@@ -15,9 +19,14 @@ from .nodes.tikpan_grok_videos import TikpanGrokVideoNode
 from .nodes.tikpan_suno_music import TikpanSunoMusicNode
 from .nodes.tikpan_doubao_image import TikpanDoubaoImageNode
 from .nodes.tikpan_nano_banana_pro import TikpanNanoBananaProNode
+from .nodes.tikpan_task_fetcher import TikpanTaskFetcherNode
 
 # 2. 建立内部类名映射
 NODE_CLASS_MAPPINGS = {
+    "TikpanHappyHorseI2VNode": TikpanHappyHorseI2VNode,
+    "TikpanHappyHorseT2VNode": TikpanHappyHorseT2VNode,
+    "TikpanHappyHorseR2VNode": TikpanHappyHorseR2VNode,
+    "TikpanHappyHorseVideoEditNode": TikpanHappyHorseVideoEditNode,
     "TikpanExclusiveVideoNode": TikpanExclusiveVideoNode,
     "TikpanGeminiImageMaxNode": TikpanGeminiImageMaxNode,
     "TikpanGeminiVideoAnalystNode": TikpanGeminiVideoAnalystNode,
@@ -32,10 +41,15 @@ NODE_CLASS_MAPPINGS = {
     "TikpanSunoMusicNode": TikpanSunoMusicNode,
     "TikpanDoubaoImageNode": TikpanDoubaoImageNode,
     "TikpanNanoBananaProNode": TikpanNanoBananaProNode,
+    "TikpanTaskFetcherNode": TikpanTaskFetcherNode,
 }
 
 # 3. 设置 ComfyUI 界面显示的华丽名称
 NODE_DISPLAY_NAME_MAPPINGS = {
+    "TikpanHappyHorseI2VNode": "🐴 Tikpan：HappyHorse 1.0 I2V 图生视频",
+    "TikpanHappyHorseT2VNode": "🐴 Tikpan：HappyHorse 1.0 T2V 文生视频",
+    "TikpanHappyHorseR2VNode": "🐴 Tikpan：HappyHorse 1.0 R2V 参考生视频",
+    "TikpanHappyHorseVideoEditNode": "🐴 Tikpan：HappyHorse 1.0 Video-Edit 视频编辑",
     "TikpanExclusiveVideoNode": "🎬 Tikpan：Grok3 直出视频生成",
     "TikpanGeminiImageMaxNode": "👑 Tikpan：Gemini 14图极限生图",
     "TikpanGeminiVideoAnalystNode": "👁️ Tikpan：AI音视频双轨智能解构",
@@ -50,6 +64,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanSunoMusicNode": "🎵 Tikpan: Suno 音乐生成",
     "TikpanDoubaoImageNode": "🎨 Tikpan: 豆包图像生成",
     "TikpanNanoBananaProNode": "🍌 Tikpan: Nano Banana Pro",
+    "TikpanTaskFetcherNode": "🔍 Tikpan：异步任务查询与下载",
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
