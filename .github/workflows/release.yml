@@ -9,6 +9,9 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # 尚方宝剑！授权写入权限
+    permissions:
+      contents: write
     
     steps:
       - name: Checkout code
