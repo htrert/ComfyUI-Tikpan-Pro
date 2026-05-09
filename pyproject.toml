@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-tikpan-pro"
-version = "0.5.1"
+version = "1.0.0"
 description = "Tikpan 官方独家节点：支持 GPT-Image-2 高级多图编辑与视频生成"
 readme = "README.md"
 authors = [{ name = "htrert" }]
