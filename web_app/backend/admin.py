@@ -3,15 +3,14 @@
 """
 import json
 from flask import Blueprint, request, jsonify, session, render_template
-from database import (get_categories, add_category, update_category, delete_category,
+from backend.database import (get_categories, add_category, update_category, delete_category,
                       get_models, get_model, add_model, update_model, delete_model,
                       get_fields, add_field, update_field, delete_field,
                       get_full_model_tree, seed_default_data)
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
-# 简单管理密码（生产环境请改为更强的认证）
-ADMIN_PASSWORD = "admin123"
+from config import ADMIN_PASSWORD
 
 
 # ==================== 页面路由 ====================
@@ -176,3 +175,43 @@ def api_seed():
 def api_tree():
     """返回完整的模型树结构（前端使用）"""
     return jsonify(get_full_model_tree())
+
+
+# ==================== 系统设置 API ====================
+
+@admin_bp.route("/api/settings", methods=["GET"])
+def api_get_settings():
+    from models import get_all_settings
+    settings = get_all_settings()
+    return jsonify(settings)
+
+
+@admin_bp.route("/api/settings", methods=["POST"])
+def api_save_settings():
+    from models import set_setting
+    data = request.json
+    if not data:
+        return jsonify({"error": "无数据"}), 400
+    saved = []
+    for key, value in data.items():
+        set_setting(key, str(value))
+        saved.append(key)
+
+    # 测试 SMTP 连接（如果修改了 SMTP 配置）
+    if any(k.startswith("smtp_") for k in saved):
+        from models import get_smtp_config
+        cfg = get_smtp_config()
+        if cfg.get("password"):
+            try:
+                import smtplib
+                if cfg["use_ssl"]:
+                    server = smtplib.SMTP_SSL(cfg["server"], cfg["port"], timeout=10)
+                else:
+                    server = smtplib.SMTP(cfg["server"], cfg["port"], timeout=10)
+                server.login(cfg["account"], cfg["password"])
+                server.quit()
+                return jsonify({"success": True, "smtp_test": "✅ SMTP 连接成功"})
+            except Exception as e:
+                return jsonify({"success": True, "smtp_test": f"⚠️ 配置已保存，但 SMTP 测试连接失败: {str(e)[:100]}"})
+
+    return jsonify({"success": True, "message": f"已保存 {len(saved)} 项设置"})
