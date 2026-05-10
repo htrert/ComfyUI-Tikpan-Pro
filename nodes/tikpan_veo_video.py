@@ -10,6 +10,7 @@ from PIL import Image
 
 import comfy.utils
 import comfy.model_management
+from .tikpan_happyhorse_common import video_from_path
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -36,8 +37,8 @@ class TikpanVeoVideoNode:
             
         return inputs
 
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING")
-    RETURN_NAMES = ("📁_本地保存路径", "🏷️_任务ID", "🔗_视频云端直链", "📄_完整日志")
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "VIDEO")
+    RETURN_NAMES = ("📁_本地保存路径", "🏷️_任务ID", "🔗_视频云端直链", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True 
     FUNCTION = "execute"
     CATEGORY = "👑 Tikpan 官方独家节点"
@@ -46,7 +47,7 @@ class TikpanVeoVideoNode:
         comfy.model_management.throw_exception_if_processing_interrupted()
         
         if not API_密钥 or len(API_密钥) < 10:
-            return ("❌ 请填写API密钥", "无", "无", "请填写密钥")
+            return ("❌ 请填写API密钥", "无", "无", "请填写密钥", None)
 
         # 🚀 重点1：去掉 Content-Type: application/json！让 requests 自动生成表单头
         headers = {"Authorization": f"Bearer {API_密钥}"}
@@ -98,9 +99,9 @@ class TikpanVeoVideoNode:
                 video_url = direct_url
                 task_id = task_id or "sync_task"
             elif not task_id: 
-                return ("❌ 任务创建失败", "无", "无", json.dumps(res, ensure_ascii=False))
+                return ("❌ 任务创建失败", "无", "无", json.dumps(res, ensure_ascii=False), None)
                 
-        except Exception as e: return (f"❌ 网络/表单错误: {e}", "无", "无", str(e))
+        except Exception as e: return (f"❌ 网络/表单错误: {e}", "无", "无", str(e), None)
 
         print(f"\n[Veo 3.1] 🚀 任务(表单模式)创建成功！ID: {task_id}")
         pbar = comfy.utils.ProgressBar(100)
@@ -131,11 +132,11 @@ class TikpanVeoVideoNode:
                         video_url = status_res.get("video_url") or status_res.get("url") or (status_res.get("data") and status_res["data"][0].get("url"))
                         break
                     elif state in ["failed", "error"]:
-                        return ("❌ 渲染失败", str(task_id), "无", json.dumps(status_res, ensure_ascii=False))
+                        return ("❌ 渲染失败", str(task_id), "无", json.dumps(status_res, ensure_ascii=False), None)
                 except Exception: pass 
 
         if not video_url:
-            return ("⚠️ 轮询超时或未找到链接", str(task_id), "无", "请检查聚合站接口格式")
+            return ("⚠️ 轮询超时或未找到链接", str(task_id), "无", "请检查聚合站接口格式", None)
 
         comfy.model_management.throw_exception_if_processing_interrupted()
         print(f"[Veo 3.1] 📥 正在极速下载大片到本地...")
@@ -148,6 +149,6 @@ class TikpanVeoVideoNode:
             
             with open(path, "wb") as f: f.write(response.content)
             print(f"[Veo 3.1] 🎉 下载成功！路径: {path}\n")
-            return (path, str(task_id), video_url, json.dumps(final_data, ensure_ascii=False, indent=2))
+            return (path, str(task_id), video_url, json.dumps(final_data, ensure_ascii=False, indent=2), video_from_path(path))
         except Exception as e:
-            return (f"❌ 下载失败: {e}", str(task_id), video_url, f"下载错误: {e}")
+            return (f"❌ 下载失败: {e}", str(task_id), video_url, f"下载错误: {e}", None)

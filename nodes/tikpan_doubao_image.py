@@ -139,7 +139,7 @@ class TikpanDoubaoImageNode:
                     "STRING",
                     {
                         "multiline": True,
-                        "default": "low quality, blurry, distorted, watermark, text",
+                        "default": "",
                     },
                 ),
             },
@@ -416,8 +416,6 @@ class TikpanDoubaoImageNode:
             payload["sequential_image_generation_options"] = {
                 "max_images": max(1, min(15, max_images))
             }
-        else:
-            payload["sequential_image_generation"] = "disabled"
 
         if image_payload is not None:
             payload["image"] = image_payload
@@ -425,9 +423,6 @@ class TikpanDoubaoImageNode:
                 print("[Tikpan-Doubao] 🖼️ 已添加单张参考图", flush=True)
             else:
                 print(f"[Tikpan-Doubao] 🖼️ 已添加多张参考图，共 {image_count} 张", flush=True)
-
-        if negative_prompt:
-            payload["negative_prompt"] = negative_prompt
 
         payload_preview = dict(payload)
         if "image" in payload_preview:

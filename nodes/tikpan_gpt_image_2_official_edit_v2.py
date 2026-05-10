@@ -1,4 +1,3 @@
-import uuid
 import math
 import base64
 import traceback
@@ -11,6 +10,14 @@ import urllib3
 from PIL import Image, ImageOps
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+from .tikpan_gpt_image_recovery import (
+    get_with_retry,
+    make_idempotency_key,
+    safe_json_for_log,
+    save_recovery_record,
+    short_hash,
+)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -142,7 +149,6 @@ class TikpanGptImage2OfficialEditV2:
 
             headers = {
                 "Authorization": f"Bearer {api_key}",
-                "Idempotency-Key": str(uuid.uuid4()),
                 "Accept": "application/json",
             }
 
@@ -154,6 +160,18 @@ class TikpanGptImage2OfficialEditV2:
                 "size": f"{w}x{h}",
                 "background": bg,
             }
+            files_hash = short_hash([total_bytes, len(files), has_mask])
+            idempotency_key = make_idempotency_key("images/edits", data, files_hash)
+            headers["Idempotency-Key"] = idempotency_key
+            recovery_path = save_recovery_record(
+                "official_edit_v2",
+                idempotency_key,
+                "pending",
+                endpoint="/v1/images/edits",
+                payload_hash=short_hash(data),
+                files_hash=files_hash,
+                size=f"{w}x{h}",
+            )
 
             with requests.Session() as sess:
                 sess.trust_env = False
@@ -183,6 +201,15 @@ class TikpanGptImage2OfficialEditV2:
                 except requests.exceptions.ConnectTimeout:
                     raise Exception("连接上游超时：请检查本地网络环境，或稍后重试")
                 except requests.exceptions.ReadTimeout:
+                    save_recovery_record(
+                        "official_edit_v2",
+                        idempotency_key,
+                        "post_disconnected",
+                        endpoint="/v1/images/edits",
+                        payload_hash=short_hash(data),
+                        files_hash=files_hash,
+                        error=f"ReadTimeout after {timeout}s",
+                    )
                     raise Exception(f"上游处理超时：超过 {timeout} 秒未返回结果，建议降低分辨率、减少参考图数量或稍后重试")
                 except requests.exceptions.ProxyError as e:
                     raise Exception(f"代理连接异常：{e}")
@@ -206,6 +233,24 @@ class TikpanGptImage2OfficialEditV2:
                     resj = resp.json()
                 except Exception:
                     raise Exception(f"接口返回不是合法 JSON：{self.safe_text(resp.text)}")
+
+                save_recovery_record(
+                    "official_edit_v2",
+                    idempotency_key,
+                    "response_received",
+                    endpoint="/v1/images/edits",
+                    http_status=resp.status_code,
+                    response=safe_json_for_log(resj),
+                )
+                upstream_urls = self.extract_result_urls(resj)
+                if upstream_urls:
+                    save_recovery_record(
+                        "official_edit_v2",
+                        idempotency_key,
+                        "image_pointer_received",
+                        endpoint="/v1/images/edits",
+                        image_urls=upstream_urls,
+                    )
 
                 imgs = self.parse_images(resj, sess)
 
@@ -426,12 +471,17 @@ class TikpanGptImage2OfficialEditV2:
                     print(f"Base64 图片解析失败: {e}")
             elif url:
                 try:
-                    resp = sess.get(url, timeout=(5, 30), verify=False)
-                    resp.raise_for_status()
+                    resp = get_with_retry(sess, url, timeout=(5, 90), verify=False, attempts=4)
                     out.append(Image.open(BytesIO(resp.content)).convert("RGB"))
                 except Exception as e:
                     print(f"URL 图片下载失败 ({url}): {e}")
         return out
+
+    def extract_result_urls(self, resj):
+        items = resj.get("data", [])
+        if not isinstance(items, list):
+            return []
+        return [d["url"] for d in items if isinstance(d, dict) and d.get("url")]
 
     def black_out(self, w=1024, h=1024):
         return torch.zeros((1, h, w, 3), dtype=torch.float32)

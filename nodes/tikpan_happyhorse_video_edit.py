@@ -32,6 +32,16 @@ from urllib3.util.retry import Retry
 import comfy.utils
 import comfy.model_management
 import folder_paths
+from .tikpan_happyhorse_common import (
+    extract_error_message,
+    extract_task_output,
+    extract_task_status,
+    extract_video_url,
+    is_failure_status,
+    is_success_status,
+    normalize_resolution,
+    video_from_path,
+)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -79,8 +89,7 @@ def create_retry_session(retries=5, backoff=0.5, status_forcelist=None):
 
 def normalize_params(resolution, watermark, seed):
     """参数规范化：分辨率小写、水印布尔、种子可选"""
-    res_map = {"720P": "720p", "1080P": "1080p"}
-    resolution_api = res_map.get(resolution, resolution)
+    resolution_api = normalize_resolution(resolution)
     watermark_api = True if watermark else False
     seed_api = seed if seed >= 0 else None
     return resolution_api, watermark_api, seed_api
@@ -181,8 +190,8 @@ class TikpanHappyHorseVideoEditNode:
             },
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING")
-    RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_视频云端链接", "📄_完整日志")
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "VIDEO")
+    RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_视频云端链接", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
     CATEGORY = "👑 Tikpan 官方独家节点"
@@ -516,29 +525,26 @@ class TikpanHappyHorseVideoEditNode:
                     continue
 
                 res_json = resp.json()
-                output = res_json.get("output", res_json)
-                task_status = (output.get("task_status") or output.get("status") or "").upper()
+                output = extract_task_output(res_json)
+                task_status = extract_task_status(res_json)
 
                 elapsed = int(time.time() - start_time)
                 progress = 20 + min(elapsed / max_wait_seconds * 65, 65)
                 if pbar:
                     pbar.update_absolute(int(progress), 100)
 
-                if poll_count % 3 == 0 or task_status in ("SUCCEEDED", "FAILED", "CANCELED"):
+                if poll_count % 3 == 0 or is_success_status(task_status) or is_failure_status(task_status):
                     print(f"[HappyHorse-VideoEdit] ⏳ 轮询中... {elapsed}s, 状态: {task_status}", flush=True)
 
-                if task_status == "SUCCEEDED":
-                    video_url = (
-                        output.get("video_url")
-                        or (output.get("output") or {}).get("video_url")
-                    )
+                if is_success_status(task_status):
+                    video_url = extract_video_url(res_json)
                     if video_url:
                         print(f"[HappyHorse-VideoEdit] ✅ 任务完成！总耗时 {elapsed}s", flush=True)
                         return True, video_url, res_json
                     return False, "任务成功但未返回视频链接", res_json
 
-                if task_status in ("FAILED", "CANCELED", "ERROR", "UNKNOWN"):
-                    err = output.get("message") or output.get("error") or "未知错误"
+                if is_failure_status(task_status):
+                    err = extract_error_message(output)
                     return False, f"任务终止（{task_status}）: {err}", res_json
 
                 time.sleep(poll_interval)
@@ -606,13 +612,13 @@ class TikpanHappyHorseVideoEditNode:
             is_async = mode.startswith("异步")
 
             if not api_key or len(api_key) < 10:
-                return ("", "", "", "❌ 请填写有效的 API 密钥")
+                return ("", "", "", "❌ 请填写有效的 API 密钥", None)
             if not prompt:
-                return ("", "", "", "❌ 编辑指令不能为空")
+                return ("", "", "", "❌ 编辑指令不能为空", None)
             if not (3 <= duration <= 15):
-                return ("", "", "", "❌ 时长需在 3–15 秒之间")
+                return ("", "", "", "❌ 时长需在 3–15 秒之间", None)
             if not video_url_input and not local_video:
-                return ("", "", "", "❌ 至少需要提供「视频URL」或「本地视频」")
+                return ("", "", "", "❌ 至少需要提供「视频URL」或「本地视频」", None)
 
             # 规范化参数（分辨率转小写等）
             res_norm, watermark_norm, seed_norm = normalize_params(resolution, watermark, seed)
@@ -632,14 +638,14 @@ class TikpanHappyHorseVideoEditNode:
             try:
                 video_url = self.get_video_url(session, api_key, video_url_input, local_video, pbar)
             except Exception as e:
-                return ("", "", "", f"❌ 获取视频URL失败: {e}")
+                return ("", "", "", f"❌ 获取视频URL失败: {e}", None)
 
             # 2. 参考图片 URLs (5% → 10%)
             comfy.model_management.throw_exception_if_processing_interrupted()
             try:
                 reference_urls = self.get_reference_urls(session, api_key, img_tensors, manual_ref_urls, pbar)
             except Exception as e:
-                return ("", "", "", f"❌ 获取参考图片URL失败: {e}")
+                return ("", "", "", f"❌ 获取参考图片URL失败: {e}", None)
 
             # 3. 提交任务 (10% → 20%)
             comfy.model_management.throw_exception_if_processing_interrupted()
@@ -648,7 +654,7 @@ class TikpanHappyHorseVideoEditNode:
                 res_norm, duration, watermark_norm, seed_norm
             )
             if not success:
-                return ("", "", "", f"❌ 提交失败: {result}")
+                return ("", "", "", f"❌ 提交失败: {result}", None)
 
             task_id = result
             pbar.update_absolute(20, 100)
@@ -662,7 +668,7 @@ class TikpanHappyHorseVideoEditNode:
                     f"⏱️ 时长: {duration}s\n"
                 )
                 pbar.update_absolute(100, 100)
-                return ("", task_id, "", log)
+                return ("", task_id, "", log, None)
 
             # 4. 轮询 (20% → 85%)
             comfy.model_management.throw_exception_if_processing_interrupted()
@@ -670,7 +676,7 @@ class TikpanHappyHorseVideoEditNode:
                 session, api_key, task_id, max_wait, poll_int, pbar
             )
             if not poll_ok:
-                return ("", task_id, "", f"❌ 任务执行失败: {poll_res}\n{json.dumps(poll_data, ensure_ascii=False)[:1000]}")
+                return ("", task_id, "", f"❌ 任务执行失败: {poll_res}\n{json.dumps(poll_data, ensure_ascii=False)[:1000]}", None)
 
             video_url_result = poll_res
             pbar.update_absolute(85, 100)
@@ -692,12 +698,13 @@ class TikpanHappyHorseVideoEditNode:
                 f"📊 实际: {usage.get('output_video_duration','-')}s {usage.get('SR','-')}P\n"
                 f"\n📄 完整响应:\n{json.dumps(poll_data, ensure_ascii=False, indent=2)[:2000]}"
             )
-            return (dl_res if dl_ok else "", task_id, video_url_result, log_msg)
+            video_output = video_from_path(dl_res) if dl_ok else None
+            return (dl_res if dl_ok else "", task_id, video_url_result, log_msg, video_output)
 
         except Exception as e:
             tb = traceback.format_exc()
             print(f"[HappyHorse-VideoEdit] ❌ 严重错误: {e}\n{tb}", flush=True)
-            return ("", "", "", f"❌ 严重错误: {e}\n{tb[:2000]}")
+            return ("", "", "", f"❌ 严重错误: {e}\n{tb[:2000]}", None)
 
 
 # ------------------------------------------------------------------

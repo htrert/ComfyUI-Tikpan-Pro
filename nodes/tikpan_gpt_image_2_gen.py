@@ -7,6 +7,7 @@ import numpy as np
 from io import BytesIO
 from PIL import Image
 import comfy.utils
+from .tikpan_gpt_image_recovery import get_with_retry, make_idempotency_key, safe_json_for_log, save_recovery_record, short_hash
 
 # 🔐 Tikpan 官方聚合路由
 API_BASE_URL = "https://tikpan.com"
@@ -91,15 +92,48 @@ class TikpanGptImage2GenNode:
             "seed": seed % 2147483647
         }
 
+        idempotency_key = make_idempotency_key("chat/completions", payload)
+        headers["Idempotency-Key"] = idempotency_key
+        recovery_path = save_recovery_record(
+            "all_generation",
+            idempotency_key,
+            "pending",
+            endpoint="/v1/chat/completions",
+            payload_hash=short_hash(payload),
+            size=target_res,
+        )
+
         try:
             pbar.update(20)
             url = f"{API_BASE_URL}/v1/chat/completions"
-            response = requests.post(url, json=payload, headers=headers, timeout=300, proxies=proxies)
+            try:
+                response = requests.post(url, json=payload, headers=headers, timeout=300, proxies=proxies)
+            except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
+                save_recovery_record(
+                    "all_generation",
+                    idempotency_key,
+                    "post_disconnected",
+                    endpoint="/v1/chat/completions",
+                    payload_hash=short_hash(payload),
+                    error=str(e),
+                )
+                raise RuntimeError(
+                    "上游可能已经接收并执行了绘图请求，但本地等待响应时断开。"
+                    f"请用相同参数重跑以复用幂等键。 Idempotency-Key: {idempotency_key} | recovery: {recovery_path}"
+                )
             
             if response.status_code != 200:
                 return (self.black_image(), f"❌ API 报错: {response.text}")
             
             res_json = response.json()
+            save_recovery_record(
+                "all_generation",
+                idempotency_key,
+                "response_received",
+                endpoint="/v1/chat/completions",
+                http_status=response.status_code,
+                response=safe_json_for_log(res_json),
+            )
             pbar.update(70)
 
             # 🟢 4. 暴力解码与清洗 (解决断流与格式混乱)
@@ -113,8 +147,16 @@ class TikpanGptImage2GenNode:
                 return (self.black_image(), f"⚠️ 未捕捉到图像数据: {json.dumps(res_json)}")
 
             # 如果返回的是 URL，则通过隧道下载
+            save_recovery_record(
+                "all_generation",
+                idempotency_key,
+                "image_pointer_received",
+                endpoint="/v1/chat/completions",
+                image_url=img_raw if img_raw.startswith("http") else "",
+            )
+
             if img_raw.startswith("http"):
-                img_res = requests.get(img_raw, timeout=60, proxies=proxies)
+                img_res = get_with_retry(requests.Session(), img_raw, timeout=(10, 120), proxies=proxies, attempts=4)
                 final_img = Image.open(BytesIO(img_res.content)).convert("RGB")
             else:
                 # 执行暴力字符清洗
@@ -129,6 +171,8 @@ class TikpanGptImage2GenNode:
             out_tensor = torch.from_numpy(img_np)[None, ...]
             
             pbar.update(100)
+            if img_raw.startswith("http"):
+                return (out_tensor, f"success | size: {target_res} | upstream_image_url: {img_raw}")
             print(f"[Tikpan-Gen] 🎉 画面构筑完成！尺寸: {target_res}", flush=True)
             return (out_tensor, f"✅ 生成成功 | 物理分辨率: {target_res}")
 

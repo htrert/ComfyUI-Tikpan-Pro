@@ -13,6 +13,15 @@ from urllib3.util.retry import Retry
 
 import comfy.utils
 
+from .tikpan_gpt_image_recovery import (
+    get_with_retry,
+    make_idempotency_key,
+    save_base64_image,
+    safe_json_for_log,
+    save_recovery_record,
+    short_hash,
+)
+
 # 避免部分图片截断时报错
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -180,21 +189,46 @@ class TikpanGptImage2OfficialNode:
                 k: v for k, v in raw_payload.items()
                 if k in allowed_keys and v is not None
             }
+            idempotency_key = make_idempotency_key("images/generations", payload)
+            recovery_path = save_recovery_record(
+                "official_generation",
+                idempotency_key,
+                "pending",
+                endpoint="/v1/images/generations",
+                payload_hash=short_hash(payload),
+                size=target_res,
+            )
 
             url = f"{API_BASE_URL}/v1/images/generations"
             pbar.update(25)
 
-            response = session.post(
-                url,
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                    "User-Agent": "Tikpan-ComfyUI-GenNode/Final"
-                },
-                timeout=(connect_timeout, read_timeout),
-                verify=False
-            )
+            try:
+                response = session.post(
+                    url,
+                    json=payload,
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "User-Agent": "Tikpan-ComfyUI-GenNode/Final",
+                        "Idempotency-Key": idempotency_key,
+                    },
+                    timeout=(connect_timeout, read_timeout),
+                    verify=False
+                )
+            except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
+                save_recovery_record(
+                    "official_generation",
+                    idempotency_key,
+                    "post_disconnected",
+                    endpoint="/v1/images/generations",
+                    payload_hash=short_hash(payload),
+                    error=str(e),
+                )
+                raise RuntimeError(
+                    "上游可能已经接收并执行了绘图请求，但本地等待响应时断开。"
+                    f"请不要直接改参数重跑；可用相同参数重跑以复用幂等键。"
+                    f" Idempotency-Key: {idempotency_key} | recovery: {recovery_path}"
+                )
             pbar.update(70)
 
             if response.status_code != 200:
@@ -225,6 +259,15 @@ class TikpanGptImage2OfficialNode:
                 if not skip_error:
                     raise RuntimeError(msg)
                 return (self.black_image(width, height), msg)
+
+            save_recovery_record(
+                "official_generation",
+                idempotency_key,
+                "response_received",
+                endpoint="/v1/images/generations",
+                http_status=response.status_code,
+                response=safe_json_for_log(res_json),
+            )
 
             if isinstance(res_json, dict) and res_json.get("error"):
                 err_obj = res_json.get("error")
@@ -258,7 +301,43 @@ class TikpanGptImage2OfficialNode:
                     raise RuntimeError(msg)
                 return (self.black_image(width, height), msg)
 
-            final_pil = self.load_result_image(session, img_raw, raw_type).convert("RGB")
+            save_recovery_record(
+                "official_generation",
+                idempotency_key,
+                "image_pointer_received",
+                endpoint="/v1/images/generations",
+                raw_type=raw_type,
+                image_url=img_raw if raw_type == "url" else "",
+            )
+            local_recovery_image = ""
+            if raw_type == "b64":
+                local_recovery_image = save_base64_image(idempotency_key, img_raw, output_format)
+                save_recovery_record(
+                    "official_generation",
+                    idempotency_key,
+                    "image_base64_saved",
+                    endpoint="/v1/images/generations",
+                    raw_type=raw_type,
+                    local_image=local_recovery_image,
+                )
+
+            try:
+                final_pil = self.load_result_image(session, img_raw, raw_type).convert("RGB")
+            except Exception as e:
+                save_recovery_record(
+                    "official_generation",
+                    idempotency_key,
+                    "image_download_failed",
+                    endpoint="/v1/images/generations",
+                    raw_type=raw_type,
+                    image_url=img_raw if raw_type == "url" else "",
+                    error=str(e),
+                )
+                raise RuntimeError(
+                    "上游已返回图片结果，但本地下载图片时失败；已保存恢复记录。"
+                    f" Idempotency-Key: {idempotency_key} | recovery: {recovery_path}"
+                    + (f" | image_url: {img_raw}" if raw_type == "url" else "")
+                )
             pbar.update(92)
 
             final_np = np.array(final_pil).astype(np.float32) / 255.0
@@ -270,8 +349,21 @@ class TikpanGptImage2OfficialNode:
                 f"✅ 渲染成功 | 模型: {model} | 比例: {aspect_ratio} | 尺寸: {target_res} | "
                 f"质量: {quality} | 格式: {output_format} | seed: {final_seed} | 耗时: {cost_time}s"
             )
+            if raw_type == "url":
+                log_text += f" | 上游图片链接: {img_raw}"
+            elif local_recovery_image:
+                log_text += f" | 上游未返回URL，已保存本地恢复图片: {local_recovery_image}"
 
             print(f"[Tikpan-Gen] {log_text}", flush=True)
+            save_recovery_record(
+                "official_generation",
+                idempotency_key,
+                "success",
+                endpoint="/v1/images/generations",
+                raw_type=raw_type,
+                image_url=img_raw if raw_type == "url" else "",
+                local_image=local_recovery_image,
+            )
             pbar.update(100)
 
             return (final_tensor, log_text)
@@ -395,8 +487,7 @@ class TikpanGptImage2OfficialNode:
 
     def load_result_image(self, session, img_raw, raw_type):
         if raw_type == "url" or str(img_raw).startswith("http"):
-            r = session.get(img_raw, timeout=(15, 120), verify=False)
-            r.raise_for_status()
+            r = get_with_retry(session, img_raw, timeout=(15, 180), verify=False, attempts=4)
             return Image.open(BytesIO(r.content))
 
         b64_clean = img_raw.split("base64,")[-1] if isinstance(img_raw, str) else img_raw

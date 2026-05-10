@@ -11,6 +11,7 @@ from PIL import Image
 
 import comfy.utils
 import comfy.model_management
+from .tikpan_happyhorse_common import video_from_path
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -41,8 +42,8 @@ class TikpanExclusiveVideoNode:
         return inputs
 
     # 🚀 4 个标准输出口，绝对不会再报 tuple index out of range 错
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING")
-    RETURN_NAMES = ("📁_本地保存路径", "🏷️_任务ID", "🔗_视频云端直链", "📄_完整日志")
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "VIDEO")
+    RETURN_NAMES = ("📁_本地保存路径", "🏷️_任务ID", "🔗_视频云端直链", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True 
     FUNCTION = "execute"
     CATEGORY = "👑 Tikpan 官方独家节点"
@@ -51,7 +52,7 @@ class TikpanExclusiveVideoNode:
         comfy.model_management.throw_exception_if_processing_interrupted()
         
         if not Tikpan_API密钥 or len(Tikpan_API密钥) < 10:
-            return ("❌ 请填写API密钥", "失败", "无", "请填写密钥")
+            return ("❌ 请填写API密钥", "失败", "无", "请填写密钥", None)
 
         headers = {"Authorization": f"Bearer {Tikpan_API密钥}", "Content-Type": "application/json"}
         session = requests.Session()
@@ -83,8 +84,8 @@ class TikpanExclusiveVideoNode:
         try:
             res = session.post(f"{HARDCODED_BASE_URL}/video/create", json=payload, headers=headers, verify=False, timeout=60).json()
             task_id = res.get("id") or res.get("task_id")
-            if not task_id: return ("❌ 任务创建失败", "无", "无", json.dumps(res, ensure_ascii=False))
-        except Exception as e: return (f"❌ 网络错误: {e}", "无", "无", str(e))
+            if not task_id: return ("❌ 任务创建失败", "无", "无", json.dumps(res, ensure_ascii=False), None)
+        except Exception as e: return (f"❌ 网络错误: {e}", "无", "无", str(e), None)
 
         print(f"\n[Tikpan Grok3] 🚀 任务创建成功！ID: {task_id}")
         pbar = comfy.utils.ProgressBar(100)
@@ -125,12 +126,12 @@ class TikpanExclusiveVideoNode:
                     video_url = data.get("video_url") or data.get("url")
                     break
                 if state in ["failed", "error"]:
-                    return ("❌ 渲染失败", str(task_id), "无", json.dumps(status_res, ensure_ascii=False))
+                    return ("❌ 渲染失败", str(task_id), "无", json.dumps(status_res, ensure_ascii=False), None)
             except Exception as e: 
                 print(f"[Tikpan Grok3] ⚠️ 查询状态遇到网络波动 (自动重试中): {e}")
 
         if not video_url:
-            return ("⚠️ 轮询超时", str(task_id), "无", "任务在云端排队太久，请稍后使用ID自行查询")
+            return ("⚠️ 轮询超时", str(task_id), "无", "任务在云端排队太久，请稍后使用ID自行查询", None)
 
         # 5. 自动下载成品
         comfy.model_management.throw_exception_if_processing_interrupted()
@@ -144,6 +145,6 @@ class TikpanExclusiveVideoNode:
             
             with open(path, "wb") as f: f.write(response.content)
             print(f"[Tikpan Grok3] 🎉 下载成功！赶快去 output 文件夹看吧！路径: {path}\n")
-            return (path, str(task_id), video_url, json.dumps(final_data, ensure_ascii=False, indent=2))
+            return (path, str(task_id), video_url, json.dumps(final_data, ensure_ascii=False, indent=2), video_from_path(path))
         except Exception as e:
-            return (f"❌ 下载失败: {e}", str(task_id), video_url, f"下载错误: {e}")
+            return (f"❌ 下载失败: {e}", str(task_id), video_url, f"下载错误: {e}", None)

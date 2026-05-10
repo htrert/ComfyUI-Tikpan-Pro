@@ -18,6 +18,15 @@ from urllib3.util.retry import Retry
 import folder_paths
 import comfy.utils
 import comfy.model_management
+from .tikpan_happyhorse_common import (
+    extract_error_message,
+    extract_task_output,
+    extract_task_status,
+    extract_video_url,
+    is_failure_status,
+    is_success_status,
+    video_from_path,
+)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -109,8 +118,8 @@ class TikpanTaskFetcherNode:
             },
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING")
-    RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_云端链接", "📄_完整日志")
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "VIDEO")
+    RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_云端链接", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "fetch_and_download"
     CATEGORY = "👑 Tikpan 官方独家节点"
@@ -124,9 +133,9 @@ class TikpanTaskFetcherNode:
             file_prefix = str(file_prefix or "Tikpan_Task").strip()
 
             if not api_key or len(api_key) < 10:
-                return ("", "", "", "❌ 错误：请填写有效的 API 密钥")
+                return ("", "", "", "❌ 错误：请填写有效的 API 密钥", None)
             if not task_id:
-                return ("", "", "", "❌ 错误：任务 ID 不能为空")
+                return ("", "", "", "❌ 错误：任务 ID 不能为空", None)
 
             session = create_retry_session()
             pbar = comfy.utils.ProgressBar(100)
@@ -145,6 +154,7 @@ class TikpanTaskFetcherNode:
                     "",
                     f"❌ 任务查询失败: {poll_result}\n"
                     f"{json.dumps(poll_data, ensure_ascii=False)[:1000]}",
+                    None,
                 )
 
             media_url = poll_result
@@ -180,12 +190,13 @@ class TikpanTaskFetcherNode:
                 f"{json.dumps(poll_data, ensure_ascii=False, indent=2)[:2000]}"
             )
 
-            return (dl_result if dl_ok else "", task_id, media_url, log_msg)
+            video_output = video_from_path(dl_result) if dl_ok and is_video else None
+            return (dl_result if dl_ok else "", task_id, media_url, log_msg, video_output)
 
         except Exception as e:
             tb = traceback.format_exc()
             print(f"[TikpanFetcher] ❌ 严重错误: {e}\n{tb}", flush=True)
-            return ("", "", "", f"❌ 严重错误: {e}\n{tb[:2000]}")
+            return ("", "", "", f"❌ 严重错误: {e}\n{tb[:2000]}", None)
 
     def _poll(self, session, api_key, task_id, max_wait_seconds, poll_interval, pbar):
         """轮询任务状态，返回 (success, media_url_or_error, raw_response)"""
@@ -212,39 +223,30 @@ class TikpanTaskFetcherNode:
                     continue
 
                 res_json = resp.json()
-                output = res_json.get("output", res_json)
-                task_status = (
-                    output.get("task_status") or output.get("status") or ""
-                ).upper()
+                output = extract_task_output(res_json)
+                task_status = extract_task_status(res_json)
 
                 elapsed = int(time.time() - start)
                 progress = 15 + min(elapsed / max_wait_seconds * 70, 70)
                 if pbar is not None:
                     pbar.update_absolute(int(progress), 100)
 
-                if poll_count % 3 == 0 or task_status in (
-                    "SUCCEEDED", "FAILED", "CANCELED", "UNKNOWN",
-                ):
+                if poll_count % 3 == 0 or is_success_status(task_status) or is_failure_status(task_status):
                     print(
                         f"[TikpanFetcher] ⏳ 已等待 {elapsed}s，状态: {task_status}",
                         flush=True,
                     )
 
-                if task_status == "SUCCEEDED":
+                if is_success_status(task_status):
                     # 尝试多种可能的字段路径
-                    media_url = (
-                        output.get("video_url")
-                        or output.get("image_url")
-                        or (output.get("output") or {}).get("video_url")
-                        or (output.get("output") or {}).get("image_url")
-                    )
+                    media_url = extract_video_url(res_json) or output.get("image_url")
                     if media_url:
                         print(f"[TikpanFetcher] ✅ 任务完成！耗时 {elapsed}s", flush=True)
                         return True, media_url, res_json
                     return False, "任务成功但响应中未找到 media_url", res_json
 
-                if task_status in ("FAILED", "CANCELED", "ERROR", "UNKNOWN"):
-                    err = output.get("message") or output.get("error") or "未知错误"
+                if is_failure_status(task_status):
+                    err = extract_error_message(output)
                     print(f"[TikpanFetcher] ❌ 任务终止: {err}", flush=True)
                     return False, f"任务终止（{task_status}）: {err}", res_json
 

@@ -26,6 +26,16 @@ from urllib3.util.retry import Retry
 import folder_paths
 import comfy.utils
 import comfy.model_management
+from .tikpan_happyhorse_common import (
+    extract_error_message,
+    extract_task_output,
+    extract_task_status,
+    extract_video_url,
+    is_failure_status,
+    is_success_status,
+    normalize_resolution,
+    video_from_path,
+)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -144,8 +154,8 @@ class TikpanHappyHorseT2VNode:
             },
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING")
-    RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_视频云端链接", "📄_完整日志")
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "VIDEO")
+    RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_视频云端链接", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
     CATEGORY = "👑 Tikpan 官方独家节点"
@@ -256,10 +266,8 @@ class TikpanHappyHorseT2VNode:
                     continue
 
                 res_json = resp.json()
-                output = res_json.get("output", res_json)
-                task_status = (
-                    output.get("task_status") or output.get("status") or ""
-                ).upper()
+                output = extract_task_output(res_json)
+                task_status = extract_task_status(res_json)
 
                 elapsed = int(time.time() - start_time)
                 # 动态更新进度条（提交占 15%，轮询占 70%）
@@ -268,26 +276,21 @@ class TikpanHappyHorseT2VNode:
                     pbar.update_absolute(int(progress), 100)
 
                 # 每 3 次打印一次，以及最终状态时必打印
-                if poll_count % 3 == 0 or task_status in (
-                    "SUCCEEDED", "FAILED", "CANCELED", "UNKNOWN",
-                ):
+                if poll_count % 3 == 0 or is_success_status(task_status) or is_failure_status(task_status):
                     print(
                         f"[HappyHorse-T2V] ⏳ 轮询中... 已等待 {elapsed}s，状态: {task_status}",
                         flush=True,
                     )
 
-                if task_status == "SUCCEEDED":
-                    video_url = (
-                        output.get("video_url")
-                        or (output.get("output") or {}).get("video_url")
-                    )
+                if is_success_status(task_status):
+                    video_url = extract_video_url(res_json)
                     if video_url:
                         print(f"[HappyHorse-T2V] ✅ 任务完成！总耗时 {elapsed}s", flush=True)
                         return True, video_url, res_json
                     return False, "任务成功但响应中未找到 video_url", res_json
 
-                if task_status in ("FAILED", "CANCELED", "ERROR", "UNKNOWN"):
-                    err = output.get("message") or output.get("error") or "未知错误"
+                if is_failure_status(task_status):
+                    err = extract_error_message(output)
                     print(f"[HappyHorse-T2V] ❌ 任务终止: {err}", flush=True)
                     return False, f"任务终止（{task_status}）: {err}", res_json
 
@@ -352,7 +355,7 @@ class TikpanHappyHorseT2VNode:
             api_key = str(kwargs.get("api_key") or "").strip()
             prompt = str(kwargs.get("prompt") or "").strip()
             mode = str(kwargs.get("mode") or "同步 (等待生成并下载)")
-            resolution = str(kwargs.get("resolution") or "1080P")
+            resolution = normalize_resolution(str(kwargs.get("resolution") or "1080P"))
             ratio = str(kwargs.get("ratio") or "16:9")
             duration = int(kwargs.get("duration") or 5)
             watermark = kwargs.get("watermark") == "有水印"
@@ -364,11 +367,11 @@ class TikpanHappyHorseT2VNode:
 
             # 参数校验
             if not api_key or len(api_key) < 10:
-                return ("", "", "", "❌ 错误：请填写有效的 API 密钥")
+                return ("", "", "", "❌ 错误：请填写有效的 API 密钥", None)
             if not prompt:
-                return ("", "", "", "❌ 错误：提示词不能为空")
+                return ("", "", "", "❌ 错误：提示词不能为空", None)
             if not (3 <= duration <= 15):
-                return ("", "", "", "❌ 错误：时长必须在 3–15 秒之间")
+                return ("", "", "", "❌ 错误：时长必须在 3–15 秒之间", None)
 
             print(f"\n{'='*60}", flush=True)
             print(f"[HappyHorse-T2V] 🐴 HappyHorse 1.0 T2V 文生视频", flush=True)
@@ -391,7 +394,7 @@ class TikpanHappyHorseT2VNode:
                 duration, watermark, seed,
             )
             if not success:
-                return ("", "", "", f"❌ 任务提交失败: {result}")
+                return ("", "", "", f"❌ 任务提交失败: {result}", None)
 
             task_id = result
             pbar.update_absolute(15, 100)
@@ -407,7 +410,7 @@ class TikpanHappyHorseT2VNode:
                     f"⏱️ 时长: {duration}s\n"
                 )
                 pbar.update_absolute(100, 100)
-                return ("", task_id, "", log_msg)
+                return ("", task_id, "", log_msg, None)
 
             # 步骤 2 — 轮询状态（同步模式）
             comfy.model_management.throw_exception_if_processing_interrupted()
@@ -422,6 +425,7 @@ class TikpanHappyHorseT2VNode:
                     "",
                     f"❌ 任务执行失败: {poll_result}\n"
                     f"{json.dumps(poll_data, ensure_ascii=False)[:1000]}",
+                    None,
                 )
 
             video_url = poll_result
@@ -451,12 +455,13 @@ class TikpanHappyHorseT2VNode:
                 f"{json.dumps(poll_data, ensure_ascii=False, indent=2)[:2000]}"
             )
 
-            return (dl_result if dl_ok else "", task_id, video_url, log_msg)
+            video_output = video_from_path(dl_result) if dl_ok else None
+            return (dl_result if dl_ok else "", task_id, video_url, log_msg, video_output)
 
         except Exception as e:
             tb = traceback.format_exc()
             print(f"[HappyHorse-T2V] ❌ 严重错误: {e}\n{tb}", flush=True)
-            return ("", "", "", f"❌ 严重错误: {e}\n{tb[:2000]}")
+            return ("", "", "", f"❌ 严重错误: {e}\n{tb[:2000]}", None)
 
 
 # ------------------------------------------------------------------

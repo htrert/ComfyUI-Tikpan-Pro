@@ -47,12 +47,13 @@ class TikpanSunoMusicNode:
                 ),
                 "风格标签": ("STRING", {"default": "pop, romantic"}),
                 "模型版本": (
-                    ["chirp-v3-0", "chirp-v3-5", "chirp-v4", "chirp-v5", "chirp-fenix"],
+                    ["chirp-v3-0", "chirp-v3-5", "chirp-v4", "chirp-auk", "chirp-v5", "chirp-fenix"],
                     {"default": "chirp-fenix"},
                 ),
                 "生成纯音乐": ("BOOLEAN", {"default": False}),
             },
             "optional": {
+                "负面风格标签": ("STRING", {"default": ""}),
                 "🎤_续写_歌曲ID": ("STRING", {"default": ""}),
                 "⏱️_续写起始秒数": ("FLOAT", {"default": 0.0, "min": 0, "max": 600}),
                 "🎭_歌手风格_PersonaID": ("STRING", {"default": ""}),
@@ -60,7 +61,7 @@ class TikpanSunoMusicNode:
             },
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING")
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "AUDIO", "AUDIO")
     RETURN_NAMES = (
         "📁_音频路径1",
         "📁_音频路径2",
@@ -73,6 +74,8 @@ class TikpanSunoMusicNode:
         "🆔_片段ID2",
         "🏷️_标签",
         "📋_歌曲标题",
+        "🎧_音频流1",
+        "🎧_音频流2",
     )
     OUTPUT_NODE = True
     FUNCTION = "generate_music"
@@ -139,13 +142,21 @@ class TikpanSunoMusicNode:
                     or clips[0].get("msg")
                     or ""
                 ).strip()
+                nested_clips = clips[0].get("data")
+                if isinstance(nested_clips, list):
+                    clips = nested_clips
             return state, clips, fail_reason
 
-        # 处理 data 是 dict 的情况
+        # 处理 data 是 dict 的情况。云雾 Task 对象里 data.data 才是真正的音乐数组。
         candidates = [status_json]
 
         if isinstance(data_field, dict):
             candidates.append(data_field)
+            nested_data = data_field.get("data")
+            if isinstance(nested_data, list):
+                clips = nested_data
+            elif isinstance(nested_data, dict):
+                candidates.append(nested_data)
             response_field = data_field.get("response")
             if isinstance(response_field, dict):
                 candidates.append(response_field)
@@ -178,23 +189,22 @@ class TikpanSunoMusicNode:
         title = str(title or "").strip()
         return title if title else default_title
 
-    def build_payload(self, mode, title, prompt, tags, mv, make_instrumental, continue_clip_id, continue_at, persona_id, artist_clip_id):
+    def build_payload(self, mode, title, prompt, tags, negative_tags, mv, make_instrumental, continue_clip_id, continue_at, persona_id, artist_clip_id):
         payload = {
-            "model": mv,
+            "mv": mv,
             "make_instrumental": make_instrumental,
         }
 
         if mode == "灵感模式":
             payload["gpt_description_prompt"] = prompt
             payload["prompt"] = prompt
-            payload["task"] = "generate"
 
         elif mode == "自定义模式":
             payload["title"] = self.normalize_title(title, "命中注定")
             payload["prompt"] = prompt
             payload["tags"] = tags if tags else "pop"
-            payload["generation_type"] = "text"
-            payload["task"] = "generate"
+            payload["negative_tags"] = negative_tags
+            payload["generation_type"] = "TEXT"
 
         elif mode == "续写模式":
             if not continue_clip_id:
@@ -202,6 +212,7 @@ class TikpanSunoMusicNode:
             payload["title"] = self.normalize_title(title, "续写歌曲")
             payload["prompt"] = prompt
             payload["tags"] = tags if tags else "pop"
+            payload["negative_tags"] = negative_tags
             payload["continue_clip_id"] = continue_clip_id
             payload["continue_at"] = continue_at
             payload["task"] = "extend"
@@ -215,9 +226,11 @@ class TikpanSunoMusicNode:
             payload["title"] = self.normalize_title(title, "歌手风格歌曲")
             payload["prompt"] = prompt
             payload["tags"] = tags if tags else "pop"
-            payload["generation_type"] = "text"
+            payload["negative_tags"] = negative_tags
+            payload["generation_type"] = "TEXT"
             payload["persona_id"] = persona_id
             payload["artist_clip_id"] = artist_clip_id
+            payload["vocal_gender"] = ""
             payload["task"] = "artist_consistency"
 
             tau_map = {
@@ -226,12 +239,36 @@ class TikpanSunoMusicNode:
                 "chirp-v4": "chirp-v4-tau",
                 "chirp-v5": "chirp-v5-tau",
             }
-            payload["model"] = tau_map.get(mv, mv)
+            payload["mv"] = tau_map.get(mv, mv)
 
         else:
             raise ValueError(f"不支持的生成模式: {mode}")
 
         return payload
+
+    def empty_audio(self):
+        try:
+            import torch
+            return {"waveform": torch.zeros((1, 1, 1), dtype=torch.float32), "sample_rate": 44100}
+        except Exception:
+            return {"waveform": None, "sample_rate": 44100}
+
+    def make_return(self, audio_path1="", audio_path2="", audio_url1="", audio_url2="", prompt="", task_id="", log_text="", clip_id1="", clip_id2="", tags="", title="", audio1=None, audio2=None):
+        return (
+            audio_path1,
+            audio_path2,
+            audio_url1,
+            audio_url2,
+            prompt,
+            task_id,
+            log_text,
+            clip_id1,
+            clip_id2,
+            tags,
+            title,
+            audio1 if audio1 is not None else self.empty_audio(),
+            audio2 if audio2 is not None else self.empty_audio(),
+        )
 
     def get_audio_extension(self, url, response):
         content_type = str(response.headers.get("Content-Type", "")).lower()
@@ -284,12 +321,99 @@ class TikpanSunoMusicNode:
             print(f"[Tikpan-Suno] ⚠️ 下载音频{index}失败: {e}", flush=True)
             return ""
 
+    def audio_from_path(self, audio_path):
+        if not audio_path or not os.path.exists(audio_path):
+            return self.empty_audio()
+
+        try:
+            from comfy_extras.nodes_audio import load as load_audio_file
+            waveform, sample_rate = load_audio_file(audio_path)
+            return {"waveform": waveform.unsqueeze(0), "sample_rate": sample_rate}
+        except Exception as e:
+            print(f"[Tikpan-Suno] ⚠️ 音频流解码失败，只返回文件路径: {e}", flush=True)
+            return self.empty_audio()
+
+    def fetch_status(self, session, headers, task_id):
+        fetch_urls = [
+            f"{API_BASE_URL}/suno/fetch/{task_id}",
+            f"{API_BASE_URL}/suno/fetch?id={task_id}",
+        ]
+
+        last_response = None
+        for url in fetch_urls:
+            response = session.get(
+                url,
+                headers=headers,
+                timeout=(15, 30),
+                verify=False,
+            )
+            last_response = response
+            if response.status_code != 200:
+                print(f"[Tikpan-Suno] ⚠️ 查询状态失败: HTTP {response.status_code} | URL: {url}", flush=True)
+                continue
+            try:
+                status_json = response.json()
+                state, clips, _ = self.parse_status_payload(status_json)
+                if state or clips or status_json.get("code") == "success" or status_json.get("data") is not None:
+                    return response
+                print(f"[Tikpan-Suno] ⚠️ 查询地址无有效任务数据，尝试备用查询: {url}", flush=True)
+            except Exception:
+                return response
+
+        response = session.post(
+            f"{API_BASE_URL}/suno/fetch",
+            json={"ids": [task_id]},
+            headers=headers,
+            timeout=(15, 30),
+            verify=False,
+        )
+        last_response = response
+        if response.status_code != 200:
+            print(f"[Tikpan-Suno] ⚠️ 批量查询状态失败: HTTP {response.status_code}", flush=True)
+        else:
+            return response
+
+        return last_response
+
+    def extract_clip_audio(self, clip):
+        if isinstance(clip, str):
+            return clip.strip(), "", ""
+
+        if not isinstance(clip, dict):
+            return "", "", ""
+
+        audio_url = str(
+            clip.get("audio_url")
+            or clip.get("audioUrl")
+            or clip.get("stream_audio_url")
+            or clip.get("source_audio_url")
+            or clip.get("download_url")
+            or clip.get("url")
+            or ""
+        ).strip()
+
+        audio_field = clip.get("audio")
+        if not audio_url and isinstance(audio_field, str):
+            audio_url = audio_field.strip()
+        elif not audio_url and isinstance(audio_field, dict):
+            audio_url = str(audio_field.get("url") or audio_field.get("audio_url") or "").strip()
+
+        clip_id = str(
+            clip.get("id")
+            or clip.get("clip_id")
+            or clip.get("clipId")
+            or ""
+        ).strip()
+        out_tags = str(clip.get("tags") or "").strip()
+        return audio_url, clip_id, out_tags
+
     def generate_music(self, **kwargs):
         api_key = str(kwargs.get("API_密钥") or "").strip()
         mode = kwargs.get("🎵_生成模式", "自定义模式")
         title = str(kwargs.get("歌曲标题") or "").strip()
         prompt = str(kwargs.get("创作提示词") or "").strip()
         tags = str(kwargs.get("风格标签") or "").strip()
+        negative_tags = str(kwargs.get("负面风格标签") or "").strip()
         mv = kwargs.get("模型版本", "chirp-fenix")
         make_instrumental = bool(kwargs.get("生成纯音乐", False))
 
@@ -302,10 +426,10 @@ class TikpanSunoMusicNode:
         pbar = comfy.utils.ProgressBar(100)
 
         if not api_key or api_key == "sk-":
-            return ("", "", "", "", prompt, "", "❌ 错误：请填写有效的 API 密钥", "", "", tags, title)
+            return self.make_return(prompt=prompt, log_text="❌ 错误：请填写有效的 API 密钥", tags=tags, title=title)
 
         if not prompt:
-            return ("", "", "", "", prompt, "", "❌ 错误：创作提示词不能为空", "", "", tags, title)
+            return self.make_return(prompt=prompt, log_text="❌ 错误：创作提示词不能为空", tags=tags, title=title)
 
         print(f"[Tikpan-Suno] 🎵 启动音乐生成引擎 | 模式: {mode} | 模型: {mv}", flush=True)
 
@@ -315,6 +439,7 @@ class TikpanSunoMusicNode:
                 title=title,
                 prompt=prompt,
                 tags=tags,
+                negative_tags=negative_tags,
                 mv=mv,
                 make_instrumental=make_instrumental,
                 continue_clip_id=continue_clip_id,
@@ -323,7 +448,7 @@ class TikpanSunoMusicNode:
                 artist_clip_id=artist_clip_id,
             )
         except ValueError as e:
-            return ("", "", "", "", prompt, "", f"❌ 错误：{str(e)}", "", "", tags, title)
+            return self.make_return(prompt=prompt, log_text=f"❌ 错误：{str(e)}", tags=tags, title=title)
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -353,18 +478,18 @@ class TikpanSunoMusicNode:
             if response.status_code != 200:
                 error_text = response.text[:500]
                 print(f"[Tikpan-Suno] ❌ 任务创建失败: HTTP {response.status_code} | {error_text}", flush=True)
-                return ("", "", "", "", prompt, "", f"❌ HTTP {response.status_code}: {error_text}", "", "", tags, title)
+                return self.make_return(prompt=prompt, log_text=f"❌ HTTP {response.status_code}: {error_text}", tags=tags, title=title)
 
             try:
                 res_json = response.json()
             except Exception:
-                return ("", "", "", "", prompt, "", f"❌ 提交接口返回非 JSON: {response.text[:500]}", "", "", tags, title)
+                return self.make_return(prompt=prompt, log_text=f"❌ 提交接口返回非 JSON: {response.text[:500]}", tags=tags, title=title)
 
             task_id = self.extract_task_id(res_json)
 
             if not task_id:
                 print(f"[Tikpan-Suno] ❌ 任务创建失败：未获取到任务ID", flush=True)
-                return ("", "", "", "", prompt, "", f"❌ 未获取到任务ID: {self.safe_json_text(res_json, 500)}", "", "", tags, title)
+                return self.make_return(prompt=prompt, log_text=f"❌ 未获取到任务ID: {self.safe_json_text(res_json, 500)}", tags=tags, title=title)
 
             print(f"[Tikpan-Suno] ✅ 任务创建成功！Task ID: {task_id}", flush=True)
             print(f"[Tikpan-Suno] ⏳ 开始轮询任务状态 (每5秒)...", flush=True)
@@ -374,15 +499,9 @@ class TikpanSunoMusicNode:
                 comfy.model_management.throw_exception_if_processing_interrupted()
 
                 try:
-                    status_response = session.get(
-                        f"{API_BASE_URL}/suno/fetch?id={task_id}",
-                        headers=headers,
-                        timeout=(15, 30),
-                        verify=False,
-                    )
+                    status_response = self.fetch_status(session, headers, task_id)
 
-                    if status_response.status_code != 200:
-                        print(f"[Tikpan-Suno] ⚠️ 查询状态失败: HTTP {status_response.status_code}", flush=True)
+                    if status_response is None or status_response.status_code != 200:
                         continue
 
                     try:
@@ -406,7 +525,7 @@ class TikpanSunoMusicNode:
 
                         if not clips:
                             print(f"[Tikpan-Suno] ❌ 任务完成但未获取到音频数据", flush=True)
-                            return ("", "", "", "", prompt, task_id, "❌ 未获取到音频数据", "", "", tags, title)
+                            return self.make_return(prompt=prompt, task_id=task_id, log_text="❌ 未获取到音频数据", tags=tags, title=title)
 
                         audio_url1 = ""
                         audio_url2 = ""
@@ -415,60 +534,40 @@ class TikpanSunoMusicNode:
                         out_tags = tags
 
                         if len(clips) >= 1:
-                            clip1 = clips[0]
-                            if isinstance(clip1, dict):
-                                audio_url1 = str(clip1.get("audio_url") or clip1.get("url") or "").strip()
-                                clip_id1 = str(clip1.get("id") or clip1.get("clip_id") or "").strip()
-                                out_tags = str(clip1.get("tags") or out_tags).strip()
-                            elif isinstance(clip1, str):
-                                audio_url1 = clip1.strip()
+                            audio_url1, clip_id1, clip_tags = self.extract_clip_audio(clips[0])
+                            out_tags = clip_tags or out_tags
 
                         if len(clips) >= 2:
-                            clip2 = clips[1]
-                            if isinstance(clip2, dict):
-                                audio_url2 = str(clip2.get("audio_url") or clip2.get("url") or "").strip()
-                                clip_id2 = str(clip2.get("id") or clip2.get("clip_id") or "").strip()
-                            elif isinstance(clip2, str):
-                                audio_url2 = clip2.strip()
+                            audio_url2, clip_id2, _ = self.extract_clip_audio(clips[1])
 
                         print(f"[Tikpan-Suno] 🔗 音频1地址: {audio_url1}", flush=True)
                         print(f"[Tikpan-Suno] 🔗 音频2地址: {audio_url2}", flush=True)
 
                         audio_path1 = self.download_audio(session, audio_url1, task_id, "1")
                         audio_path2 = self.download_audio(session, audio_url2, task_id, "2")
+                        audio1 = self.audio_from_path(audio_path1)
+                        audio2 = self.audio_from_path(audio_path2)
 
                         if audio_path1 or audio_path2:
                             log_text = (
                                 f"✅ 音乐生成成功！\n"
                                 f"📁 音频1: {audio_path1}\n"
                                 f"📁 音频2: {audio_path2}\n"
-                                f"💡 请用 LoadAudio 节点加载后连接 SaveAudio"
+                                f"💡 已同时输出 AUDIO 音频流，可直接连接 PreviewAudio 或 SaveAudio"
                             )
                         else:
                             log_text = f"⚠️ 音乐生成完成但下载失败，请查看上方日志 | Task ID: {task_id}"
 
                         print(f"[Tikpan-Suno] ✅ 音乐生成流程完成！", flush=True)
 
-                        return (
-                            audio_path1,
-                            audio_path2,
-                            audio_url1,
-                            audio_url2,
-                            prompt,
-                            task_id,
-                            log_text,
-                            clip_id1,
-                            clip_id2,
-                            out_tags,
-                            title,
-                        )
+                        return self.make_return(audio_path1, audio_path2, audio_url1, audio_url2, prompt, task_id, log_text, clip_id1, clip_id2, out_tags, title, audio1, audio2)
 
                     # --- ✅ 优化点 1：补全失败状态处理分支 ---
                     elif state in ["failed", "error", "cancelled", "failure", "timeout"]:
                         error_msg = fail_reason if fail_reason else "未知服务端错误 (上游未返回具体原因)"
                         log_text = f"❌ 音乐生成失败 | 状态: {state} | 原因: {error_msg}"
                         print(f"[Tikpan-Suno] {log_text}", flush=True)
-                        return ("", "", "", "", prompt, task_id, log_text, "", "", tags, title)
+                        return self.make_return(prompt=prompt, task_id=task_id, log_text=log_text, tags=tags, title=title)
 
                     # --- ✅ 优化点 2：显式增加处理中状态分支，提升日志可读性和稳定性 ---
                     elif state in ["not_start", "submitted", "queued", "pending", "in_progress", "processing", "running", "creating"]:
@@ -484,14 +583,14 @@ class TikpanSunoMusicNode:
 
             timeout_msg = f"❌ 任务超时：经过 20 分钟轮询仍未完成 | Task ID: {task_id}"
             print(f"[Tikpan-Suno] {timeout_msg}", flush=True)
-            return ("", "", "", "", prompt, task_id, timeout_msg, "", "", tags, title)
+            return self.make_return(prompt=prompt, task_id=task_id, log_text=timeout_msg, tags=tags, title=title)
 
         # --- ✅ 优化点 3：最外层抛出完整 Traceback，方便前端调试 ---
         except Exception as e:
             tb = traceback.format_exc()
             print(tb, flush=True)
             err_msg = f"❌ 节点运行期发生异常: {str(e)}\n{tb}"
-            return ("", "", "", "", prompt, "", err_msg, "", "", tags, title)
+            return self.make_return(prompt=prompt, log_text=err_msg, tags=tags, title=title)
 
 # ====================== 节点注册 ======================
 NODE_CLASS_MAPPINGS = {

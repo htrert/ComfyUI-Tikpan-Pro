@@ -1,10 +1,24 @@
 [project]
 name = "comfyui-tikpan-pro"
-version = "1.0.0"
-description = "Tikpan 官方独家节点：支持 GPT-Image-2 高级多图编辑与视频生成"
+version = "1.0.1"
+description = "Tikpan 官方独家节点：支持 GPT-Image-2、Doubao、Suno、HappyHorse、Grok、Veo 等图像、音频与视频生成"
 readme = "README.md"
 authors = [{ name = "htrert" }]
 license = { text = "MIT License" }
+keywords = [
+    "comfyui",
+    "tikpan",
+    "gpt-image-2",
+    "doubao",
+    "suno",
+    "happyhorse",
+    "grok",
+    "veo",
+    "image-generation",
+    "video-generation",
+    "audio-generation",
+    "custom-nodes",
+]
 
 [project.urls]
 Repository = "https://github.com/htrert/ComfyUI-Tikpan-Pro"

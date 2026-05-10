@@ -7,6 +7,7 @@ import numpy as np
 from io import BytesIO
 from PIL import Image, ImageOps
 import comfy.utils
+from .tikpan_gpt_image_recovery import get_with_retry, make_idempotency_key, safe_json_for_log, save_recovery_record, short_hash
 
 # 🔐 Tikpan 官方聚合路由
 API_BASE_URL = "https://tikpan.com"
@@ -95,15 +96,48 @@ class TikpanGptImage2EditNode:
             "quality": 品质,
         }
 
+        idempotency_key = make_idempotency_key("chat/completions-edit", payload)
+        headers["Idempotency-Key"] = idempotency_key
+        recovery_path = save_recovery_record(
+            "all_edit",
+            idempotency_key,
+            "pending",
+            endpoint="/v1/chat/completions",
+            payload_hash=short_hash(payload),
+            size=f"{width}x{height}",
+        )
+
         try:
             pbar.update(30)
             url = f"{API_BASE_URL}/v1/chat/completions" # 使用统一聊天绘图路由
-            response = requests.post(url, json=payload, headers=headers, timeout=300, proxies=proxies)
+            try:
+                response = requests.post(url, json=payload, headers=headers, timeout=300, proxies=proxies)
+            except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
+                save_recovery_record(
+                    "all_edit",
+                    idempotency_key,
+                    "post_disconnected",
+                    endpoint="/v1/chat/completions",
+                    payload_hash=short_hash(payload),
+                    error=str(e),
+                )
+                raise RuntimeError(
+                    "上游可能已经接收并执行了修图请求，但本地等待响应时断开。"
+                    f"请用相同参数重跑以复用幂等键。 Idempotency-Key: {idempotency_key} | recovery: {recovery_path}"
+                )
             
             if response.status_code != 200:
                 return (self.black_image(width, height), f"❌ 手术失败: {response.text}")
             
             res_json = response.json()
+            save_recovery_record(
+                "all_edit",
+                idempotency_key,
+                "response_received",
+                endpoint="/v1/chat/completions",
+                http_status=response.status_code,
+                response=safe_json_for_log(res_json),
+            )
             pbar.update(80)
 
             # 抓取数据
@@ -114,15 +148,29 @@ class TikpanGptImage2EditNode:
                 img_raw = res_json["data"][0].get("url") or res_json["data"][0].get("b64_json")
 
             # 暴力清洗与解码
-            b64_clean = re.sub(r'[^A-Za-z0-9+/=]', '', img_raw.split("base64,")[-1])
-            missing_padding = len(b64_clean) % 4
-            if missing_padding: b64_clean += '=' * (4 - missing_padding)
-            
-            img_bytes = base64.b64decode(b64_clean)
-            final_img = Image.open(BytesIO(img_bytes)).convert("RGB")
+            save_recovery_record(
+                "all_edit",
+                idempotency_key,
+                "image_pointer_received",
+                endpoint="/v1/chat/completions",
+                image_url=img_raw if img_raw.startswith("http") else "",
+            )
+
+            if img_raw.startswith("http"):
+                img_res = get_with_retry(requests.Session(), img_raw, timeout=(10, 120), proxies=proxies, attempts=4)
+                final_img = Image.open(BytesIO(img_res.content)).convert("RGB")
+            else:
+                b64_clean = re.sub(r'[^A-Za-z0-9+/=]', '', img_raw.split("base64,")[-1])
+                missing_padding = len(b64_clean) % 4
+                if missing_padding: b64_clean += '=' * (4 - missing_padding)
+
+                img_bytes = base64.b64decode(b64_clean)
+                final_img = Image.open(BytesIO(img_bytes)).convert("RGB")
             
             img_np = np.array(final_img).astype(np.float32) / 255.0
             pbar.update(100)
+            if img_raw.startswith("http"):
+                return (torch.from_numpy(img_np)[None, ...], f"success | upstream_image_url: {img_raw}")
             return (torch.from_numpy(img_np)[None, ...], "✅ 手术成功：局部重绘完成")
 
         except Exception as e:
