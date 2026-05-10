@@ -1,5 +1,58 @@
 # Changelog
 
+## [v1.0.1] - 2026-05-10
+
+### 🚀 New Features
+
+#### Suno 音乐生成节点 (`TikpanSunoMusicNode`)
+- 新增两个 `AUDIO` 音频流输出，可直接连接 ComfyUI 的 `PreviewAudio` / `SaveAudio` 等音频节点。
+- 保留原有音频路径、音频链接、任务 ID、片段 ID 等字符串输出，方便继续排查上游返回内容。
+- 新增 `负面风格标签` 输入，对应 Suno API 的 `negative_tags` 参数。
+- 补充模型选项 `chirp-auk`，并保留 `chirp-v3-0`、`chirp-v3-5`、`chirp-v4`、`chirp-v5`、`chirp-fenix`。
+
+#### HappyHorse 视频节点
+- 新增通用辅助模块 `tikpan_happyhorse_common.py`，统一处理任务状态、视频链接提取、视频下载与 ComfyUI `VIDEO` 输出。
+- `HappyHorse T2V`、`I2V`、`R2V`、`Video-Edit` 四个节点均新增 `VIDEO` 输出，方便后续接入完整视频工作流。
+
+#### GPT-Image-2 恢复能力
+- 新增 `tikpan_gpt_image_recovery.py` 恢复辅助节点，用于读取本地 recovery 记录，帮助找回上游已返回但本地下载/回传失败的图片信息。
+
+### 🐛 Bug Fixes
+
+#### Suno 音乐生成节点 (`TikpanSunoMusicNode`)
+- 修复提交参数字段错误：将原来的 `model` 改为文档要求的 `mv`，避免中转站/上游因参数不兼容导致任务失败。
+- 修复任务查询路径：优先使用 `/suno/fetch/{task_id}`，并保留 `?id=` 与批量 `/suno/fetch` 作为兼容 fallback。
+- 修复云雾/Tikpan 返回结构解析：兼容 `data.data` 音乐数组、`data` 直接数组、`clips`、`items` 等多种任务结果格式。
+- 修复歌手风格模式参数：按文档使用 `artist_consistency`，并自动将普通模型映射到 `chirp-v*-tau` 形式。
+- 将 `generation_type` 调整为文档示例中的 `TEXT`，减少上游参数不兼容概率。
+
+#### Doubao 图像生成节点 (`TikpanDoubaoImageNode`)
+- 对齐 Tikpan 中转站的 Doubao 5.0 图像接口参数，默认使用 `doubao-seedream-5-0-260128`。
+- 保留文档要求的 `2K` / `3K` 分辨率写法与 `output_format` 参数。
+- 移除容易造成兼容问题的默认负面提示词与不必要的 `sequential_image_generation: disabled`。
+
+### 🔧 Improvements
+
+#### 视频节点链路
+- `Grok Video`、`Grok Videos`、`Veo Video` 节点新增 `VIDEO` 输出，保留原有字符串路径/链接输出。
+- 异步任务查询节点 `TikpanTaskFetcherNode` 新增 `VIDEO` 输出，可用于提交任务后单独轮询并继续传递视频流。
+- HappyHorse 系列节点增强状态识别与视频 URL 提取，兼容更多上游返回字段。
+
+#### GPT-Image-2 节点
+- 增强上游返回数据保存与恢复提示，降低“上游已扣费但本地下载失败”时完全找不到结果的风险。
+- 在部分失败场景中保留更完整的错误信息、任务信息或可恢复记录，方便后续人工排查。
+
+#### 项目元数据
+- `pyproject.toml` 版本更新至 `1.0.1`。
+- 更新项目描述，覆盖 GPT-Image-2、Doubao、Suno、HappyHorse、Grok、Veo 等图像、音频与视频节点。
+- 新增 `keywords` 标签：`tikpan`、`gpt-image-2`、`doubao`、`suno`、`happyhorse`、`grok`、`veo`、`image-generation`、`video-generation`、`audio-generation` 等。
+
+### ✅ Validation
+
+- 已使用 Aki 自带 Python 执行节点编译检查：
+  - `C:\ComfyUI-aki-v2\python\python.exe -m compileall -q .\nodes`
+- Suno 节点已做本地 payload 构造、返回数量、任务状态解析的基础自检。
+
 ## [v0.1.0] - 2026-05-07
 
 ### 🐛 Bug Fixes
