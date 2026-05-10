@@ -184,7 +184,7 @@ def balance_history():
         (request.user_id,)
     ).fetchall()
     logs = conn.execute(
-        "SELECT id, model, credits_used as credits, status, created_at, 'usage' as type FROM generation_logs WHERE user_id=? ORDER BY created_at DESC LIMIT 20",
+        "SELECT id, model, CASE WHEN status='success' THEN credits_used ELSE 0 END as credits, status, created_at, 'usage' as type FROM generation_logs WHERE user_id=? ORDER BY created_at DESC LIMIT 20",
         (request.user_id,)
     ).fetchall()
     conn.close()

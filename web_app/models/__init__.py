@@ -87,8 +87,27 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
+    _ensure_generation_log_columns(conn)
     conn.commit()
     conn.close()
+
+
+def _ensure_generation_log_columns(conn):
+    """Keep old SQLite databases compatible with newer generation tracking."""
+    rows = conn.execute("PRAGMA table_info(generation_logs)").fetchall()
+    existing = {row["name"] for row in rows}
+    columns = {
+        "status": "TEXT DEFAULT 'success'",
+        "image_url": "TEXT DEFAULT ''",
+        "error_message": "TEXT DEFAULT ''",
+        "request_id": "TEXT DEFAULT ''",
+        "raw_response": "TEXT DEFAULT ''",
+        "refunded_at": "TIMESTAMP",
+        "updated_at": "TIMESTAMP DEFAULT ''",
+    }
+    for name, ddl in columns.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE generation_logs ADD COLUMN {name} {ddl}")
 
 
 def seed_pricing():
@@ -195,12 +214,54 @@ def complete_order(order_id):
 
 # ==================== 生成记录 ====================
 
-def log_generation(user_id, model, credits_used, prompt, image_url=""):
+def log_generation(
+    user_id,
+    model,
+    credits_used,
+    prompt,
+    image_url="",
+    status="success",
+    error_message="",
+    request_id="",
+    raw_response="",
+):
     conn = get_db()
-    conn.execute(
-        "INSERT INTO generation_logs (user_id, model, credits_used, prompt, image_url) VALUES (?,?,?,?,?)",
-        (user_id, model, credits_used, prompt, image_url)
+    cur = conn.execute(
+        """
+        INSERT INTO generation_logs
+            (user_id, model, credits_used, prompt, image_url, status, error_message, request_id, raw_response, updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+        """,
+        (user_id, model, credits_used, prompt, image_url, status, error_message, request_id, raw_response)
     )
+    log_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return log_id
+
+
+def update_generation_log(log_id, **kwargs):
+    allowed = {
+        "status",
+        "image_url",
+        "error_message",
+        "request_id",
+        "raw_response",
+        "refunded_at",
+    }
+    updates = {k: v for k, v in kwargs.items() if k in allowed}
+    if not updates:
+        return
+
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    if updates.get("refunded_at") == "now":
+        updates["refunded_at"] = now
+    updates["updated_at"] = now
+    sets = ", ".join(f"{k}=?" for k in updates)
+    values = list(updates.values()) + [log_id]
+
+    conn = get_db()
+    conn.execute(f"UPDATE generation_logs SET {sets} WHERE id=?", values)
     conn.commit()
     conn.close()
 
