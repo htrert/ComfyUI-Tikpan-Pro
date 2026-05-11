@@ -7,6 +7,14 @@ from backend.database import (get_categories, add_category, update_category, del
                       get_models, get_model, add_model, update_model, delete_model,
                       get_fields, add_field, update_field, delete_field,
                       get_full_model_tree, seed_default_data)
+from models import (
+    get_model_routes,
+    get_pricing,
+    get_provider_channels,
+    upsert_model_route,
+    upsert_pricing,
+    upsert_provider_channel,
+)
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -175,6 +183,47 @@ def api_seed():
 def api_tree():
     """返回完整的模型树结构（前端使用）"""
     return jsonify(get_full_model_tree())
+
+
+# ==================== 商业化运营 API：供应商 / 路由 / 计价 ====================
+
+@admin_bp.route("/api/provider-channels", methods=["GET"])
+def api_provider_channels():
+    return jsonify(get_provider_channels(active_only=False))
+
+
+@admin_bp.route("/api/provider-channels", methods=["POST"])
+def api_save_provider_channel():
+    ok, error = upsert_provider_channel(request.json or {})
+    if not ok:
+        return jsonify({"error": error}), 400
+    return jsonify({"success": True})
+
+
+@admin_bp.route("/api/pricing", methods=["GET"])
+def api_pricing():
+    return jsonify(get_pricing())
+
+
+@admin_bp.route("/api/pricing", methods=["POST"])
+def api_save_pricing():
+    ok, error = upsert_pricing(request.json or {})
+    if not ok:
+        return jsonify({"error": error}), 400
+    return jsonify({"success": True})
+
+
+@admin_bp.route("/api/model-routes", methods=["GET"])
+def api_model_routes():
+    return jsonify(get_model_routes(request.args.get("model_id")))
+
+
+@admin_bp.route("/api/model-routes", methods=["POST"])
+def api_save_model_route():
+    ok, error = upsert_model_route(request.json or {})
+    if not ok:
+        return jsonify({"error": error}), 400
+    return jsonify({"success": True})
 
 
 # ==================== 系统设置 API ====================

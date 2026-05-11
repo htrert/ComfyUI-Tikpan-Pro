@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+
+recovery/
+tmp_test_output/
+
+web_app/data/*.db
+web_app/data/*.db-*
+
+experiments/**/data/assets/
+experiments/**/data/projects/

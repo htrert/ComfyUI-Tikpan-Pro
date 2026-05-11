@@ -6,7 +6,7 @@ import os
 from flask import Flask, render_template, jsonify, send_from_directory, abort
 
 from config import FLASK_SECRET
-from models import init_db, seed_pricing
+from models import init_db, seed_pricing, seed_provider_channels
 from backend.admin import admin_bp
 from backend.handlers import API_DISPATCH
 from config import generate_image_token, verify_image_token
@@ -69,6 +69,7 @@ def serve_output(filename):
 # ===== 初始化 =====
 init_db()
 seed_pricing()
+seed_provider_channels()
 
 # ===== 启动 =====
 if __name__ == "__main__":

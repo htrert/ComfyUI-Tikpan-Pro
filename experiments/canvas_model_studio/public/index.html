@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Canvas Model Studio</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div id="welcomeOverlay" class="welcome-overlay">
+      <section class="welcome-card">
+        <div>
+          <span class="eyebrow">AI Canvas Studio</span>
+          <h1>从画布开始选择模型，而不是从表单开始。</h1>
+          <p>单击或双击空白画布，选择文字生图、图片编辑、视频、音乐或你自己的工作流。后台可以继续配置渠道、模型、参数和计费。</p>
+        </div>
+        <div class="welcome-actions">
+          <button class="generate" id="welcomeStartButton">开始创作</button>
+        </div>
+        <div class="welcome-grid">
+          <button data-welcome-profile="tikpan-gpt-image-2">文字生图</button>
+          <button data-welcome-profile="tikpan-gpt-image-2-edit">图片编辑</button>
+          <button data-welcome-profile="tikpan-veo-video">视频生成</button>
+          <button data-welcome-profile="tikpan-suno-music">音乐生成</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CM</div>
+          <div>
+            <h1>Canvas Model Studio</h1>
+            <p id="connectionLabel">正在连接生成通道</p>
+          </div>
+        </div>
+
+        <section class="panel user-panel">
+          <div class="panel-title">用户</div>
+          <div id="userSummary" class="user-summary">
+            <strong>访客模式</strong>
+            <span>可以编辑画布；商业生成建议接入正式网站账号。</span>
+          </div>
+          <div class="button-row">
+            <button id="loginButton">登录</button>
+            <button id="logoutButton">退出</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">画布</div>
+          <label>
+            主题
+            <select id="themeSelect">
+              <option value="system">跟随系统</option>
+              <option value="dark">黑色</option>
+              <option value="light">白色</option>
+            </select>
+          </label>
+          <div class="button-row">
+            <button id="addPromptButton" class="primary">添加模型节点</button>
+            <label class="file-button">
+              导入图片
+              <input id="imageInput" type="file" accept="image/*" multiple>
+            </label>
+          </div>
+          <div class="button-row">
+            <button id="fitButton">适应视图</button>
+            <button id="clearButton">清空</button>
+          </div>
+        </section>
+
+        <section class="panel content-factory-panel">
+          <div class="panel-title">内容工厂</div>
+          <label>
+            工作流
+            <select id="factoryWorkflowSelect">
+              <option value="">读取中...</option>
+            </select>
+          </label>
+          <label>
+            项目输入
+            <textarea id="factoryBriefInput" rows="5" placeholder="粘贴小说片段、短剧梗概、产品信息或 TikTok 账号定位"></textarea>
+          </label>
+          <div id="factorySummary" class="factory-summary">
+            选择一个工作流后，会自动生成角色、分镜、生成、后期和发布节点。
+          </div>
+          <button id="buildFactoryButton" class="generate">生成内容工厂画布</button>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">生成通道</div>
+          <div class="provider-row">
+            <span id="providerBadge" class="badge">provider</span>
+            <span id="providerHint">本地 ComfyUI 或云端上游</span>
+          </div>
+          <label>
+            参数档案
+            <select id="profileSelect">
+              <option value="">读取中...</option>
+            </select>
+          </label>
+          <label>
+            档案名
+            <input id="profileNameInput" value="my-comfy-profile">
+          </label>
+          <button id="saveProfileButton">保存当前参数为档案</button>
+          <p id="profileHint" class="status-text">参数档案会决定调用本地 SDXL 工作流，还是调用 Tikpan 自定义节点。</p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">模型参数</div>
+          <div id="profileSummary" class="profile-summary">正在读取模型档案...</div>
+          <label id="checkpointField">
+            Checkpoint
+            <select id="checkpointSelect">
+              <option value="">读取中...</option>
+            </select>
+          </label>
+          <label>
+            Prompt
+            <textarea id="promptInput" rows="5" placeholder="选中 prompt 卡片时会自动同步"></textarea>
+          </label>
+          <label>
+            Negative
+            <textarea id="negativeInput" rows="3">low quality, blurry, distorted</textarea>
+          </label>
+          <div id="sdxlFields" class="grid-two">
+            <label>宽度<input id="widthInput" type="number" value="1024" min="256" max="4096" step="64"></label>
+            <label>高度<input id="heightInput" type="number" value="1024" min="256" max="4096" step="64"></label>
+            <label>步数<input id="stepsInput" type="number" value="24" min="1" max="120"></label>
+            <label>CFG<input id="cfgInput" type="number" value="7" min="1" max="30" step="0.5"></label>
+            <label>采样器<input id="samplerInput" value="euler"></label>
+            <label>调度器<input id="schedulerInput" value="normal"></label>
+            <label>去噪<input id="denoiseInput" type="number" value="1" min="0" max="1" step="0.05"></label>
+            <label>批量<input id="batchSizeInput" type="number" value="1" min="1" max="8"></label>
+            <label>Seed<input id="seedInput" placeholder="随机"></label>
+          </div>
+          <div id="dynamicFields" class="dynamic-fields"></div>
+          <p id="referenceHint" class="status-text"></p>
+          <div class="button-row">
+            <button id="previewButton">预览请求</button>
+            <button id="generateButton" class="generate">生成到画布</button>
+          </div>
+          <p id="statusText" class="status-text">选择参数档案，网站会把它转换成 ComfyUI workflow 或云端请求。</p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">请求预览</div>
+          <textarea id="requestPreview" class="request-preview" readonly rows="8" placeholder="点击“预览请求”查看网站将发送的结构。"></textarea>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">项目</div>
+          <label>
+            项目名
+            <input id="projectNameInput" value="my-canvas">
+          </label>
+          <div class="button-row">
+            <button id="saveButton">保存</button>
+            <button id="loadButton">加载</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">我的资产</div>
+          <div id="assetList" class="asset-list">
+            <p class="status-text">登录后，导入和生成的图片/媒体会归档到资产库。</p>
+          </div>
+        </section>
+      </aside>
+
+      <main class="stage">
+        <header class="stage-header">
+          <div class="project-title">
+            <span class="logo-dot"></span>
+            <input id="projectTitleInput" value="Untitled Canvas" aria-label="项目标题">
+          </div>
+          <nav class="stage-tabs">
+            <button data-menu="create" class="active">创作</button>
+            <button data-menu="assets">资产</button>
+            <button data-menu="workflows">工作流</button>
+            <button data-menu="history">历史</button>
+            <button data-menu="director">导演台</button>
+          </nav>
+          <div class="stage-actions">
+            <a href="/admin.html">后台</a>
+            <button id="shareButton">分享</button>
+            <button id="rechargeButton">充值</button>
+          </div>
+        </header>
+
+        <nav class="rail">
+          <button data-menu="create" class="active"><strong>＋</strong><span>创建</span></button>
+          <button data-menu="assets"><strong>▣</strong><span>资产</span></button>
+          <button data-menu="workflows"><strong>⌘</strong><span>工作流</span></button>
+          <button data-menu="history"><strong>◷</strong><span>历史</span></button>
+          <button data-menu="director"><strong>▤</strong><span>导播台</span></button>
+          <button data-menu="cut"><strong>✂</strong><span>剪辑</span></button>
+        </nav>
+
+        <div id="canvasEmptyHint" class="canvas-empty-hint">
+          <strong>单击画布</strong>
+          <span>选择模型或工作流开始创作</span>
+          <div>
+            <button data-quick-profile="tikpan-gpt-image-2">文字生图</button>
+            <button data-quick-profile="tikpan-gpt-image-2-edit">图片换背景</button>
+            <button data-quick-profile="tikpan-veo-video">首尾帧生视频</button>
+            <button data-quick-profile="tikpan-suno-music">音乐生成</button>
+          </div>
+        </div>
+
+        <div id="canvas" class="canvas">
+          <div id="world" class="world"></div>
+        </div>
+
+        <div id="launcher" class="launcher" hidden>
+          <div class="launcher-head">
+            <strong>选择模型 / 工作流</strong>
+            <button id="launcherCloseButton">×</button>
+          </div>
+          <input id="launcherSearch" placeholder="搜索模型、视频、音乐、编辑">
+          <div id="launcherList" class="launcher-list"></div>
+        </div>
+
+        <div class="bottom-toolbar">
+          <button id="miniMapButton">地图</button>
+          <button id="gridButton">网格</button>
+          <button id="centerButton">居中</button>
+          <input id="zoomRange" type="range" min="16" max="300" value="78">
+          <span id="zoomLabel">100%</span>
+        </div>
+      </main>
+    </div>
+
+    <template id="promptTemplate">
+      <article class="node prompt-node">
+        <header>
+          <strong>Prompt</strong>
+          <span></span>
+        </header>
+        <textarea spellcheck="false"></textarea>
+      </article>
+    </template>
+
+    <div id="authModal" class="modal">
+      <div class="modal-card">
+        <div class="modal-head">
+          <strong>登录创作账号</strong>
+          <button id="authCloseButton" aria-label="关闭">×</button>
+        </div>
+        <div class="auth-tabs">
+          <button id="authLoginTab" class="active">登录</button>
+          <button id="authRegisterTab">注册</button>
+        </div>
+        <label>
+          邮箱
+          <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com">
+        </label>
+        <label>
+          密码
+          <input id="authPassword" type="password" autocomplete="current-password" placeholder="至少 6 位">
+        </label>
+        <label id="authCodeField" hidden>
+          验证码
+          <div class="code-row">
+            <input id="authCode" inputmode="numeric" placeholder="邮箱验证码">
+            <button id="sendCodeButton">发送</button>
+          </div>
+        </label>
+        <button id="authSubmitButton" class="generate">登录</button>
+        <p id="authMessage" class="status-text"></p>
+      </div>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

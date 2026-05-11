@@ -1,5 +1,6 @@
 import os
 import sys
+from io import BytesIO
 
 try:
     from comfy_api.input_impl import VideoFromFile
@@ -135,5 +136,23 @@ def video_from_path(path):
     if not path or not isinstance(path, str) or not os.path.exists(path):
         return None
     if VideoFromFile is None:
+        print("[TikpanVideo] ⚠️ 当前 ComfyUI 环境无法导入 VideoFromFile，VIDEO 输出将为空。", flush=True)
         return None
-    return VideoFromFile(path)
+    try:
+        file_size = os.path.getsize(path)
+        if file_size <= 0:
+            print(f"[TikpanVideo] ⚠️ 视频文件为空，无法生成 VIDEO 输出: {path}", flush=True)
+            return None
+
+        # 用 BytesIO 包装可避免部分 SaveVideo 节点二次读取文件路径或复用容器流时失败。
+        with open(path, "rb") as f:
+            video_bytes = f.read()
+        video = VideoFromFile(BytesIO(video_bytes))
+
+        # 提前触发一次维度读取，保证下游 SaveVideo 不会拿到不可解析的视频对象。
+        width, height = video.get_dimensions()
+        print(f"[TikpanVideo] ✅ VIDEO 输出已就绪: {width}x{height} | {file_size} bytes", flush=True)
+        return video
+    except Exception as e:
+        print(f"[TikpanVideo] ⚠️ VIDEO 输出创建失败: {e} | path={path}", flush=True)
+        return None

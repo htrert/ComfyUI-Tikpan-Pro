@@ -197,6 +197,8 @@ def delete_field(field_id):
 
 def get_full_model_tree():
     """返回完整的分类→模型→字段树结构（前端使用）"""
+    from models import calculate_model_credits, get_pricing, select_model_route
+
     categories = get_categories()
     result = {}
     for cat in categories:
@@ -240,6 +242,13 @@ def get_full_model_tree():
                 "description": m["description"],
                 "api_type": m["api_type"],
                 "endpoint": m["endpoint"],
+                "pricing": {
+                    "1K": calculate_model_credits(m["id"], {"resolution": "1K"})["credits"],
+                    "2K": calculate_model_credits(m["id"], {"resolution": "2K"})["credits"],
+                    "4K": calculate_model_credits(m["id"], {"resolution": "4K"})["credits"],
+                },
+                "pricing_rule": (get_pricing(m["id"]) or [{}])[0],
+                "route": select_model_route(m["id"]),
                 "fields": field_list,
             })
         if model_list:

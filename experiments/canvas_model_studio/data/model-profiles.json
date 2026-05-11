@@ -1,0 +1,288 @@
+[
+  {
+    "id": "sdxl-comfy-base",
+    "name": "本地 SDXL 基础生图",
+    "group": "本地 ComfyUI",
+    "description": "通用文生图参数档案，字段对齐 ComfyUI 的 CheckpointLoader + KSampler。",
+    "task": "text-to-image",
+    "engine": "comfy_sdxl",
+    "mediaType": "image",
+    "parameters": {
+      "checkpoint": "",
+      "width": 1024,
+      "height": 1024,
+      "steps": 24,
+      "cfg": 7,
+      "sampler": "euler",
+      "scheduler": "normal",
+      "denoise": 1,
+      "batchSize": 1,
+      "negative": "low quality, blurry, distorted"
+    },
+    "fields": []
+  },
+  {
+    "id": "tikpan-gpt-image-2",
+    "name": "GPT Image 2 官方生图",
+    "group": "Tikpan 图像节点",
+    "description": "适配 TikpanGptImage2OfficialNode，适合高质量文生图和商品主图。",
+    "task": "text-to-image",
+    "engine": "tikpan_node",
+    "mediaType": "image",
+    "credentialEnv": "TIKPAN_API_KEY",
+    "parameters": {
+      "模型": "gpt-image-2",
+      "分辨率档位": "1K (1024)",
+      "画面比例": "1:1",
+      "画质与推理强度": "medium",
+      "审核强度": "auto",
+      "返回格式": "png",
+      "跳过错误": false
+    },
+    "node": {
+      "classType": "TikpanGptImage2OfficialNode",
+      "apiKeyInput": "API_密钥",
+      "promptInput": "生成指令",
+      "seedInput": "seed",
+      "hiddenInputs": {
+        "💎_源头拿货价福利_💎": "🔥 0.6元 RMB 兑换 👉 1美元余额 | 绝对全网底价",
+        "获取密钥请访问": "👉 https://tikpan.com (官方授权Key获取点)"
+      },
+      "saveImage": true
+    },
+    "fields": [
+      { "key": "模型", "label": "模型", "type": "select", "options": ["gpt-image-2"] },
+      { "key": "分辨率档位", "label": "分辨率", "type": "select", "options": ["512", "1K (1024)", "2K (2048)", "4K (官方极限 3840)"] },
+      { "key": "画面比例", "label": "画面比例", "type": "select", "options": ["1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16", "21:9", "9:21"] },
+      { "key": "画质与推理强度", "label": "画质", "type": "select", "options": ["auto", "low", "medium", "high"] },
+      { "key": "审核强度", "label": "审核强度", "type": "select", "options": ["auto", "low", "high"] },
+      { "key": "返回格式", "label": "返回格式", "type": "select", "options": ["png", "webp", "jpg"] }
+    ]
+  },
+  {
+    "id": "tikpan-nano-banana-pro",
+    "name": "Nano Banana Pro / Gemini 图片",
+    "group": "Tikpan 图像节点",
+    "description": "适配 TikpanNanoBananaProNode，支持文生图、图生图、多参考图和 Gemini/OpenAI 兼容调用。",
+    "task": "image-generation",
+    "engine": "tikpan_node",
+    "mediaType": "image",
+    "credentialEnv": "TIKPAN_API_KEY",
+    "parameters": {
+      "调用方式": "gemini原生",
+      "模型": "gemini-3-pro-image-preview",
+      "分辨率": "2K",
+      "画面比例": "1:1 | 1:1正方形",
+      "温度": 0.7,
+      "max_tokens": 4096
+    },
+    "node": {
+      "classType": "TikpanNanoBananaProNode",
+      "apiKeyInput": "API_密钥",
+      "promptInput": "修改指令",
+      "seedInput": "seed",
+      "hiddenInputs": {
+        "获取密钥请访问": "👉 https://tikpan.com (官方授权Key获取点)"
+      },
+      "referenceImageInputs": ["参考图_1", "参考图_2", "参考图_3", "参考图_4", "参考图_5", "参考图_6", "参考图_7", "参考图_8", "参考图_9", "参考图_10", "参考图_11", "参考图_12", "参考图_13", "参考图_14"],
+      "saveImage": true
+    },
+    "fields": [
+      { "key": "调用方式", "label": "调用方式", "type": "select", "options": ["gemini原生", "openai兼容"] },
+      { "key": "模型", "label": "模型", "type": "select", "options": ["gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview"] },
+      { "key": "分辨率", "label": "分辨率", "type": "select", "options": ["2K", "4K", "1K", "none"] },
+      { "key": "画面比例", "label": "画面比例", "type": "select", "options": ["1:1 | 1:1正方形", "16:9 | 16:9宽屏", "9:16 | 9:16竖屏", "4:3 | 4:3标准", "3:4 | 3:4竖版", "21:9 | 21:9超宽", "2.35:1 | 2.35:1电影", "3:2 | 3:2摄影", "2:3 | 2:3人像"] },
+      { "key": "温度", "label": "温度", "type": "number", "min": 0, "max": 2, "step": 0.1 },
+      { "key": "max_tokens", "label": "Max tokens", "type": "number", "min": 1, "max": 32768, "step": 1 }
+    ]
+  },
+  {
+    "id": "tikpan-doubao-seedream",
+    "name": "豆包 Seedream 5.0",
+    "group": "Tikpan 图像节点",
+    "description": "适配 TikpanDoubaoImageNode，适合商品图、组图、联网增强和多图参考。",
+    "task": "image-generation",
+    "engine": "tikpan_node",
+    "mediaType": "image",
+    "credentialEnv": "TIKPAN_API_KEY",
+    "parameters": {
+      "size_mode": "比例尺寸",
+      "size_quality": "2K",
+      "aspect_ratio": "1:1 正方形",
+      "output_format": "jpeg",
+      "response_format": "url",
+      "watermark": "无水印",
+      "联网搜索增强": "关闭",
+      "多图生成": "关闭",
+      "最多生成张数": 4,
+      "multi_image_fallback": "自动降级为首图",
+      "negative_prompt": ""
+    },
+    "node": {
+      "classType": "TikpanDoubaoImageNode",
+      "apiKeyInput": "api_key",
+      "promptInput": "prompt",
+      "hiddenInputs": {
+        "💰_福利_💰": "🔥 0.6元RMB兑1虚拟美元余额 | 全网底价 👉 https://tikpan.com",
+        "获取密钥请访问": "👉 https://tikpan.com (官方授权Key获取点)"
+      },
+      "dataUrlListInput": "image_url_or_base64",
+      "maxCanvasImages": 14,
+      "saveImage": true
+    },
+    "fields": [
+      { "key": "size_mode", "label": "尺寸模式", "type": "select", "options": ["品质档位", "比例尺寸"] },
+      { "key": "size_quality", "label": "品质档位", "type": "select", "options": ["2K", "3K"] },
+      { "key": "aspect_ratio", "label": "画面比例", "type": "select", "options": ["1:1 正方形", "4:3 横版", "3:4 竖版", "16:9 宽屏", "9:16 手机竖屏", "3:2 海报横版", "2:3 海报竖版", "21:9 超宽屏"] },
+      { "key": "output_format", "label": "图片格式", "type": "select", "options": ["jpeg", "png"] },
+      { "key": "response_format", "label": "响应格式", "type": "select", "options": ["url", "b64_json"] },
+      { "key": "watermark", "label": "水印", "type": "select", "options": ["无水印", "有水印"] },
+      { "key": "联网搜索增强", "label": "联网搜索", "type": "select", "options": ["关闭", "自动"] },
+      { "key": "多图生成", "label": "多图生成", "type": "select", "options": ["关闭", "自动"] },
+      { "key": "最多生成张数", "label": "最多张数", "type": "number", "min": 1, "max": 15, "step": 1 },
+      { "key": "negative_prompt", "label": "负面提示词", "type": "textarea", "rows": 3 }
+    ]
+  },
+  {
+    "id": "tikpan-gpt-image-2-edit",
+    "name": "GPT Image 2 图片编辑",
+    "group": "Tikpan 编辑节点",
+    "description": "适配 TikpanGptImage2OfficialEditV2。选中画布上的图片后，可基于主图编辑并贴回画布。",
+    "task": "image-edit",
+    "engine": "tikpan_node",
+    "mediaType": "image",
+    "credentialEnv": "TIKPAN_API_KEY",
+    "requiresSelectedImage": true,
+    "parameters": {
+      "生成张数": 1,
+      "分辨率档位": "2K",
+      "画面比例": "Auto",
+      "画质": "medium",
+      "背景模式": "auto",
+      "遮罩反相": false,
+      "提示增强": true,
+      "超时秒数": 300
+    },
+    "node": {
+      "classType": "TikpanGptImage2OfficialEditV2",
+      "apiKeyInput": "API_密钥",
+      "promptInput": "编辑指令",
+      "requiredImageInput": "主图像",
+      "referenceImageInputs": ["参考图1", "参考图2", "参考图3", "参考图4"],
+      "hiddenInputs": {
+        "💎_源头拿货价福利_💎": "🔥 0.6元RMB兑1美元余额全网底价",
+        "获取密钥请访问": "👉 https://tikpan.com 官方授权获取Key"
+      },
+      "saveImage": true
+    },
+    "fields": [
+      { "key": "生成张数", "label": "生成张数", "type": "number", "min": 1, "max": 10, "step": 1 },
+      { "key": "分辨率档位", "label": "分辨率", "type": "select", "options": ["Auto", "1K", "2K", "4K"] },
+      { "key": "画面比例", "label": "画面比例", "type": "select", "options": ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "21:9", "9:21"] },
+      { "key": "画质", "label": "画质", "type": "select", "options": ["auto", "low", "medium", "high"] },
+      { "key": "背景模式", "label": "背景", "type": "select", "options": ["auto", "opaque", "transparent"] },
+      { "key": "提示增强", "label": "提示增强", "type": "checkbox" },
+      { "key": "超时秒数", "label": "超时秒数", "type": "number", "min": 30, "max": 1800, "step": 10 }
+    ]
+  },
+  {
+    "id": "tikpan-veo-video",
+    "name": "Veo 3.1 视频",
+    "group": "Tikpan 视频节点",
+    "description": "适配 TikpanVeoVideoNode，可用画布图片作为首帧、尾帧或垫图。",
+    "task": "text-to-video",
+    "engine": "tikpan_node",
+    "mediaType": "video",
+    "credentialEnv": "TIKPAN_API_KEY",
+    "parameters": {
+      "模型选择": "veo_3_1-lite",
+      "比例": "16:9"
+    },
+    "node": {
+      "classType": "TikpanVeoVideoNode",
+      "apiKeyInput": "API_密钥",
+      "promptInput": "Veo专属提示词",
+      "seedInput": "seed",
+      "referenceImageInputs": ["参考图_首帧", "参考图_尾帧", "垫图_1", "垫图_2", "垫图_3"],
+      "hiddenInputs": {
+        "获取密钥请访问": "👉 https://tikpan.com (官方授权Key获取点)"
+      },
+      "saveImage": false
+    },
+    "fields": [
+      { "key": "模型选择", "label": "模型", "type": "select", "options": ["veo_3_1-lite", "veo_3_1-lite-4K", "veo_3_1-fast-4K", "veo3.1-fast-components", "veo3.1-pro", "veo_3_1-components-4K", "veo_3_1-fast-components-4K"] },
+      { "key": "比例", "label": "比例", "type": "select", "options": ["16:9", "9:16"] }
+    ]
+  },
+  {
+    "id": "tikpan-grok-video",
+    "name": "Grok 视频",
+    "group": "Tikpan 视频节点",
+    "description": "适配 TikpanExclusiveVideoNode，支持最多 7 张参考图。",
+    "task": "text-to-video",
+    "engine": "tikpan_node",
+    "mediaType": "video",
+    "credentialEnv": "TIKPAN_API_KEY",
+    "parameters": {
+      "模型选择": "grok-video-3",
+      "比例": "9:16",
+      "分辨率": "720P"
+    },
+    "node": {
+      "classType": "TikpanExclusiveVideoNode",
+      "apiKeyInput": "Tikpan_API密钥",
+      "promptInput": "Grok3专属提示词",
+      "seedInput": "seed",
+      "referenceImageInputs": ["参考图_1", "参考图_2", "参考图_3", "参考图_4", "参考图_5", "参考图_6", "参考图_7"],
+      "hiddenInputs": {
+        "获取密钥请访问": "👉 https://tikpan.com (官方授权Key获取点)"
+      },
+      "saveImage": false
+    },
+    "fields": [
+      { "key": "模型选择", "label": "模型", "type": "select", "options": ["grok-video-3", "grok-video-3-10s"] },
+      { "key": "比例", "label": "比例", "type": "select", "options": ["9:16", "16:9", "1:1", "4:3", "3:4", "21:9", "9:21"] },
+      { "key": "分辨率", "label": "分辨率", "type": "select", "options": ["1080P", "720P", "480P"] }
+    ]
+  },
+  {
+    "id": "tikpan-suno-music",
+    "name": "Suno 音乐",
+    "group": "Tikpan 音频节点",
+    "description": "适配 TikpanSunoMusicNode，用画布管理歌词、标题和风格方向。",
+    "task": "text-to-audio",
+    "engine": "tikpan_node",
+    "mediaType": "audio",
+    "credentialEnv": "TIKPAN_API_KEY",
+    "parameters": {
+      "🎵_生成模式": "自定义模式",
+      "歌曲标题": "命中注定",
+      "风格标签": "pop, romantic",
+      "模型版本": "chirp-fenix",
+      "生成纯音乐": false,
+      "负面风格标签": ""
+    },
+    "node": {
+      "classType": "TikpanSunoMusicNode",
+      "apiKeyInput": "API_密钥",
+      "promptInput": "创作提示词",
+      "hiddenInputs": {
+        "💰_福利_💰": "🔥 0.6元RMB兑1虚拟美元余额 | 全网底价 👉 https://tikpan.com",
+        "获取密钥请访问": "👉 https://tikpan.com (官方授权Key获取点)"
+      },
+      "saveImage": false
+    },
+    "fields": [
+      { "key": "🎵_生成模式", "label": "生成模式", "type": "select", "options": ["灵感模式", "自定义模式", "续写模式", "歌手风格"] },
+      { "key": "歌曲标题", "label": "歌曲标题", "type": "text" },
+      { "key": "风格标签", "label": "风格标签", "type": "text" },
+      { "key": "模型版本", "label": "模型版本", "type": "select", "options": ["chirp-v3-0", "chirp-v3-5", "chirp-v4", "chirp-auk", "chirp-v5", "chirp-fenix"] },
+      { "key": "生成纯音乐", "label": "生成纯音乐", "type": "checkbox" },
+      { "key": "负面风格标签", "label": "负面风格标签", "type": "text" },
+      { "key": "🎤_续写_歌曲ID", "label": "续写歌曲 ID", "type": "text" },
+      { "key": "⏱️_续写起始秒数", "label": "续写起始秒数", "type": "number", "min": 0, "max": 600, "step": 1 },
+      { "key": "🎭_歌手风格_PersonaID", "label": "Persona ID", "type": "text" },
+      { "key": "🎙️_歌手风格_参考音频ID", "label": "参考音频 ID", "type": "text" }
+    ]
+  }
+]

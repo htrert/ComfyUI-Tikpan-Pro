@@ -1,10 +1,10 @@
 """
 💰 计费模块 — 余额扣费/额度校验
 """
-from models import get_model_price, update_balance, log_generation, get_user
+from models import calculate_model_credits, get_model_price, update_balance, get_user
 
 
-def deduct_credits(user_id, model_id, resolution="2K"):
+def deduct_credits(user_id, model_id, resolution="2K", params=None):
     """
     扣费流程：检查余额 → 扣费 → 记录日志
     返回 (success, credits_used, error_msg)
@@ -13,7 +13,10 @@ def deduct_credits(user_id, model_id, resolution="2K"):
     if not user:
         return False, 0, "用户不存在"
 
-    credits = get_model_price(model_id, resolution)
+    billing_params = dict(params or {})
+    billing_params.setdefault("resolution", resolution)
+    quote = calculate_model_credits(model_id, billing_params)
+    credits = quote["credits"]
 
     if user["balance"] < credits:
         return False, credits, f"余额不足（需要 {credits} 额度，当前 {user['balance']} 额度）"
@@ -23,6 +26,12 @@ def deduct_credits(user_id, model_id, resolution="2K"):
         return False, credits, error
 
     return True, credits, None
+
+
+def quote_credits(model_id, resolution="2K", params=None):
+    billing_params = dict(params or {})
+    billing_params.setdefault("resolution", resolution)
+    return calculate_model_credits(model_id, billing_params)
 
 
 def get_pricing_list():

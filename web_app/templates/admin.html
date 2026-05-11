@@ -326,6 +326,12 @@ textarea{min-height:80px;resize:vertical}
     <button class="side-item" onclick="showTab('fields', this)">
       <span class="icon">📋</span> 字段管理
     </button>
+    <button class="side-item" onclick="showTab('channels', this)">
+      <span class="icon">🔌</span> 供应商渠道
+    </button>
+    <button class="side-item" onclick="showTab('pricing', this)">
+      <span class="icon">💰</span> 计价规则
+    </button>
     <button class="side-item" onclick="showTab('settings', this)">
       <span class="icon">⚙️</span> 系统设置
     </button>
@@ -341,6 +347,9 @@ textarea{min-height:80px;resize:vertical}
 <script>
 let categories = [];
 let models = [];
+let channels = [];
+let pricingRules = [];
+let routes = [];
 let selectedModelId = null;
 
 async function api(url, method='GET', body=null) {
@@ -362,6 +371,8 @@ function showTab(tab, btn) {
   if (tab==='categories') renderCategories();
   else if (tab==='models') renderModels();
   else if (tab==='fields') renderFields();
+  else if (tab==='channels') renderChannels();
+  else if (tab==='pricing') renderPricing();
   else if (tab==='settings') renderSettings();
   else if (tab==='about') renderAbout();
 }
@@ -685,6 +696,243 @@ async function delField(id) {
   if (!confirm('确定删除此字段？')) return;
   await api(`/admin/api/fields/${id}`, 'DELETE');
   renderFields();
+}
+
+// ===== Provider Channels =====
+async function renderChannels() {
+  channels = await api('/admin/api/provider-channels');
+  routes = await api('/admin/api/model-routes');
+  models = await api('/admin/api/models');
+  const h = [
+    `<div class="page-title">🔌 供应商渠道</div>`,
+    `<div class="page-desc">配置多个上游供应商渠道，并把模型路由到指定渠道。后续可以按优先级、权重、成本做自动切换。</div>`,
+    `<div class="notice">💡 API Key 会保存在本地 SQLite，生产环境建议迁移到云端密钥管理服务，并按渠道做最小权限。</div>`,
+    `<div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">🔌</span> 渠道列表 (${channels.length})</div>
+        <button class="btn btn-primary btn-sm" onclick="showChannelForm()">+ 新增渠道</button>
+      </div>`,
+  ];
+  h.push('<table><tr><th>优先级</th><th>Key</th><th>名称</th><th>类型</th><th>Base URL</th><th>状态</th><th>操作</th></tr>');
+  for (const c of channels) {
+    h.push(`<tr>
+      <td>${c.priority}</td>
+      <td><code>${c.key}</code></td>
+      <td>${c.name}</td>
+      <td><span class="tag tag-blue">${c.provider_type || 'custom'}</span></td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis">${c.base_url || '—'}</td>
+      <td><span class="tag ${c.is_active ? 'tag-green' : 'tag-red'}">${c.is_active ? '启用' : '停用'}</span></td>
+      <td><button class="btn btn-sm btn-edit" onclick="showChannelForm('${c.key}')">编辑</button></td>
+    </tr>`);
+  }
+  h.push('</table></div>');
+
+  h.push(`<div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">🧭</span> 模型路由 (${routes.length})</div>
+      <button class="btn btn-primary btn-sm" onclick="showRouteForm()">+ 新增路由</button>
+    </div>
+    <table><tr><th>模型</th><th>渠道</th><th>上游模型</th><th>端点</th><th>成本/单位</th><th>状态</th><th>操作</th></tr>`);
+  for (const r of routes) {
+    h.push(`<tr>
+      <td><code>${r.model_id}</code></td>
+      <td>${r.channel_key}</td>
+      <td>${r.upstream_model || '—'}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${r.endpoint || '—'}</td>
+      <td>${r.cost_per_unit || 0}</td>
+      <td><span class="tag ${r.is_active ? 'tag-green' : 'tag-red'}">${r.is_active ? '启用' : '停用'}</span></td>
+      <td><button class="btn btn-sm btn-edit" onclick="showRouteForm('${r.model_id}','${r.channel_key}')">编辑</button></td>
+    </tr>`);
+  }
+  h.push('</table></div>');
+  document.getElementById('main-content').innerHTML = h.join('');
+}
+
+function showChannelForm(key='') {
+  const c = channels.find(x => x.key === key) || {};
+  document.getElementById('main-content').innerHTML = `
+    <div class="page-title">${key ? '✏️ 编辑' : '➕ 新增'}供应商渠道</div>
+    <div class="card">
+      <div class="form-row">
+        <div><label>渠道 Key</label><input id="ch-key" value="${c.key || ''}" ${key ? 'readonly' : ''} placeholder="如：openai-main"></div>
+        <div><label>渠道名称</label><input id="ch-name" value="${c.name || ''}" placeholder="如：OpenAI 主渠道"></div>
+      </div>
+      <div class="form-row">
+        <div><label>供应商类型</label><input id="ch-type" value="${c.provider_type || ''}" placeholder="openai / doubao / tikpan / custom"></div>
+        <div><label>Base URL</label><input id="ch-base" value="${c.base_url || ''}" placeholder="https://api.example.com"></div>
+      </div>
+      <div><label>API Key</label><input id="ch-api-key" type="password" value="${c.api_key || ''}" placeholder="留空表示暂不配置"></div>
+      <div class="form-row-3">
+        <div><label>优先级</label><input id="ch-priority" type="number" value="${c.priority ?? 100}"></div>
+        <div><label>权重</label><input id="ch-weight" type="number" value="${c.weight ?? 1}"></div>
+        <div><label>超时秒数</label><input id="ch-timeout" type="number" value="${c.timeout_seconds ?? 120}"></div>
+      </div>
+      <div class="form-row">
+        <div><label>状态</label><select id="ch-active"><option value="1" ${c.is_active !== 0 ? 'selected' : ''}>启用</option><option value="0" ${c.is_active === 0 ? 'selected' : ''}>停用</option></select></div>
+        <div><label>备注</label><input id="ch-notes" value="${c.notes || ''}" placeholder="成本、限额、账号说明"></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-edit" onclick="renderChannels()">取消</button>
+        <button class="btn btn-primary" onclick="saveChannel()">💾 保存渠道</button>
+      </div>
+    </div>`;
+}
+
+async function saveChannel() {
+  const data = {
+    key: document.getElementById('ch-key').value,
+    name: document.getElementById('ch-name').value,
+    provider_type: document.getElementById('ch-type').value,
+    base_url: document.getElementById('ch-base').value,
+    api_key: document.getElementById('ch-api-key').value,
+    priority: parseInt(document.getElementById('ch-priority').value),
+    weight: parseInt(document.getElementById('ch-weight').value),
+    timeout_seconds: parseInt(document.getElementById('ch-timeout').value),
+    is_active: parseInt(document.getElementById('ch-active').value),
+    notes: document.getElementById('ch-notes').value,
+  };
+  await api('/admin/api/provider-channels', 'POST', data);
+  renderChannels();
+}
+
+function showRouteForm(modelId='', channelKey='') {
+  const r = routes.find(x => x.model_id === modelId && x.channel_key === channelKey) || {};
+  const modelOpts = models.map(m => `<option value="${m.id}" ${r.model_id === m.id ? 'selected' : ''}>${m.name} (${m.id})</option>`).join('');
+  const channelOpts = channels.map(c => `<option value="${c.key}" ${r.channel_key === c.key ? 'selected' : ''}>${c.name} (${c.key})</option>`).join('');
+  document.getElementById('main-content').innerHTML = `
+    <div class="page-title">${modelId ? '✏️ 编辑' : '➕ 新增'}模型路由</div>
+    <div class="card">
+      <div class="form-row">
+        <div><label>模型</label><select id="rt-model">${modelOpts}</select></div>
+        <div><label>渠道</label><select id="rt-channel">${channelOpts}</select></div>
+      </div>
+      <div class="form-row">
+        <div><label>上游模型 ID</label><input id="rt-upstream" value="${r.upstream_model || ''}" placeholder="供应商真实模型名"></div>
+        <div><label>端点</label><input id="rt-endpoint" value="${r.endpoint || ''}" placeholder="/v1/images/generations"></div>
+      </div>
+      <div class="form-row-3">
+        <div><label>优先级</label><input id="rt-priority" type="number" value="${r.priority ?? 100}"></div>
+        <div><label>权重</label><input id="rt-weight" type="number" value="${r.weight ?? 1}"></div>
+        <div><label>成本/单位</label><input id="rt-cost" type="number" step="0.0001" value="${r.cost_per_unit ?? 0}"></div>
+      </div>
+      <div class="form-row">
+        <div><label>状态</label><select id="rt-active"><option value="1" ${r.is_active !== 0 ? 'selected' : ''}>启用</option><option value="0" ${r.is_active === 0 ? 'selected' : ''}>停用</option></select></div>
+        <div><label>备注</label><input id="rt-notes" value="${r.notes || ''}"></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-edit" onclick="renderChannels()">取消</button>
+        <button class="btn btn-primary" onclick="saveRoute()">💾 保存路由</button>
+      </div>
+    </div>`;
+}
+
+async function saveRoute() {
+  const data = {
+    model_id: document.getElementById('rt-model').value,
+    channel_key: document.getElementById('rt-channel').value,
+    upstream_model: document.getElementById('rt-upstream').value,
+    endpoint: document.getElementById('rt-endpoint').value,
+    priority: parseInt(document.getElementById('rt-priority').value),
+    weight: parseInt(document.getElementById('rt-weight').value),
+    cost_per_unit: parseFloat(document.getElementById('rt-cost').value || '0'),
+    is_active: parseInt(document.getElementById('rt-active').value),
+    notes: document.getElementById('rt-notes').value,
+  };
+  await api('/admin/api/model-routes', 'POST', data);
+  renderChannels();
+}
+
+// ===== Pricing =====
+async function renderPricing() {
+  pricingRules = await api('/admin/api/pricing');
+  models = await api('/admin/api/models');
+  const h = [
+    `<div class="page-title">💰 计价规则</div>`,
+    `<div class="page-desc">配置用户侧售价。支持按分辨率、固定每次、按字段数量计费。</div>`,
+    `<div class="notice">💡 代理体系可以基于这里的零售价与渠道成本计算利润。建议每个模型都配置明确计价规则。</div>`,
+    `<div class="card"><div class="card-header"><div class="card-title"><span class="icon">💰</span> 全部计价 (${pricingRules.length})</div><button class="btn btn-primary btn-sm" onclick="showPricingForm()">+ 新增/覆盖规则</button></div>`,
+    `<table><tr><th>模型</th><th>模式</th><th>1K</th><th>2K/固定</th><th>4K</th><th>单位字段</th><th>单位额度</th><th>成本</th><th>状态</th><th>操作</th></tr>`
+  ];
+  for (const p of pricingRules) {
+    h.push(`<tr>
+      <td><code>${p.model_id}</code><br>${p.model_name}</td>
+      <td><span class="tag tag-blue">${p.billing_mode || 'resolution'}</span></td>
+      <td>${p.credits_1k}</td>
+      <td>${p.credits_2k}</td>
+      <td>${p.credits_4k}</td>
+      <td>${p.unit_field || '—'}</td>
+      <td>${p.unit_credits || '—'}</td>
+      <td>${p.cost_per_unit || 0}</td>
+      <td><span class="tag ${p.is_active ? 'tag-green' : 'tag-red'}">${p.is_active ? '启用' : '停用'}</span></td>
+      <td><button class="btn btn-sm btn-edit" onclick="showPricingForm('${p.model_id}')">编辑</button></td>
+    </tr>`);
+  }
+  h.push('</table></div>');
+  document.getElementById('main-content').innerHTML = h.join('');
+}
+
+function showPricingForm(modelId='') {
+  const p = pricingRules.find(x => x.model_id === modelId) || {};
+  const modelOpts = models.map(m => `<option value="${m.id}" ${p.model_id === m.id ? 'selected' : ''}>${m.name} (${m.id})</option>`).join('');
+  document.getElementById('main-content').innerHTML = `
+    <div class="page-title">${modelId ? '✏️ 编辑' : '➕ 新增'}计价规则</div>
+    <div class="card">
+      <div class="form-row">
+        <div><label>模型</label><select id="pr-model">${modelOpts}</select></div>
+        <div><label>模型显示名</label><input id="pr-name" value="${p.model_name || ''}" placeholder="用于后台识别"></div>
+      </div>
+      <div class="form-row">
+        <div><label>计费模式</label><select id="pr-mode">
+          <option value="resolution" ${p.billing_mode === 'resolution' || !p.billing_mode ? 'selected' : ''}>按分辨率档位</option>
+          <option value="flat" ${p.billing_mode === 'flat' ? 'selected' : ''}>固定每次</option>
+          <option value="per_unit" ${p.billing_mode === 'per_unit' ? 'selected' : ''}>按字段数量</option>
+        </select></div>
+        <div><label>单位名称</label><input id="pr-unit-name" value="${p.unit_name || 'generation'}" placeholder="generation / image / second"></div>
+      </div>
+      <div class="form-row-3">
+        <div><label>1K 额度</label><input id="pr-1k" type="number" value="${p.credits_1k ?? 5}"></div>
+        <div><label>2K / 固定额度</label><input id="pr-2k" type="number" value="${p.credits_2k ?? 8}"></div>
+        <div><label>4K 额度</label><input id="pr-4k" type="number" value="${p.credits_4k ?? 15}"></div>
+      </div>
+      <div class="form-row">
+        <div><label>按量字段名</label><input id="pr-unit-field" value="${p.unit_field || ''}" placeholder="如 n / duration / seconds"></div>
+        <div><label>每单位额度</label><input id="pr-unit-credits" type="number" step="0.01" value="${p.unit_credits ?? 0}"></div>
+      </div>
+      <div class="form-row-3">
+        <div><label>最低扣费</label><input id="pr-min" type="number" value="${p.min_credits ?? 0}"></div>
+        <div><label>成本/单位</label><input id="pr-cost" type="number" step="0.0001" value="${p.cost_per_unit ?? 0}"></div>
+        <div><label>零售倍率</label><input id="pr-markup" type="number" step="0.01" value="${p.retail_markup ?? 1}"></div>
+      </div>
+      <div class="form-row" style="grid-template-columns:1fr">
+        <div><label>状态</label><select id="pr-active"><option value="1" ${p.is_active !== 0 ? 'selected' : ''}>启用</option><option value="0" ${p.is_active === 0 ? 'selected' : ''}>停用</option></select></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-edit" onclick="renderPricing()">取消</button>
+        <button class="btn btn-primary" onclick="savePricing()">💾 保存计价</button>
+      </div>
+    </div>`;
+}
+
+async function savePricing() {
+  const modelId = document.getElementById('pr-model').value;
+  const model = models.find(m => m.id === modelId);
+  const data = {
+    model_id: modelId,
+    model_name: document.getElementById('pr-name').value || model?.name || modelId,
+    billing_mode: document.getElementById('pr-mode').value,
+    unit_name: document.getElementById('pr-unit-name').value,
+    credits_1k: parseInt(document.getElementById('pr-1k').value),
+    credits_2k: parseInt(document.getElementById('pr-2k').value),
+    credits_4k: parseInt(document.getElementById('pr-4k').value),
+    unit_field: document.getElementById('pr-unit-field').value,
+    unit_credits: parseFloat(document.getElementById('pr-unit-credits').value || '0'),
+    min_credits: parseInt(document.getElementById('pr-min').value || '0'),
+    cost_per_unit: parseFloat(document.getElementById('pr-cost').value || '0'),
+    retail_markup: parseFloat(document.getElementById('pr-markup').value || '1'),
+    is_active: parseInt(document.getElementById('pr-active').value),
+  };
+  await api('/admin/api/pricing', 'POST', data);
+  renderPricing();
 }
 
 // ===== Settings =====

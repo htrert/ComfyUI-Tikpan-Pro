@@ -10,10 +10,32 @@ from backend.database import get_model
 from backend.handlers import API_DISPATCH
 from config import generate_image_token
 from core.auth import login_required
-from core.billing import deduct_credits
-from models import get_user, log_generation, update_balance, update_generation_log
+from core.billing import deduct_credits, quote_credits
+from models import get_user, log_generation, select_model_route, update_balance, update_generation_log
 
 bp = Blueprint("api_generate", __name__, url_prefix="/api")
+
+MAX_PROMPT_CHARS = 8000
+MAX_REFERENCE_IMAGES = 14
+
+
+def _validate_generation_input(data, files):
+    model_id = str(data.get("model_id", "")).strip()
+    prompt = str(data.get("prompt", "")).strip()
+    if not model_id:
+        return None, None, "请选择模型"
+    if prompt and len(prompt) > MAX_PROMPT_CHARS:
+        return None, None, f"提示词过长，请控制在 {MAX_PROMPT_CHARS} 字符以内"
+
+    reference_images = []
+    for key in files:
+        if key.startswith("reference_images"):
+            for f in files.getlist(key):
+                if f and f.filename:
+                    reference_images.append(f)
+    if len(reference_images) > MAX_REFERENCE_IMAGES:
+        return None, None, f"参考图最多 {MAX_REFERENCE_IMAGES} 张"
+    return model_id, reference_images, None
 
 
 @bp.route("/generate", methods=["POST"])
@@ -22,7 +44,9 @@ def generate():
     """Create one billable generation job."""
     data = request.form.to_dict()
     files = request.files
-    model_id = data.get("model_id")
+    model_id, reference_images, validation_error = _validate_generation_input(data, files)
+    if validation_error:
+        return jsonify({"error": validation_error}), 400
     prompt = data.get("prompt", "")
     resolution = data.get("resolution", "2K")
 
@@ -30,7 +54,7 @@ def generate():
     if not config:
         return jsonify({"error": f"未知模型: {model_id}"}), 400
 
-    success, credits, error = deduct_credits(request.user_id, model_id, resolution)
+    success, credits, error = deduct_credits(request.user_id, model_id, resolution, data)
     if not success:
         return jsonify({"error": error}), 402
 
@@ -43,14 +67,12 @@ def generate():
     )
 
     try:
-        reference_images = []
-        for key in files:
-            if key.startswith("reference_images"):
-                for f in request.files.getlist(key):
-                    if f and f.filename:
-                        reference_images.append(f)
-
         api_type = config["api_type"]
+        route = select_model_route(model_id)
+        if route:
+            data["_channel_key"] = route.get("channel_key", "")
+            data["_upstream_model"] = route.get("upstream_model", "")
+            data["_route_endpoint"] = route.get("endpoint", "")
         handler = API_DISPATCH.get(api_type)
         if not handler:
             return _refund_and_fail(
@@ -103,6 +125,41 @@ def generate():
             f"服务器异常: {str(exc)[:500]}",
             raw_response=tb[:4000],
         )
+
+
+@bp.route("/request-preview", methods=["POST"])
+def request_preview():
+    """Preview the normalized upstream request without charging or generating."""
+    data = request.form.to_dict()
+    model_id, reference_images, validation_error = _validate_generation_input(data, request.files)
+    if validation_error:
+        return jsonify({"error": validation_error}), 400
+    config = get_model(model_id)
+    if not config:
+        return jsonify({"error": f"未知模型: {model_id}"}), 400
+
+    preview = {
+        "version": "2026-05-11",
+        "model_id": model_id,
+        "model_name": config.get("name", ""),
+        "provider": config.get("provider", ""),
+        "api_type": config.get("api_type", ""),
+        "endpoint": config.get("endpoint", ""),
+        "estimated_credits": quote_credits(model_id, data.get("resolution", "2K"), data),
+        "route": select_model_route(model_id),
+        "parameters": {
+            key: value
+            for key, value in data.items()
+            if key not in ("api_key",)
+        },
+        "reference_images": [f.filename for f in reference_images],
+        "execution": {
+            "mode": "upstream",
+            "billing": "preview_only_no_charge",
+            "note": "前端表单会在真实生成时由后端转换为对应上游 API 请求；这些字段也可以继续映射为 ComfyUI workflow 参数。",
+        },
+    }
+    return jsonify({"success": True, "preview": preview})
 
 
 def _call_handler(api_type, handler, model_id, data, reference_images):

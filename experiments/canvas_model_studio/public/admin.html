@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Canvas Admin</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body class="admin-body">
+    <header class="admin-header">
+      <div>
+        <span class="eyebrow">Canvas Admin</span>
+        <h1>模型与渠道配置</h1>
+      </div>
+      <nav>
+        <a href="/">返回画布</a>
+        <button id="reloadConfigButton">刷新</button>
+        <button id="saveConfigButton" class="generate">保存配置</button>
+      </nav>
+    </header>
+
+    <main class="admin-layout">
+      <aside class="admin-nav">
+        <button data-admin-tab="overview" class="active">总览</button>
+        <button data-admin-tab="channels">渠道 API</button>
+        <button data-admin-tab="routes">模型路由</button>
+        <button data-admin-tab="pricing">计价规则</button>
+        <button data-admin-tab="settings">全局设置</button>
+        <button data-admin-tab="raw">原始 JSON</button>
+      </aside>
+
+      <section class="admin-main">
+        <div id="adminNotice" class="admin-notice">正在读取配置...</div>
+
+        <section id="tab-overview" class="admin-tab active">
+          <div class="admin-grid">
+            <article class="admin-card">
+              <strong id="profileCount">0</strong>
+              <span>模型档案</span>
+            </article>
+            <article class="admin-card">
+              <strong id="channelCount">0</strong>
+              <span>渠道</span>
+            </article>
+            <article class="admin-card">
+              <strong id="routeCount">0</strong>
+              <span>路由</span>
+            </article>
+            <article class="admin-card">
+              <strong id="pricingCount">0</strong>
+              <span>计价</span>
+            </article>
+          </div>
+          <div class="admin-panel">
+            <h2>当前模型档案</h2>
+            <div id="profileTable" class="admin-table"></div>
+          </div>
+        </section>
+
+        <section id="tab-channels" class="admin-tab">
+          <div class="admin-panel">
+            <div class="admin-panel-head">
+              <h2>渠道 API</h2>
+              <button id="addChannelButton">新增渠道</button>
+            </div>
+            <div id="channelsEditor" class="config-list"></div>
+          </div>
+        </section>
+
+        <section id="tab-routes" class="admin-tab">
+          <div class="admin-panel">
+            <div class="admin-panel-head">
+              <h2>模型路由</h2>
+              <button id="addRouteButton">新增路由</button>
+            </div>
+            <div id="routesEditor" class="config-list"></div>
+          </div>
+        </section>
+
+        <section id="tab-pricing" class="admin-tab">
+          <div class="admin-panel">
+            <div class="admin-panel-head">
+              <h2>计价规则</h2>
+              <button id="addPricingButton">新增计价</button>
+            </div>
+            <div id="pricingEditor" class="config-list"></div>
+          </div>
+        </section>
+
+        <section id="tab-settings" class="admin-tab">
+          <div class="admin-panel">
+            <h2>全局设置</h2>
+            <div id="settingsEditor" class="config-form"></div>
+          </div>
+        </section>
+
+        <section id="tab-raw" class="admin-tab">
+          <div class="admin-panel">
+            <h2>原始配置 JSON</h2>
+            <textarea id="rawConfig" class="request-preview" rows="24"></textarea>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/admin.js"></script>
+  </body>
+</html>

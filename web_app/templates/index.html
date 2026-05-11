@@ -218,6 +218,36 @@ body{
 
 .nav-user:hover{background:var(--accent-mid)}
 
+.nav-balance{
+  display:none;
+  align-items:center;
+  gap:6px;
+  padding:5px 12px;
+  border-radius:var(--radius-sm);
+  border:1px solid rgba(34,197,94,0.16);
+  background:var(--green-bg);
+  color:var(--green);
+  font-size:12px;
+  font-weight:700;
+}
+
+.nav-balance.show{display:flex}
+
+.nav-cta{
+  display:none;
+  min-height:31px;
+  padding:0 13px;
+  border:0;
+  border-radius:var(--radius-sm);
+  background:var(--text);
+  color:var(--bg2);
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+.nav-cta.show{display:inline-flex;align-items:center}
+
 /* ===== 6. Layout - Main App ===== */
 .app-wrap{
   position:fixed;
@@ -233,6 +263,36 @@ body{
   width:220px;flex-shrink:0;
   display:flex;flex-direction:column;gap:8px;
   overflow-y:auto;overflow-x:hidden;
+}
+
+.side-tools{
+  position:sticky;top:0;z-index:2;
+  padding:0 0 8px;
+  background:linear-gradient(180deg,var(--bg) 70%,rgba(244,246,251,0));
+}
+
+[data-theme="dark"] .side-tools{
+  background:linear-gradient(180deg,var(--bg) 70%,rgba(8,8,16,0));
+}
+
+.model-search{
+  width:100%;
+  min-height:36px;
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:var(--card);
+  color:var(--text);
+  padding:0 12px;
+  font-size:12px;
+  box-shadow:var(--shadow-card);
+}
+
+.model-search::placeholder{color:var(--text3)}
+
+.model-search:focus{
+  outline:none;
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-glow);
 }
 
 .side-section{
@@ -349,6 +409,88 @@ body{
 .tag-pro{background:var(--amber-bg);color:var(--amber)}
 .tag-new{background:var(--green-bg);color:var(--green)}
 
+.insight-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+
+.insight-card{
+  background:var(--card);
+  border:1px solid var(--card-border);
+  border-radius:var(--radius);
+  padding:14px 15px;
+  box-shadow:var(--shadow-card);
+}
+
+.insight-label{
+  color:var(--text3);
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.7px;
+  margin-bottom:7px;
+}
+
+.insight-value{
+  color:var(--text);
+  font-size:13px;
+  font-weight:700;
+  line-height:1.35;
+}
+
+.insight-text{
+  margin-top:5px;
+  color:var(--text2);
+  font-size:11px;
+  line-height:1.5;
+}
+
+.workflow-card{
+  background:linear-gradient(135deg,var(--card),var(--card-hover));
+  border:1px solid var(--card-border);
+  border-radius:var(--radius);
+  padding:15px 16px;
+  box-shadow:var(--shadow-card);
+}
+
+.workflow-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--text);
+  font-size:13px;
+  font-weight:700;
+  margin-bottom:11px;
+}
+
+.workflow-steps{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+}
+
+.workflow-step{
+  min-height:58px;
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:var(--bg2);
+  padding:9px 10px;
+}
+
+.workflow-step strong{
+  display:block;
+  color:var(--accent);
+  font-size:11px;
+  margin-bottom:4px;
+}
+
+.workflow-step span{
+  color:var(--text2);
+  font-size:10.5px;
+  line-height:1.45;
+}
+
 /* Section Cards */
 .card{
   background:var(--card);border:1px solid var(--card-border);
@@ -402,6 +544,45 @@ body{
 .key-btn:hover{color:var(--text)}
 
 .key-note{font-size:10px;color:var(--text3);margin-top:6px}
+
+.commercial-strip{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+}
+
+.commercial-metric{
+  border:1px solid var(--card-border);
+  border-radius:var(--radius);
+  background:var(--card);
+  padding:13px 14px;
+  box-shadow:var(--shadow-card);
+}
+
+.commercial-metric span{
+  display:block;
+  color:var(--text3);
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.7px;
+  margin-bottom:6px;
+}
+
+.commercial-metric strong{
+  display:block;
+  color:var(--text);
+  font-size:17px;
+  font-weight:800;
+}
+
+.commercial-metric small{
+  display:block;
+  color:var(--text2);
+  font-size:10.5px;
+  line-height:1.45;
+  margin-top:4px;
+}
 
 /* Form Fields */
 .form-field{margin-bottom:14px}
@@ -549,6 +730,67 @@ select{
 .gen-btn.loading .btn-text{display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+.form-actions{
+  display:grid;
+  grid-template-columns:1fr 1.4fr;
+  gap:10px;
+  margin-top:4px;
+}
+
+.preview-btn{
+  width:100%;
+  padding:12px;
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:var(--bg2);
+  color:var(--text);
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  font-family:var(--font);
+  transition:all .2s;
+}
+
+.preview-btn:hover{
+  border-color:var(--accent);
+  color:var(--accent);
+  background:var(--accent-light);
+}
+
+.request-preview{
+  display:none;
+  margin-top:12px;
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:var(--bg3);
+  overflow:hidden;
+}
+
+.request-preview.open{display:block}
+
+.request-preview-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 10px;
+  border-bottom:1px solid var(--border);
+  color:var(--text2);
+  font-size:11px;
+  font-weight:700;
+}
+
+.request-preview pre{
+  margin:0;
+  max-height:260px;
+  overflow:auto;
+  padding:12px;
+  color:var(--text);
+  font-size:11px;
+  line-height:1.55;
+  font-family:"Cascadia Code",Consolas,monospace;
+  white-space:pre-wrap;
+}
+
 /* ===== 9. Result Panel - Right ===== */
 .rp{
   width:340px;flex-shrink:0;
@@ -642,6 +884,183 @@ select{
   border-radius:var(--radius-sm);
 }
 
+.modal-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:200;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:rgba(8,8,16,0.46);
+  backdrop-filter:blur(10px);
+}
+
+.modal-backdrop.open{display:flex}
+
+.modal{
+  width:min(520px,100%);
+  max-height:calc(100vh - 40px);
+  overflow:auto;
+  border:1px solid var(--card-border);
+  border-radius:var(--radius-lg);
+  background:var(--card);
+  box-shadow:var(--shadow-lg);
+}
+
+.modal-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:18px 20px;
+  border-bottom:1px solid var(--border);
+}
+
+.modal-title{
+  font-size:16px;
+  font-weight:800;
+  color:var(--text);
+}
+
+.modal-subtitle{
+  margin-top:4px;
+  color:var(--text2);
+  font-size:12px;
+  line-height:1.45;
+}
+
+.modal-close{
+  width:32px;
+  height:32px;
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:var(--bg2);
+  color:var(--text2);
+  cursor:pointer;
+}
+
+.modal-body{padding:18px 20px 20px}
+
+.auth-tabs{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  padding:3px;
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:var(--bg3);
+  margin-bottom:14px;
+}
+
+.auth-tab{
+  min-height:34px;
+  border:0;
+  border-radius:7px;
+  background:transparent;
+  color:var(--text2);
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+
+.auth-tab.active{
+  background:var(--card);
+  color:var(--accent);
+  box-shadow:var(--shadow-xs);
+}
+
+.modal-field{
+  display:grid;
+  gap:6px;
+  margin-bottom:12px;
+}
+
+.modal-field label{
+  color:var(--text);
+  font-size:12px;
+  font-weight:700;
+}
+
+.modal-field input{
+  width:100%;
+  min-height:40px;
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:var(--bg2);
+  color:var(--text);
+  padding:0 12px;
+  font-size:13px;
+}
+
+.modal-field input:focus{
+  outline:none;
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-glow);
+}
+
+.modal-action{
+  width:100%;
+  min-height:42px;
+  border:0;
+  border-radius:var(--radius-sm);
+  background:linear-gradient(135deg,#818cf8,#6366f1);
+  color:#fff;
+  font-size:14px;
+  font-weight:800;
+  cursor:pointer;
+  box-shadow:var(--shadow-accent);
+}
+
+.modal-note{
+  margin-top:10px;
+  color:var(--text3);
+  font-size:11px;
+  line-height:1.5;
+}
+
+.billing-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+
+.billing-plan{
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  background:var(--bg2);
+  padding:14px;
+  text-align:left;
+  cursor:pointer;
+  transition:all .18s;
+}
+
+.billing-plan:hover{
+  border-color:var(--accent);
+  background:var(--accent-light);
+  transform:translateY(-1px);
+}
+
+.billing-plan strong{
+  display:block;
+  color:var(--text);
+  font-size:18px;
+  margin-bottom:5px;
+}
+
+.billing-plan span{
+  display:block;
+  color:var(--text2);
+  font-size:12px;
+}
+
+.modal-message{
+  min-height:18px;
+  margin-top:10px;
+  color:var(--red);
+  font-size:12px;
+}
+
 @keyframes shimmer{to{background-position:-200% 0}}
 
 /* ===== 10. Model Switch Animation ===== */
@@ -662,6 +1081,9 @@ select{
   .rp{width:100%;min-height:280px;flex-shrink:0}
   .ct{flex:none;overflow:visible}
   html,body{overflow:auto}
+  .side-tools{position:relative;width:100%;padding-bottom:4px}
+  .insight-grid{grid-template-columns:1fr}
+  .workflow-steps{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
@@ -687,10 +1109,12 @@ select{
     <span class="nav-stat">
       <strong id="sm">—</strong> 模型 · <strong id="sc">—</strong> 分类
     </span>
+    <span class="nav-balance" id="balanceBadge">余额 0</span>
+    <button class="nav-cta" id="rechargeTopBtn" onclick="openBilling()">充值</button>
     <div class="theme-toggle" id="tt" onclick="toggleTheme()" title="切换主题">
       <div class="dot"></div>
     </div>
-    <div class="nav-user" onclick="showLogin()">
+    <div class="nav-user" onclick="handleUserClick()">
       <span>👤</span><span id="userLabel">登录</span>
     </div>
   </div>
@@ -700,7 +1124,11 @@ select{
 <div class="app-wrap">
 
   <!-- Left: Model Selector -->
-  <div class="side" id="side"></div>
+  <div class="side" id="side">
+    <div class="side-tools">
+      <input id="modelSearch" class="model-search" placeholder="搜索模型、供应商或能力">
+    </div>
+  </div>
 
   <!-- Center: Form -->
   <div class="ct" id="ct">
@@ -709,6 +1137,57 @@ select{
       <div class="model-name" id="mt">选择一个模型</div>
       <div class="model-desc" id="md">从左侧选择一个模型开始创作</div>
       <div class="model-tags" id="modelTags"></div>
+    </div>
+
+    <div class="commercial-strip">
+      <div class="commercial-metric">
+        <span>账户余额</span>
+        <strong id="balanceMetric">未登录</strong>
+        <small>登录后使用余额生成，失败自动退款。</small>
+      </div>
+      <div class="commercial-metric">
+        <span>本次预估</span>
+        <strong id="priceMetric">—</strong>
+        <small id="priceHint">根据模型和分辨率动态计算。</small>
+      </div>
+      <div class="commercial-metric">
+        <span>服务模式</span>
+        <strong>聚合 API</strong>
+        <small>统一封装多个上游模型，支持后续代理分销。</small>
+      </div>
+      <div class="commercial-metric">
+        <span>交付保障</span>
+        <strong>记录留痕</strong>
+        <small>订单、生成任务、失败退款都有审计记录。</small>
+      </div>
+    </div>
+
+    <div class="insight-grid" id="insightGrid">
+      <div class="insight-card">
+        <div class="insight-label">能力定位</div>
+        <div class="insight-value" id="capabilityTitle">聚合生成</div>
+        <div class="insight-text" id="capabilityText">统一接入图像、音乐、视频模型，屏蔽不同上游的请求差异。</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-label">参数协议</div>
+        <div class="insight-value" id="parameterTitle">动态表单</div>
+        <div class="insight-text" id="parameterText">每个模型的字段由数据库配置，后续可映射 ComfyUI 已验证节点参数。</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-label">交付方式</div>
+        <div class="insight-value" id="deliveryTitle">云端执行</div>
+        <div class="insight-text" id="deliveryText">网站负责鉴权、计费、请求打包和结果回传，用户无需安装 ComfyUI。</div>
+      </div>
+    </div>
+
+    <div class="workflow-card">
+      <div class="workflow-title">请求链路</div>
+      <div class="workflow-steps">
+        <div class="workflow-step"><strong>1. 选择模型</strong><span>用户只需要理解用途，不接触节点细节。</span></div>
+        <div class="workflow-step"><strong>2. 填写参数</strong><span>表单字段来自模型配置和已验证参数档案。</span></div>
+        <div class="workflow-step"><strong>3. 网站打包</strong><span>统一转换为上游 API 请求或 ComfyUI workflow。</span></div>
+        <div class="workflow-step"><strong>4. 返回结果</strong><span>保存任务记录、扣费记录和可访问产物。</span></div>
+      </div>
     </div>
 
     <!-- Form Area -->
@@ -721,7 +1200,7 @@ select{
           <input type="password" id="ak" placeholder="sk-..." autocomplete="off" spellcheck="false">
           <button class="key-btn" onclick="toggleKey()" title="显示/隐藏">👁</button>
         </div>
-        <div class="key-note">留空使用平台默认 Key，也可填写自己的 Key 覆盖</div>
+        <div class="key-note">留空使用平台托管 Key；临时填写自己的 Key 只用于本次请求，不会保存在浏览器。</div>
       </div>
 
       <!-- Dynamic Fields -->
@@ -730,10 +1209,20 @@ select{
         <form id="fm" enctype="multipart/form-data">
           <input type="hidden" name="model_id" id="mi">
           <div id="ff"></div>
-          <button type="submit" class="gen-btn" id="go">
-            <span class="spinner"></span>
-            <span class="btn-text">✨ 开始生成</span>
-          </button>
+          <div class="form-actions">
+            <button type="button" class="preview-btn" id="previewReq">预览请求</button>
+            <button type="submit" class="gen-btn" id="go">
+              <span class="spinner"></span>
+              <span class="btn-text">✨ 开始生成</span>
+            </button>
+          </div>
+          <div class="request-preview" id="requestPreviewBox">
+            <div class="request-preview-head">
+              <span>网站即将发送的标准请求</span>
+              <span>Preview</span>
+            </div>
+            <pre id="requestPreviewText"></pre>
+          </div>
         </form>
       </div>
     </div>
@@ -755,16 +1244,72 @@ select{
   </div>
 </div>
 
+<div class="modal-backdrop" id="authModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">登录 Tikpan AI Studio</div>
+        <div class="modal-subtitle">商业版服务需要账户、余额和生成记录，方便计费、退款和代理分销。</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('authModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="loginTab" onclick="setAuthMode('login')">登录</button>
+        <button class="auth-tab" id="registerTab" onclick="setAuthMode('register')">注册</button>
+      </div>
+      <div class="modal-field">
+        <label>邮箱</label>
+        <input id="authEmail" type="email" placeholder="you@example.com">
+      </div>
+      <div class="modal-field">
+        <label>密码</label>
+        <input id="authPassword" type="password" placeholder="至少 6 位">
+      </div>
+      <div class="modal-field" id="codeField" style="display:none">
+        <label>验证码</label>
+        <div style="display:grid;grid-template-columns:1fr 112px;gap:8px">
+          <input id="authCode" placeholder="邮箱验证码">
+          <button class="preview-btn" type="button" onclick="sendAuthCode()">发送验证码</button>
+        </div>
+      </div>
+      <button class="modal-action" onclick="submitAuth()">继续</button>
+      <div class="modal-note">登录后生成会自动扣除余额。API Key 可由平台统一托管，也可以临时填写自己的 Key 覆盖。</div>
+      <div class="modal-message" id="authMessage"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="billingModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">充值额度</div>
+        <div class="modal-subtitle">当前为开发模式，创建订单后会直接完成充值；生产环境可替换为支付宝/微信支付回调。</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('billingModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="billing-grid" id="billingPlans"></div>
+      <div class="modal-message" id="billingMessage"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===== State =====
 let allData = null;
 let currentModel = null;
 let allModels = [];
 let theme = localStorage.getItem('theme') || 'light';
+let currentUser = null;
+let authMode = 'login';
 
 // ===== Init =====
 document.documentElement.setAttribute('data-theme', theme);
 if (theme === 'dark') document.getElementById('tt').classList.add('dark');
+captureTokenFromUrl();
+refreshUser();
 
 function toggleTheme() {
   const t = document.getElementById('tt');
@@ -783,9 +1328,72 @@ function toggleTheme() {
     buildSidebar();
     updateStats();
   } catch(e) { console.error('Load models failed', e); }
-  const saved = localStorage.getItem('tikpan_key');
-  if (saved) document.getElementById('ak').value = saved;
 })();
+
+function getToken() {
+  return localStorage.getItem('tikpan_token') || '';
+}
+
+function captureTokenFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const token = params.get('token');
+  if (token) {
+    localStorage.setItem('tikpan_token', token);
+    params.delete('token');
+    const clean = `${location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
+    history.replaceState({}, '', clean);
+  }
+}
+
+async function apiFetch(url, options = {}) {
+  const headers = options.headers ? { ...options.headers } : {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return fetch(url, { ...options, headers });
+}
+
+async function refreshUser() {
+  const token = getToken();
+  if (!token) {
+    currentUser = null;
+    updateUserUI();
+    return;
+  }
+  try {
+    const resp = await apiFetch('/api/user/info');
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || '登录已失效');
+    currentUser = data.user;
+  } catch {
+    localStorage.removeItem('tikpan_token');
+    currentUser = null;
+  }
+  updateUserUI();
+}
+
+function updateUserUI() {
+  const userLabel = document.getElementById('userLabel');
+  const balanceBadge = document.getElementById('balanceBadge');
+  const rechargeTopBtn = document.getElementById('rechargeTopBtn');
+  const balanceMetric = document.getElementById('balanceMetric');
+  if (currentUser) {
+    userLabel.textContent = currentUser.nickname || currentUser.username || '已登录';
+    balanceBadge.textContent = `余额 ${currentUser.balance || 0}`;
+    balanceBadge.classList.add('show');
+    rechargeTopBtn.classList.add('show');
+    balanceMetric.textContent = `${currentUser.balance || 0} 额度`;
+  } else {
+    userLabel.textContent = '登录';
+    balanceBadge.classList.remove('show');
+    rechargeTopBtn.classList.remove('show');
+    balanceMetric.textContent = '未登录';
+  }
+}
+
+function handleUserClick() {
+  if (currentUser) openBilling();
+  else showLogin();
+}
 
 function updateStats() {
   let total = 0;
@@ -797,7 +1405,13 @@ function updateStats() {
 // ===== Sidebar Builder =====
 function buildSidebar() {
   const side = document.getElementById('side');
-  side.innerHTML = '';
+  side.innerHTML = `
+    <div class="side-tools">
+      <input id="modelSearch" class="model-search" placeholder="搜索模型、供应商或能力">
+    </div>
+  `;
+  document.getElementById('modelSearch').addEventListener('input', filterModels);
+  allModels = [];
 
   const catConfig = {
     image_generation: { label: '图像生成', icon: '🎨', color: 'p' },
@@ -822,6 +1436,9 @@ function buildSidebar() {
       item.className = 'side-item';
       item.dataset.id = m.id;
       item.dataset.cat = catKey;
+      item.dataset.name = m.name || '';
+      item.dataset.provider = m.provider || m.api_type || '';
+      item.dataset.description = m.description || '';
       item.onclick = () => sel(m.id, catKey);
 
       const provider = getProviderShort(m.provider || m.api_type || '');
@@ -843,6 +1460,24 @@ function buildSidebar() {
       sel(first.dataset.id, first.dataset.cat);
     }, 100);
   }
+}
+
+function filterModels() {
+  const q = document.getElementById('modelSearch').value.trim().toLowerCase();
+  document.querySelectorAll('.side-item').forEach(item => {
+    const haystack = [
+      item.dataset.id,
+      item.dataset.cat,
+      item.dataset.name,
+      item.dataset.provider,
+      item.dataset.description
+    ].join(' ').toLowerCase();
+    item.style.display = haystack.includes(q) ? 'flex' : 'none';
+  });
+  document.querySelectorAll('.side-section').forEach(section => {
+    const visible = Array.from(section.querySelectorAll('.side-item')).some(item => item.style.display !== 'none');
+    section.style.display = visible ? 'flex' : 'none';
+  });
 }
 
 function getProviderShort(p) {
@@ -893,6 +1528,7 @@ function sel(id, catKey) {
   // Update header
   document.getElementById('mt').textContent = model.name;
   document.getElementById('md').textContent = model.description || '';
+  updateModelInsights(model, catKey);
 
   // Build tags
   const tagsEl = document.getElementById('modelTags');
@@ -923,6 +1559,67 @@ function sel(id, catKey) {
   renderFields(model);
 }
 
+function updateModelInsights(model, catKey) {
+  const categoryLabel = {
+    image_generation: '图像生产',
+    music_generation: '音乐生产',
+    video_generation: '视频生产'
+  }[catKey] || '模型生产';
+  const provider = model.provider || model.api_type || '上游模型';
+  const fields = model.fields || [];
+  const fileFields = fields.filter(f => f.type === 'file_image').length;
+  const selectFields = fields.filter(f => f.type === 'select' || f.type === 'select_group').length;
+  const requiredFields = fields.filter(f => f.required).length;
+
+  document.getElementById('capabilityTitle').textContent = `${categoryLabel} · ${provider}`;
+  document.getElementById('capabilityText').textContent = model.description || '该模型由 Tikpan 聚合 API 执行，网站负责统一封装调用方式。';
+  document.getElementById('parameterTitle').textContent = `${fields.length} 个参数 · ${requiredFields} 个必填`;
+  document.getElementById('parameterText').textContent =
+    `包含 ${selectFields} 个选项参数、${fileFields} 个参考图入口；后续可把 ComfyUI 节点参数沉淀为同类配置。`;
+  document.getElementById('deliveryTitle').textContent = model.api_type ? `${model.api_type} 通道` : '云端通道';
+  document.getElementById('deliveryText').textContent =
+    model.route
+      ? `当前路由到 ${model.route.channel_key}，后端负责鉴权、计费、上游请求和失败退款。`
+      : '前端只提交统一表单，后端完成鉴权、计费、上游请求、结果保存和失败退款。';
+  updatePriceEstimate();
+}
+
+function updatePriceEstimate() {
+  const model = currentModel;
+  const metric = document.getElementById('priceMetric');
+  const hint = document.getElementById('priceHint');
+  if (!model) {
+    metric.textContent = '—';
+    hint.textContent = '根据模型和分辨率动态计算。';
+    return;
+  }
+  const form = document.getElementById('fm');
+  const fd = form ? new FormData(form) : new FormData();
+  const resolution = fd.get('resolution') || '2K';
+  const rule = model.pricing_rule || {};
+  if (rule.billing_mode === 'flat') {
+    const price = Number(rule.credits_2k || model.pricing?.['2K'] || 5);
+    metric.textContent = `${price} 额度`;
+    hint.textContent = `${model.name} · 固定每次计费，真实扣费以后端为准。`;
+    return;
+  }
+  if (rule.billing_mode === 'per_unit') {
+    const unitField = rule.unit_field || 'n';
+    const rawQuantity = fd.get(unitField) || 1;
+    const quantity = Math.max(Number(rawQuantity) || 1, 1);
+    const unitCredits = Number(rule.unit_credits || rule.credits_2k || 1);
+    const minCredits = Number(rule.min_credits || 0);
+    const price = Math.max(Math.round(quantity * unitCredits), minCredits);
+    metric.textContent = `${price} 额度`;
+    hint.textContent = `${quantity} × ${unitCredits} 额度 / ${rule.unit_name || unitField}`;
+    return;
+  }
+  const pricing = model.pricing || {};
+  const price = pricing[resolution] ?? pricing['2K'] ?? pricing['1K'] ?? 5;
+  metric.textContent = `${price} 额度`;
+  hint.textContent = `${model.name} · ${resolution} 预估价格，真实扣费以后端为准。`;
+}
+
 function addTag(parent, text, type) {
   const tag = document.createElement('span');
   tag.className = `tag tag-${type}`;
@@ -947,6 +1644,11 @@ function renderFields(m) {
     bindSubFields(el, subContainer);
     el.addEventListener('change', () => bindSubFields(el, subContainer));
   });
+  ff.querySelectorAll('input, select, textarea').forEach(el => {
+    el.addEventListener('input', updatePriceEstimate);
+    el.addEventListener('change', updatePriceEstimate);
+  });
+  updatePriceEstimate();
 }
 
 function createField(f) {
@@ -1076,6 +1778,25 @@ function resetResult() {
 }
 
 // ===== Form Submit =====
+document.getElementById('previewReq').addEventListener('click', async function() {
+  const box = document.getElementById('requestPreviewBox');
+  const text = document.getElementById('requestPreviewText');
+  const key = document.getElementById('ak').value.trim();
+  const fd = new FormData(document.getElementById('fm'));
+  fd.set('api_key', key);
+
+  text.textContent = '正在整理请求...';
+  box.classList.add('open');
+
+  try {
+    const resp = await apiFetch('/api/request-preview', { method: 'POST', body: fd });
+    const data = await resp.json();
+    text.textContent = JSON.stringify(data, null, 2);
+  } catch (err) {
+    text.textContent = `请求预览失败: ${err.message}`;
+  }
+});
+
 document.getElementById('fm').addEventListener('submit', async function(e) {
   e.preventDefault();
 
@@ -1085,7 +1806,10 @@ document.getElementById('fm').addEventListener('submit', async function(e) {
   const rs = document.getElementById('rs');
 
   const key = document.getElementById('ak').value.trim();
-  localStorage.setItem('tikpan_key', key);
+  if (!currentUser) {
+    showLogin();
+    return;
+  }
 
   // Loading state
   btn.classList.add('loading');
@@ -1104,13 +1828,14 @@ document.getElementById('fm').addEventListener('submit', async function(e) {
     const fd = new FormData(this);
     fd.set('api_key', key);
 
-    const resp = await fetch('/api/generate', { method: 'POST', body: fd });
+    const resp = await apiFetch('/api/generate', { method: 'POST', body: fd });
     const d = await resp.json();
 
     if (d.error) {
       rb.innerHTML = `<div class="er-box">${d.error}</div>`;
       rs.className = 'rp-status error';
       rs.textContent = '失败';
+      if (resp.status === 401) showLogin();
       return;
     }
 
@@ -1141,6 +1866,7 @@ document.getElementById('fm').addEventListener('submit', async function(e) {
         <a href="${r.video_url}" target="_blank" class="download-btn">▶ 打开</a>`;
       rm.style.display = 'flex';
     }
+    await refreshUser();
   }
   catch(err) {
     rb.innerHTML = `<div class="er-box">请求失败: ${err.message}</div>`;
@@ -1155,7 +1881,119 @@ document.getElementById('fm').addEventListener('submit', async function(e) {
 
 // ===== Placeholder =====
 function showLogin() {
-  alert('登录功能开发中...');
+  document.getElementById('authModal').classList.add('open');
+  document.getElementById('authMessage').textContent = '';
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  document.getElementById('loginTab').classList.toggle('active', mode === 'login');
+  document.getElementById('registerTab').classList.toggle('active', mode === 'register');
+  document.getElementById('codeField').style.display = mode === 'register' ? 'grid' : 'none';
+  document.getElementById('authMessage').textContent = '';
+}
+
+async function sendAuthCode() {
+  const email = document.getElementById('authEmail').value.trim();
+  const msg = document.getElementById('authMessage');
+  if (!email) {
+    msg.textContent = '请先填写邮箱。';
+    return;
+  }
+  try {
+    const resp = await fetch('/api/send-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await resp.json();
+    msg.style.color = data.success ? 'var(--green)' : 'var(--red)';
+    msg.textContent = data.code_preview
+      ? `开发模式验证码：${data.code_preview}`
+      : (data.message || data.error || '验证码已发送');
+  } catch (err) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = `发送失败：${err.message}`;
+  }
+}
+
+async function submitAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value.trim();
+  const code = document.getElementById('authCode').value.trim();
+  const msg = document.getElementById('authMessage');
+  const endpoint = authMode === 'register' ? '/api/register' : '/api/login';
+  const payload = authMode === 'register' ? { email, password, code } : { email, password };
+
+  try {
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || '操作失败');
+    localStorage.setItem('tikpan_token', data.token);
+    closeModal('authModal');
+    await refreshUser();
+  } catch (err) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = err.message;
+  }
+}
+
+async function openBilling() {
+  if (!currentUser) {
+    showLogin();
+    return;
+  }
+  const modal = document.getElementById('billingModal');
+  const plansEl = document.getElementById('billingPlans');
+  const msg = document.getElementById('billingMessage');
+  modal.classList.add('open');
+  msg.textContent = '';
+  plansEl.innerHTML = '<div class="modal-note">正在读取充值方案...</div>';
+  try {
+    const resp = await fetch('/api/recharge/plans');
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || '读取失败');
+    plansEl.innerHTML = '';
+    data.plans.forEach(plan => {
+      const btn = document.createElement('button');
+      btn.className = 'billing-plan';
+      btn.innerHTML = `<strong>¥${plan.amount}</strong><span>${plan.credits} 额度 · 赠送 ${Math.max(plan.bonus, 0)}</span>`;
+      btn.onclick = () => createRecharge(plan.amount);
+      plansEl.appendChild(btn);
+    });
+  } catch (err) {
+    plansEl.innerHTML = '';
+    msg.textContent = `充值方案读取失败：${err.message}`;
+  }
+}
+
+async function createRecharge(amount) {
+  const msg = document.getElementById('billingMessage');
+  msg.style.color = 'var(--text2)';
+  msg.textContent = '正在创建订单...';
+  try {
+    const resp = await apiFetch('/api/recharge/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount })
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || '充值失败');
+    msg.style.color = 'var(--green)';
+    msg.textContent = data.message || '充值成功';
+    await refreshUser();
+  } catch (err) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = err.message;
+  }
 }
 </script>
 </body>

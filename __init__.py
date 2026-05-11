@@ -8,6 +8,7 @@ from .nodes.tikpan_happyhorse_video_edit import TikpanHappyHorseVideoEditNode
 from .nodes.tikpan_grok_video import TikpanExclusiveVideoNode
 from .nodes.tikpan_gemini_image import TikpanGeminiImageMaxNode
 from .nodes.tikpan_gemini_video_analyst import TikpanGeminiVideoAnalystNode
+from .nodes.tikpan_gemini_tts import TikpanGemini31FlashTTSNode
 from .nodes.tikpan_grok_optimizer import TikpanGrokPromptOptimizerNode
 from .nodes.tikpan_veo_video import TikpanVeoVideoNode
 from .nodes.tikpan_gpt_image_node import TikpanGptImage2Node
@@ -17,6 +18,7 @@ from .nodes.tikpan_gpt_image_2_official import TikpanGptImage2OfficialNode
 from .nodes.tikpan_gpt_image_2_official_edit_v2 import TikpanGptImage2OfficialEditV2
 from .nodes.tikpan_grok_videos import TikpanGrokVideoNode
 from .nodes.tikpan_suno_music import TikpanSunoMusicNode
+from .nodes.tikpan_minimax_speech import TikpanMiniMaxSpeech28HDNode, TikpanMiniMaxSpeech28TurboNode
 from .nodes.tikpan_doubao_image import TikpanDoubaoImageNode
 from .nodes.tikpan_nano_banana_pro import TikpanNanoBananaProNode
 from .nodes.tikpan_task_fetcher import TikpanTaskFetcherNode
@@ -30,6 +32,7 @@ NODE_CLASS_MAPPINGS = {
     "TikpanExclusiveVideoNode": TikpanExclusiveVideoNode,
     "TikpanGeminiImageMaxNode": TikpanGeminiImageMaxNode,
     "TikpanGeminiVideoAnalystNode": TikpanGeminiVideoAnalystNode,
+    "TikpanGemini31FlashTTSNode": TikpanGemini31FlashTTSNode,
     "TikpanGrokPromptOptimizerNode": TikpanGrokPromptOptimizerNode,
     "TikpanGptImage2Node": TikpanGptImage2Node,
     "TikpanVeoVideoNode": TikpanVeoVideoNode,
@@ -39,6 +42,8 @@ NODE_CLASS_MAPPINGS = {
     "TikpanGptImage2OfficialEditV2": TikpanGptImage2OfficialEditV2,
     "TikpanGrokVideoNode": TikpanGrokVideoNode,
     "TikpanSunoMusicNode": TikpanSunoMusicNode,
+    "TikpanMiniMaxSpeech28HDNode": TikpanMiniMaxSpeech28HDNode,
+    "TikpanMiniMaxSpeech28TurboNode": TikpanMiniMaxSpeech28TurboNode,
     "TikpanDoubaoImageNode": TikpanDoubaoImageNode,
     "TikpanNanoBananaProNode": TikpanNanoBananaProNode,
     "TikpanTaskFetcherNode": TikpanTaskFetcherNode,
@@ -53,15 +58,18 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanExclusiveVideoNode": "🎬 Tikpan：Grok3 直出视频生成",
     "TikpanGeminiImageMaxNode": "👑 Tikpan：Gemini 14图极限生图",
     "TikpanGeminiVideoAnalystNode": "👁️ Tikpan：AI音视频双轨智能解构",
+    "TikpanGemini31FlashTTSNode": "🎙️ Tikpan: Gemini 3.1 Flash TTS Preview",
     "TikpanGrokPromptOptimizerNode": "🧠 Tikpan：Grok多图剧本重构专家",
     "TikpanGptImage2Node": "👑 Tikpan：gpt-image-2-all图片生成",
-    "TikpanVeoVideoNode": "🚀 Tikpan: Veo 3.1 备用视频生成",
+    "TikpanVeoVideoNode": "🚀 Tikpan: Veo 3.1 多模型视频生成",
     "TikpanGptImage2GenNode": "🎨 Tikpan: GPT-Image-2-all 视觉建筑师(生成)",
     "TikpanGptImage2EditNode": "💉 Tikpan: GPT-Image-2-all 视觉整形师(修改)",
     "TikpanGptImage2OfficialNode": "💎 Tikpan: GPT-Image-2 官方正式版(生图)",
     "TikpanGptImage2OfficialEditV2": "💎 Tikpan: GPT-Image-2 官方正式版(修图) V2",
     "TikpanGrokVideoNode": "🎬 Tikpan: Grok-Videos 视频生成",
     "TikpanSunoMusicNode": "🎵 Tikpan: Suno 音乐生成",
+    "TikpanMiniMaxSpeech28HDNode": "🎙️ Tikpan: speech-2.8-hd 高清语音合成",
+    "TikpanMiniMaxSpeech28TurboNode": "🎙️ Tikpan: speech-2.8-turbo 极速语音合成",
     "TikpanDoubaoImageNode": "🎨 Tikpan: 豆包图像生成",
     "TikpanNanoBananaProNode": "🍌 Tikpan: Nano Banana Pro",
     "TikpanTaskFetcherNode": "🔍 Tikpan：异步任务查询与下载",

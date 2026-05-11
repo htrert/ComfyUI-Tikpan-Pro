@@ -1,0 +1,51 @@
+{
+  "channels": [
+    {
+      "key": "tikpan-main",
+      "name": "Tikpan 主渠道",
+      "providerType": "new-api",
+      "baseUrl": "https://tikpan.com",
+      "apiKeyEnv": "TIKPAN_API_KEY",
+      "priority": 10,
+      "enabled": true,
+      "notes": "本地开发默认渠道，生产建议放到密钥管理中。"
+    },
+    {
+      "key": "newapi-backup",
+      "name": "New API 备用渠道",
+      "providerType": "openai-compatible",
+      "baseUrl": "",
+      "apiKeyEnv": "NEWAPI_BACKUP_KEY",
+      "priority": 50,
+      "enabled": false,
+      "notes": "用于后续接入低价或备用上游。"
+    }
+  ],
+  "routes": [
+    {
+      "profileId": "tikpan-gpt-image-2",
+      "channelKey": "tikpan-main",
+      "upstreamModel": "gpt-image-2",
+      "endpoint": "/v1/images/generations",
+      "enabled": true
+    }
+  ],
+  "pricing": [
+    {
+      "profileId": "tikpan-gpt-image-2",
+      "billingMode": "resolution",
+      "credits1k": 6,
+      "credits2k": 10,
+      "credits4k": 18,
+      "costPerUnit": 0,
+      "enabled": true
+    }
+  ],
+  "settings": {
+    "siteName": "Canvas Model Studio",
+    "requireLoginForGenerate": false,
+    "defaultProfileId": "tikpan-gpt-image-2",
+    "assetStorage": "local",
+    "adminNote": "这里是无限画布自己的运营配置；正式商业化时建议迁移到 web_app 后台和数据库。"
+  }
+}

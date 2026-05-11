@@ -68,7 +68,46 @@ def init_db():
             credits_1k INTEGER DEFAULT 5,
             credits_2k INTEGER DEFAULT 8,
             credits_4k INTEGER DEFAULT 15,
+            billing_mode TEXT DEFAULT 'resolution',
+            unit_name TEXT DEFAULT 'generation',
+            unit_field TEXT DEFAULT '',
+            unit_credits REAL DEFAULT 0,
+            min_credits INTEGER DEFAULT 0,
+            cost_per_unit REAL DEFAULT 0,
+            retail_markup REAL DEFAULT 1.0,
             is_active INTEGER DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS provider_channels (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            provider_type TEXT DEFAULT '',
+            base_url TEXT DEFAULT '',
+            api_key TEXT DEFAULT '',
+            priority INTEGER DEFAULT 100,
+            weight INTEGER DEFAULT 1,
+            timeout_seconds INTEGER DEFAULT 120,
+            is_active INTEGER DEFAULT 1,
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS model_provider_routes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            model_id TEXT NOT NULL,
+            channel_key TEXT NOT NULL,
+            upstream_model TEXT DEFAULT '',
+            endpoint TEXT DEFAULT '',
+            priority INTEGER DEFAULT 100,
+            weight INTEGER DEFAULT 1,
+            cost_per_unit REAL DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(model_id, channel_key)
         );
 
         CREATE TABLE IF NOT EXISTS agent_configs (
@@ -88,6 +127,7 @@ def init_db():
         );
     """)
     _ensure_generation_log_columns(conn)
+    _ensure_pricing_columns(conn)
     conn.commit()
     conn.close()
 
@@ -110,6 +150,24 @@ def _ensure_generation_log_columns(conn):
             conn.execute(f"ALTER TABLE generation_logs ADD COLUMN {name} {ddl}")
 
 
+def _ensure_pricing_columns(conn):
+    """Keep old pricing rows compatible with flexible commercial billing."""
+    rows = conn.execute("PRAGMA table_info(models_pricing)").fetchall()
+    existing = {row["name"] for row in rows}
+    columns = {
+        "billing_mode": "TEXT DEFAULT 'resolution'",
+        "unit_name": "TEXT DEFAULT 'generation'",
+        "unit_field": "TEXT DEFAULT ''",
+        "unit_credits": "REAL DEFAULT 0",
+        "min_credits": "INTEGER DEFAULT 0",
+        "cost_per_unit": "REAL DEFAULT 0",
+        "retail_markup": "REAL DEFAULT 1.0",
+    }
+    for name, ddl in columns.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE models_pricing ADD COLUMN {name} {ddl}")
+
+
 def seed_pricing():
     """初始化模型定价"""
     pricing = [
@@ -124,6 +182,27 @@ def seed_pricing():
         conn.execute(
             "INSERT OR IGNORE INTO models_pricing (model_id, model_name, credits_1k, credits_2k, credits_4k) VALUES (?,?,?,?,?)",
             (pid, name, p1, p2, p4)
+        )
+    conn.commit()
+    conn.close()
+
+
+def seed_provider_channels():
+    """Initialize default provider channels for multi-supplier routing."""
+    channels = [
+        ("tikpan-default", "Tikpan 默认中转", "tikpan", "", "", 10, 1, 120, 1, "默认平台渠道"),
+        ("openai-compatible", "OpenAI 兼容渠道", "openai", "", "", 50, 1, 180, 0, "可配置第三方兼容 API"),
+        ("doubao-compatible", "豆包兼容渠道", "doubao", "", "", 50, 1, 180, 0, "可配置火山/豆包渠道"),
+    ]
+    conn = get_db()
+    for row in channels:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO provider_channels
+                (key, name, provider_type, base_url, api_key, priority, weight, timeout_seconds, is_active, notes)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+            """,
+            row,
         )
     conn.commit()
     conn.close()
@@ -279,17 +358,71 @@ def get_user_logs(user_id, limit=20):
 # ==================== 定价 ====================
 
 def get_model_price(model_id, resolution="2K"):
+    return calculate_model_credits(model_id, {"resolution": resolution})["credits"]
+
+
+def calculate_model_credits(model_id, params=None):
+    """Calculate billable credits for a model using fixed or usage-based rules."""
+    params = params or {}
     conn = get_db()
     price_row = conn.execute("SELECT * FROM models_pricing WHERE model_id=?", (model_id,)).fetchone()
     conn.close()
     if not price_row:
-        return 5  # 默认 5 额度
+        return {
+            "credits": 5,
+            "billing_mode": "fallback",
+            "unit_name": "generation",
+            "quantity": 1,
+            "detail": "未配置价格，使用默认 5 额度",
+        }
+
+    row = dict(price_row)
+    mode = row.get("billing_mode") or "resolution"
+    resolution = str(params.get("resolution") or params.get("size") or "2K")
+
+    if mode == "per_unit":
+        unit_field = row.get("unit_field") or "n"
+        try:
+            quantity = float(params.get(unit_field, 1) or 1)
+        except (TypeError, ValueError):
+            quantity = 1
+        unit_credits = float(row.get("unit_credits") or row.get("credits_2k") or 1)
+        min_credits = int(row.get("min_credits") or 0)
+        credits = max(min_credits, int(round(quantity * unit_credits)))
+        return {
+            "credits": credits,
+            "billing_mode": mode,
+            "unit_name": row.get("unit_name") or unit_field,
+            "unit_field": unit_field,
+            "quantity": quantity,
+            "unit_credits": unit_credits,
+            "detail": f"{quantity:g} × {unit_credits:g} 额度",
+        }
+
+    if mode == "flat":
+        credits = int(row.get("credits_2k") or 5)
+        return {
+            "credits": credits,
+            "billing_mode": mode,
+            "unit_name": row.get("unit_name") or "generation",
+            "quantity": 1,
+            "detail": f"固定 {credits} 额度/次",
+        }
+
     if resolution == "4K":
-        return price_row["credits_4k"]
+        credits = row["credits_4k"]
     elif resolution == "1K":
-        return price_row["credits_1k"]
+        credits = row["credits_1k"]
     else:
-        return price_row["credits_2k"]
+        credits = row["credits_2k"]
+    return {
+        "credits": int(credits),
+        "billing_mode": "resolution",
+        "unit_name": row.get("unit_name") or "generation",
+        "quantity": 1,
+        "resolution": resolution,
+        "detail": f"{resolution} 档位 {credits} 额度",
+    }
 
 
 def get_all_pricing():
@@ -297,6 +430,182 @@ def get_all_pricing():
     rows = conn.execute("SELECT * FROM models_pricing WHERE is_active=1").fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def get_pricing(model_id=None, active_only=False):
+    conn = get_db()
+    sql = "SELECT * FROM models_pricing"
+    args = []
+    clauses = []
+    if model_id:
+        clauses.append("model_id=?")
+        args.append(model_id)
+    if active_only:
+        clauses.append("is_active=1")
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    sql += " ORDER BY model_id"
+    rows = conn.execute(sql, args).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def upsert_pricing(data):
+    model_id = str(data.get("model_id", "")).strip()
+    if not model_id:
+        return False, "model_id required"
+    conn = get_db()
+    conn.execute(
+        """
+        INSERT INTO models_pricing
+            (model_id, model_name, credits_1k, credits_2k, credits_4k, billing_mode,
+             unit_name, unit_field, unit_credits, min_credits, cost_per_unit, retail_markup, is_active)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(model_id) DO UPDATE SET
+            model_name=excluded.model_name,
+            credits_1k=excluded.credits_1k,
+            credits_2k=excluded.credits_2k,
+            credits_4k=excluded.credits_4k,
+            billing_mode=excluded.billing_mode,
+            unit_name=excluded.unit_name,
+            unit_field=excluded.unit_field,
+            unit_credits=excluded.unit_credits,
+            min_credits=excluded.min_credits,
+            cost_per_unit=excluded.cost_per_unit,
+            retail_markup=excluded.retail_markup,
+            is_active=excluded.is_active
+        """,
+        (
+            model_id,
+            data.get("model_name") or model_id,
+            int(data.get("credits_1k") or 5),
+            int(data.get("credits_2k") or 8),
+            int(data.get("credits_4k") or 15),
+            data.get("billing_mode") or "resolution",
+            data.get("unit_name") or "generation",
+            data.get("unit_field") or "",
+            float(data.get("unit_credits") or 0),
+            int(data.get("min_credits") or 0),
+            float(data.get("cost_per_unit") or 0),
+            float(data.get("retail_markup") or 1.0),
+            int(data.get("is_active", 1)),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return True, None
+
+
+def get_provider_channels(active_only=False):
+    conn = get_db()
+    sql = "SELECT * FROM provider_channels"
+    if active_only:
+        sql += " WHERE is_active=1"
+    sql += " ORDER BY priority, id"
+    rows = conn.execute(sql).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def upsert_provider_channel(data):
+    key = str(data.get("key", "")).strip()
+    if not key:
+        return False, "key required"
+    conn = get_db()
+    conn.execute(
+        """
+        INSERT INTO provider_channels
+            (key, name, provider_type, base_url, api_key, priority, weight, timeout_seconds, is_active, notes, updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+        ON CONFLICT(key) DO UPDATE SET
+            name=excluded.name,
+            provider_type=excluded.provider_type,
+            base_url=excluded.base_url,
+            api_key=excluded.api_key,
+            priority=excluded.priority,
+            weight=excluded.weight,
+            timeout_seconds=excluded.timeout_seconds,
+            is_active=excluded.is_active,
+            notes=excluded.notes,
+            updated_at=CURRENT_TIMESTAMP
+        """,
+        (
+            key,
+            data.get("name") or key,
+            data.get("provider_type") or "",
+            data.get("base_url") or "",
+            data.get("api_key") or "",
+            int(data.get("priority") or 100),
+            int(data.get("weight") or 1),
+            int(data.get("timeout_seconds") or 120),
+            int(data.get("is_active", 1)),
+            data.get("notes") or "",
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return True, None
+
+
+def get_model_routes(model_id=None, active_only=False):
+    conn = get_db()
+    sql = "SELECT * FROM model_provider_routes"
+    args = []
+    clauses = []
+    if model_id:
+        clauses.append("model_id=?")
+        args.append(model_id)
+    if active_only:
+        clauses.append("is_active=1")
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    sql += " ORDER BY model_id, priority, id"
+    rows = conn.execute(sql, args).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def upsert_model_route(data):
+    model_id = str(data.get("model_id", "")).strip()
+    channel_key = str(data.get("channel_key", "")).strip()
+    if not model_id or not channel_key:
+        return False, "model_id and channel_key required"
+    conn = get_db()
+    conn.execute(
+        """
+        INSERT INTO model_provider_routes
+            (model_id, channel_key, upstream_model, endpoint, priority, weight, cost_per_unit, is_active, notes, updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+        ON CONFLICT(model_id, channel_key) DO UPDATE SET
+            upstream_model=excluded.upstream_model,
+            endpoint=excluded.endpoint,
+            priority=excluded.priority,
+            weight=excluded.weight,
+            cost_per_unit=excluded.cost_per_unit,
+            is_active=excluded.is_active,
+            notes=excluded.notes,
+            updated_at=CURRENT_TIMESTAMP
+        """,
+        (
+            model_id,
+            channel_key,
+            data.get("upstream_model") or "",
+            data.get("endpoint") or "",
+            int(data.get("priority") or 100),
+            int(data.get("weight") or 1),
+            float(data.get("cost_per_unit") or 0),
+            int(data.get("is_active", 1)),
+            data.get("notes") or "",
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return True, None
+
+
+def select_model_route(model_id):
+    routes = get_model_routes(model_id, active_only=True)
+    return routes[0] if routes else None
 
 
 # ==================== 代理 ====================
@@ -330,14 +639,15 @@ def get_agent_earnings(agent_id):
     """计算代理收益 = 下级用户的消费 * (1 - 平台抽成比例)"""
     conn = get_db()
     config = conn.execute("SELECT profit_share FROM agent_configs WHERE user_id=?", (agent_id,)).fetchone()
-    conn.close()
     if not config:
+        conn.close()
         return 0
     share = config["profit_share"]
     logs = conn.execute(
         "SELECT SUM(l.credits_used) as total FROM generation_logs l JOIN users u ON l.user_id=u.id WHERE u.parent_id=? AND l.status='success'",
         (agent_id,)
     ).fetchone()
+    conn.close()
     total_credits = logs["total"] or 0
     # 代理收益 = 下级消费额度 * (1 - 平台抽成)
     earnings = total_credits * (1 - share)

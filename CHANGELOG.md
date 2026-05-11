@@ -1,5 +1,34 @@
 # Changelog
 
+## [v1.1.0] - 2026-05-11
+
+### 🔧 Improvements
+
+#### Gemini 3.1 Flash TTS Preview 节点 (`TikpanGemini31FlashTTSNode`)
+- 新增 `gemini-3.1-flash-tts-preview` 文字转语音节点，支持 `geminitts` / `gemini` 原生 `generateContent` 以及 OpenAI 兼容 `/v1/chat/completions`。
+- 按官方 Gemini TTS 结构传递 `responseModalities: ["AUDIO"]`、`speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName`。
+- 自动提取 `inlineData.data` 音频；对裸 PCM 自动封装成 24kHz/16-bit/mono WAV，便于直接连接 `PreviewAudio` / `SaveAudio`。
+- 输出本地音频路径、接口路径、输入/输出 token 用量、状态日志和 `AUDIO` 音频流。
+- 增加本地缓存复用、recovery 记录、幂等 key、非 JSON/错误页/空音频检测，降低网络中断和误重复扣费风险。
+
+#### speech-2.8 高清/极速语音合成节点
+- 新增 MiniMax `speech-2.8-hd` 语音合成节点，支持同步 `/t2a_v2` 与异步 `/t2a_async_v2` 两种链路。
+- 新增 MiniMax `speech-2.8-turbo` 语音合成节点，复用同一套 T2A 接口和稳定性处理，适合更快响应和批量配音预览。
+- 支持音色 ID、语言增强、语速、音量、音调、情绪、采样率、比特率、`mp3/wav/flac` 输出、字幕、发音字典、音色混合与高级 JSON 透传。
+- 新增 `AUDIO` 音频流输出，可直接连接 `PreviewAudio` / `SaveAudio`；同时输出本地路径、音频链接、任务 ID、文件 ID、计费字符数和状态日志。
+- 增加本地缓存复用与 recovery 记录，降低网络中断或重复运行导致的多次扣费风险。
+- 增强错误处理：校验上游 `base_resp`、非 JSON 响应、空音频、错误页下载、异步失败/超时等情况。
+
+#### Veo 3.1 视频节点 (`TikpanVeoVideoNode`)
+- 将 Veo 节点收窄为 Tikpan 价格页中确认的 7 个模型：`veo_3_1-lite`、`veo_3_1-lite-4K`、`veo_3_1-fast-4K`、`veo3.1-fast-components`、`veo3.1-pro`、`veo_3_1-components-4K`、`veo_3_1-fast-components-4K`。
+- 按模型分端点提交：lite/fast/components-4K 走 OpenAI 视频格式 `POST /v1/videos`；`veo3.1-fast-components` 与 `veo3.1-pro` 走视频统一格式 `POST /v1/video/create`。
+- 对齐官方 Veo 3.1 比例能力，将节点比例选项收窄为 `16:9` 与 `9:16`。
+- 新增 `垫图_1~3` 输入，components 模型可传最多 3 张参考垫图；非 components 模型接入垫图时会返回明确错误。
+- 增强任务 ID、视频 URL 和状态解析，兼容更多 Tikpan/上游返回结构。
+- 增强视频下载校验：检查 HTTP 状态、内容类型和文件大小，避免把错误页保存成 `.mp4`。
+- 增强 `VIDEO` 输出包装：读取本地视频为 `BytesIO` 并预先校验尺寸，提高连接 ComfyUI 原生 `Save Video` 节点时的兼容性。
+- 下载文件名中加入模型名，方便区分 lite、fast、pro 和 components 输出。
+
 ## [v1.0.1] - 2026-05-10
 
 ### 🚀 New Features
