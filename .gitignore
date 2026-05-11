@@ -6,6 +6,9 @@ tmp_test_output/
 
 web_app/data/*.db
 web_app/data/*.db-*
+web_app/data/*.export.json
+web_app/data/*.backup.json
+web_app/data/config.local.json
 
 experiments/**/data/assets/
 experiments/**/data/projects/

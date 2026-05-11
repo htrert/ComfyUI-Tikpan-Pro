@@ -1,6 +1,8 @@
 build/
 outputs/
-data/
+data/*
+!data/schema.sql
+!data/seed.example.json
 __pycache__/
 *.pyc
 .env
