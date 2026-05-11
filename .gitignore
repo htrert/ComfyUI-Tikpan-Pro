@@ -9,7 +9,7 @@ web_app/data/*.db-*
 web_app/data/*.export.json
 web_app/data/*.backup.json
 web_app/data/config.local.json
+web_app/outputs/
 
-experiments/**/data/assets/
-experiments/**/data/projects/
+experiments/
 docs/assets/wechat-cover-v1.0.1.png
