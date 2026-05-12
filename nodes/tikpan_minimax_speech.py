@@ -19,7 +19,9 @@ import folder_paths
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-DEFAULT_API_BASE_URL = "https://tikpan.com/minimax/v1"
+API_HOST = "https://tikpan.com"
+MINIMAX_API_BASE_URL = f"{API_HOST}/minimax/v1"
+DEFAULT_API_BASE_URL = MINIMAX_API_BASE_URL
 RECOVERY_ROOT = Path(__file__).resolve().parents[1] / "recovery"
 
 
@@ -98,15 +100,10 @@ class TikpanMiniMaxSpeech28BaseNode:
                 "比特率": (["128000", "256000", "64000", "32000"], {"default": "128000"}),
                 "音频格式": (["mp3", "wav", "flac"], {"default": "mp3"}),
                 "声道数": (["1", "2"], {"default": "1"}),
+                "POST重试策略": (["幂等键轻重试", "保守不重试POST"], {"default": "幂等键轻重试"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                "接口基础地址": (
-                    "STRING",
-                    {
-                        "default": DEFAULT_API_BASE_URL,
-                        "tooltip": "默认走 Tikpan 的 MiniMax 中转地址；如后台渠道变化，可改成兼容的 /v1 基础地址。",
-                    },
-                ),
                 "同步返回格式": (["hex", "url"], {"default": "hex"}),
                 "发音字典_tone_每行一条": (
                     "STRING",
@@ -161,10 +158,11 @@ class TikpanMiniMaxSpeech28BaseNode:
                     },
                 ),
             },
-        }
+    }
 
     DEFAULT_OPTIONAL_VALUES = {
-        "接口基础地址": DEFAULT_API_BASE_URL,
+        "POST重试策略": "幂等键轻重试",
+        "校验HTTPS证书": True,
         "同步返回格式": "hex",
         "发音字典_tone_每行一条": "",
         "音色混合_JSON": "",
@@ -206,17 +204,21 @@ class TikpanMiniMaxSpeech28BaseNode:
     def make_return(self, path="", url="", task_id="", file_id="", usage="", log="", audio=None):
         return (path, url, str(task_id or ""), str(file_id or ""), str(usage or ""), log, audio or self.empty_audio())
 
-    def create_session(self):
+    def create_session(self, allow_post_retry=False):
         session = requests.Session()
         session.trust_env = False
+        allowed_methods = ["HEAD", "GET", "OPTIONS"]
+        if allow_post_retry:
+            allowed_methods.append("POST")
         retries = Retry(
-            total=3,
-            connect=3,
-            read=2,
-            status=3,
+            total=2,
+            connect=2,
+            read=0,
+            status=1,
             backoff_factor=1,
             status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=frozenset(["HEAD", "GET", "OPTIONS"]),
+            allowed_methods=frozenset(allowed_methods),
+            respect_retry_after_header=True,
         )
         adapter = HTTPAdapter(max_retries=retries, pool_connections=20, pool_maxsize=20)
         session.mount("http://", adapter)
@@ -468,8 +470,8 @@ class TikpanMiniMaxSpeech28BaseNode:
             except Exception as e:
                 raise RuntimeError(f"无法解码上游音频数据，既不是 hex 也不是 base64: {e}")
 
-    def download_audio_url(self, session, url, cache_key, audio_format, headers=None):
-        response = session.get(url, headers=headers or {}, timeout=(15, 300), verify=False)
+    def download_audio_url(self, session, url, cache_key, audio_format, headers=None, verify_tls=True):
+        response = session.get(url, headers=headers or {}, timeout=(15, 300), verify=verify_tls)
         response.raise_for_status()
         content_type = str(response.headers.get("Content-Type", "")).lower()
         if "json" in content_type or response.content[:1] in (b"{", b"["):
@@ -477,9 +479,9 @@ class TikpanMiniMaxSpeech28BaseNode:
         ext = self.extension_from_response(url, response, audio_format)
         return self.write_audio_bytes(response.content, cache_key, ext.lstrip("."))
 
-    def submit_sync(self, session, base_url, headers, payload, cache_key):
+    def submit_sync(self, session, base_url, headers, payload, cache_key, verify_tls=True):
         url = f"{base_url}/t2a_v2"
-        response = session.post(url, json=payload, headers=headers, timeout=(15, 300), verify=False)
+        response = session.post(url, json=payload, headers=headers, timeout=(15, 300), verify=verify_tls)
         if response.status_code != 200:
             raise RuntimeError(f"同步语音创建失败 | HTTP {response.status_code} | {self.safe_response_text(response)}")
         try:
@@ -496,7 +498,7 @@ class TikpanMiniMaxSpeech28BaseNode:
         audio_url = ""
         if audio_kind == "url":
             audio_url = audio_value
-            audio_path = self.download_audio_url(session, audio_url, cache_key, audio_format)
+            audio_path = self.download_audio_url(session, audio_url, cache_key, audio_format, verify_tls=verify_tls)
         else:
             audio_bytes = self.decode_audio_text(audio_value)
             audio_path = self.write_audio_bytes(audio_bytes, cache_key, audio_format)
@@ -506,9 +508,9 @@ class TikpanMiniMaxSpeech28BaseNode:
         trace_id = res_json.get("trace_id", "")
         return audio_path, audio_url, "", "", usage, trace_id, res_json
 
-    def submit_async(self, session, base_url, headers, payload, cache_key, max_wait_seconds, poll_interval):
+    def submit_async(self, session, base_url, headers, payload, cache_key, max_wait_seconds, poll_interval, verify_tls=True):
         create_url = f"{base_url}/t2a_async_v2"
-        response = session.post(create_url, json=payload, headers=headers, timeout=(15, 120), verify=False)
+        response = session.post(create_url, json=payload, headers=headers, timeout=(15, 120), verify=verify_tls)
         if response.status_code != 200:
             raise RuntimeError(f"异步语音创建失败 | HTTP {response.status_code} | {self.safe_response_text(response)}")
         try:
@@ -536,7 +538,7 @@ class TikpanMiniMaxSpeech28BaseNode:
                 params={"task_id": task_id},
                 headers=headers,
                 timeout=(15, 60),
-                verify=False,
+                verify=verify_tls,
             )
             if query_response.status_code != 200:
                 print(
@@ -570,7 +572,7 @@ class TikpanMiniMaxSpeech28BaseNode:
             params={"file_id": file_id},
             headers=headers,
             timeout=(15, 300),
-            verify=False,
+            verify=verify_tls,
         )
         if retrieve_response.status_code != 200:
             raise RuntimeError(f"异步音频下载失败 | HTTP {retrieve_response.status_code} | {self.safe_response_text(retrieve_response)}")
@@ -593,7 +595,9 @@ class TikpanMiniMaxSpeech28BaseNode:
         skip_error = bool(values.get("跳过错误", False))
         use_cache = bool(values.get("复用本地缓存", True))
         audio_format = values.get("音频格式", "mp3")
-        base_url = str(values.get("接口基础地址") or DEFAULT_API_BASE_URL).strip().rstrip("/")
+        base_url = MINIMAX_API_BASE_URL
+        post_retry = str(values.get("POST重试策略") or "幂等键轻重试") == "幂等键轻重试"
+        verify_tls = bool(values.get("校验HTTPS证书", True))
 
         try:
             if not api_key or api_key == "sk-":
@@ -635,10 +639,10 @@ class TikpanMiniMaxSpeech28BaseNode:
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "User-Agent": f"Tikpan-ComfyUI-{self.USER_AGENT_SUFFIX}/1.0",
+                "User-Agent": f"Tikpan-ComfyUI-{self.USER_AGENT_SUFFIX}/1.1",
                 "Idempotency-Key": f"{self.CACHE_PREFIX}-{cache_key[:32]}",
             }
-            session = self.create_session()
+            session = self.create_session(allow_post_retry=post_retry)
 
             try:
                 if async_mode:
@@ -650,9 +654,10 @@ class TikpanMiniMaxSpeech28BaseNode:
                         cache_key,
                         int(values.get("最长等待秒数", 900)),
                         int(values.get("轮询间隔秒数", 5)),
+                        verify_tls=verify_tls,
                     )
                 else:
-                    result = self.submit_sync(session, base_url, headers, payload, cache_key)
+                    result = self.submit_sync(session, base_url, headers, payload, cache_key, verify_tls=verify_tls)
             except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
                 self.save_recovery_record(
                     cache_key,
@@ -672,7 +677,7 @@ class TikpanMiniMaxSpeech28BaseNode:
             elapsed = round(time.time() - start_time, 2)
             log = (
                 f"OK {self.MODEL_NAME} 语音生成成功 | 模式={'异步' if async_mode else '同步'} | "
-                f"计费字符={usage} | 耗时={elapsed}s | 音频={audio_path}"
+                f"计费字符={usage} | 耗时={elapsed}s | api={base_url} | post_retry={post_retry} | 音频={audio_path}"
             )
             if audio_url:
                 log += f" | 链接={audio_url}"

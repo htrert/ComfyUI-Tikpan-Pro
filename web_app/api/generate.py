@@ -197,6 +197,21 @@ def _call_handler(api_type, handler, model_id, data, reference_images):
             data.get("duration", "5s"),
             None,
         )
+    if api_type == "openai_responses":
+        return handler(
+            data.get("prompt", "") or data.get("user_question", ""),
+            data.get("system_prompt", ""),
+            reference_images,
+            data,
+            None,
+        )
+    if api_type == "gemini_analysis":
+        return handler(
+            data.get("prompt", "") or data.get("analysis_requirement", ""),
+            reference_images,
+            data,
+            None,
+        )
     return None, f"未实现的 API 类型: {api_type}"
 
 

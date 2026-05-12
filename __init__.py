@@ -9,6 +9,8 @@ from .nodes.tikpan_grok_video import TikpanExclusiveVideoNode
 from .nodes.tikpan_gemini_image import TikpanGeminiImageMaxNode
 from .nodes.tikpan_gemini_video_analyst import TikpanGeminiVideoAnalystNode
 from .nodes.tikpan_gemini_tts import TikpanGemini31FlashTTSNode
+from .nodes.tikpan_gemini3_flash_preview_analyst import TikpanGemini3FlashPreviewAnalystNode
+from .nodes.tikpan_gpt5_mini_responses import TikpanGPT5MiniResponsesNode
 from .nodes.tikpan_grok_optimizer import TikpanGrokPromptOptimizerNode
 from .nodes.tikpan_veo_video import TikpanVeoVideoNode
 from .nodes.tikpan_gpt_image_node import TikpanGptImage2Node
@@ -33,6 +35,8 @@ NODE_CLASS_MAPPINGS = {
     "TikpanGeminiImageMaxNode": TikpanGeminiImageMaxNode,
     "TikpanGeminiVideoAnalystNode": TikpanGeminiVideoAnalystNode,
     "TikpanGemini31FlashTTSNode": TikpanGemini31FlashTTSNode,
+    "TikpanGemini3FlashPreviewAnalystNode": TikpanGemini3FlashPreviewAnalystNode,
+    "TikpanGPT5MiniResponsesNode": TikpanGPT5MiniResponsesNode,
     "TikpanGrokPromptOptimizerNode": TikpanGrokPromptOptimizerNode,
     "TikpanGptImage2Node": TikpanGptImage2Node,
     "TikpanVeoVideoNode": TikpanVeoVideoNode,
@@ -59,6 +63,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanGeminiImageMaxNode": "👑 Tikpan：Gemini 14图极限生图",
     "TikpanGeminiVideoAnalystNode": "👁️ Tikpan：AI音视频双轨智能解构",
     "TikpanGemini31FlashTTSNode": "🎙️ Tikpan: Gemini 3.1 Flash TTS Preview",
+    "TikpanGemini3FlashPreviewAnalystNode": "🧠 Tikpan: Gemini 3 Flash Preview 图片/视频分析",
+    "TikpanGPT5MiniResponsesNode": "🧠 Tikpan: GPT-5 Mini 多模态推理",
     "TikpanGrokPromptOptimizerNode": "🧠 Tikpan：Grok多图剧本重构专家",
     "TikpanGptImage2Node": "👑 Tikpan：gpt-image-2-all图片生成",
     "TikpanVeoVideoNode": "🚀 Tikpan: Veo 3.1 多模型视频生成",

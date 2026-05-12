@@ -1,5 +1,46 @@
 # Changelog
 
+## [Unreleased] - 2026-05-12
+
+### New Features
+
+#### GPT-5 Mini 多模态推理节点 (`TikpanGPT5MiniResponsesNode`)
+- 新增 `gpt-5-mini` Responses API 节点，默认调用 `POST /v1/responses`，面向低成本文本推理、图片理解、文件分析、视频抽帧分析、提示词优化和广告/商品分析。
+- 支持直接图片 1-4、图片 URL 列表、视频帧 `IMAGE` 抽帧、文件 URL、本地小文件 inline、可选联网搜索工具和高级 JSON 透传。
+- 支持 `reasoning_effort`、`verbosity`、`max_output_tokens`、JSON 结构化输出和提示词优化输出，便于后续网站做模型参数表单。
+- 优化视频抽帧：新增 `均匀覆盖`、`按秒抽帧`、`首尾加密`、`运动变化优先`、`混合智能` 五种策略，并在输入标注原帧序号和时间点。
+- 固定 `API_HOST = "https://tikpan.com"`，节点不再暴露接口地址输入，避免用户误填上游地址；模型、推理强度、输出风格、图片细节、URL 错误处理和 POST 重试策略均改为下拉/开关。
+- 强化商业稳定性：优先按 Responses 标准输出路径提取文本，补充状态/截断解释、固定分段输出协议、媒体数量统计、成本风险提示和文件/图片总量限制。
+- 增加本地缓存、recovery 记录、幂等 key、提交后断网警告、HTTPS 证书默认校验和大文件请求前拦截，降低重复扣费与不可恢复失败风险。
+- 输出回答文本、优化提示词、结构化 JSON、token 用量和状态日志，方便网站侧余额扣费、审计和任务追踪。
+
+#### Gemini 3 Flash Preview 图片/视频分析节点 (`TikpanGemini3FlashPreviewAnalystNode`)
+- 新增 `gemini-3-flash-preview` 多模态分析节点，面向图片理解、视频 URL 理解、本地小视频理解和视频抽帧分析，不做图片/视频生成。
+- 支持 4 张直接图片、图片 URL 列表、视频帧 `IMAGE`、本地视频路径、公开视频 URL 和高级 JSON 透传。
+- 输出分析报告、反推提示词、结构化 JSON、token 用量和状态日志，方便后续网站按量计费、任务记录和结果展示。
+- 优化视频抽帧：新增 `均匀覆盖`、`按秒抽帧`、`首尾加密`、`运动变化优先`、`混合智能` 五种策略，并在输入标注原帧序号和时间点。
+- 固定 `API_HOST = "https://tikpan.com"`，节点 API 路径绑定 Tikpan 中转站；新增模型下拉、视频输入策略、URL 错误处理和 POST 重试策略，减少用户填写开放参数。
+- 强化商业稳定性：优先按 Gemini `candidates.content.parts.text` 标准路径提取结果，补充 `finishReason`、安全阻断摘要、空 candidates 解释、固定分段输出协议、媒体统计和高成本输入警告。
+- 增加本地缓存、recovery 记录、幂等 key、网络提交后断开提示，降低重复运行导致多次扣费的风险。
+- 对本地大视频做请求前拦截，建议改用视频 URL 或抽帧分析，避免大文件上传不稳定。
+- 默认校验 HTTPS 证书，并提供高级开关兼容特殊本地代理或自签名测试环境。
+
+#### 旧语音节点 Tikpan 中转站绑定与商业化收口
+- `TikpanGemini31FlashTTSNode` 固定 `API_HOST = "https://tikpan.com"`，不再暴露接口基础地址；按调用方式自动拼接 Gemini 原生或 OpenAI 兼容路径。
+- `TikpanMiniMaxSpeech28HDNode` / `TikpanMiniMaxSpeech28TurboNode` 固定 `https://tikpan.com/minimax/v1`，不再暴露 MiniMax 基础地址输入。
+- 语音节点新增 `POST重试策略` 与 `校验HTTPS证书`，默认启用幂等键轻重试和 HTTPS 证书校验，更适合正式商业交付。
+- Gemini TTS 的 `语言代码` 改为下拉选择，默认“自动”，降低普通用户填写语言代码的理解成本。
+
+### Validation
+
+- 使用 Aki 自带 Python 编译检查 `__init__.py` 和 `nodes/tikpan_gemini3_flash_preview_analyst.py`。
+- 完成离线契约测试：payload 构造、图片/视频 URL 打包、幂等哈希稳定性、本地大视频拦截、JSON 输出拆分和非法 URL 校验。
+- 补充抽帧策略离线测试：验证抽帧数量边界、首尾覆盖、运动变化策略和抽帧标签。
+- 使用 Aki 自带 Python 编译检查 `nodes/tikpan_gpt5_mini_responses.py` 和 `tests/test_gpt5_mini_responses_offline.py`。
+- 完成 GPT-5 Mini 离线契约测试：Responses payload、图片/文件 URL、联网搜索工具、JSON 输出格式、幂等哈希、本地文件 inline、大文件拦截、错误输入校验、文本与用量提取。
+- 补充 GPT-5 Mini 抽帧策略离线测试：验证抽帧数量边界、首尾覆盖、运动变化策略和抽帧标签。
+- 新增语音节点离线契约测试：验证 Gemini TTS 与 MiniMax speech 节点不再暴露接口基础地址、绑定 Tikpan 中转站、POST 重试/HTTPS 参数存在，以及核心 payload 构造稳定。
+
 ## [v1.1.0] - 2026-05-11
 
 ### 🔧 Improvements

@@ -520,6 +520,8 @@ async function showModelForm(model) {
           <option value="doubao" ${model?.api_type==='doubao'?'selected':''}>豆包</option>
           <option value="suno" ${model?.api_type==='suno'?'selected':''}>Suno 音乐</option>
           <option value="grok_video" ${model?.api_type==='grok_video'?'selected':''}>Grok 视频</option>
+          <option value="openai_responses" ${model?.api_type==='openai_responses'?'selected':''}>OpenAI Responses</option>
+          <option value="gemini_analysis" ${model?.api_type==='gemini_analysis'?'selected':''}>Gemini 分析</option>
         </select></div>
         <div><label>API 端点</label><input id="m-endpoint" value="${model?.endpoint||''}" placeholder="如：/v1beta/models/..."></div>
       </div>

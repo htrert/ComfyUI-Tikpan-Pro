@@ -18,7 +18,8 @@ import folder_paths
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-API_BASE_URL = "https://tikpan.com"
+API_HOST = "https://tikpan.com"
+API_BASE_URL = API_HOST
 MODEL_NAME = "gemini-3.1-flash-tts-preview"
 RECOVERY_DIR = Path(__file__).resolve().parents[1] / "recovery" / "gemini_3_1_flash_tts_preview"
 
@@ -87,23 +88,12 @@ class TikpanGemini31FlashTTSNode:
                         "tooltip": "会作为自然语言指令合并到文本前面，例如：欢快地说、低声说、像纪录片旁白一样说。",
                     },
                 ),
-                "语言代码": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "tooltip": "可选，例如 zh-CN、en-US、ja-JP。留空则不传。",
-                    },
-                ),
+                "语言代码": (["自动", "zh-CN", "en-US", "ja-JP", "ko-KR", "yue-HK", "fr-FR", "de-DE", "es-ES"], {"default": "自动"}),
                 "采样率": (["24000"], {"default": "24000"}),
+                "POST重试策略": (["幂等键轻重试", "保守不重试POST"], {"default": "幂等键轻重试"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                "接口基础地址": (
-                    "STRING",
-                    {
-                        "default": API_BASE_URL,
-                        "tooltip": "默认 https://tikpan.com。会自动拼接 /v1beta/models 或 /v1/chat/completions。",
-                    },
-                ),
                 "复用本地缓存": (
                     "BOOLEAN",
                     {
@@ -127,10 +117,11 @@ class TikpanGemini31FlashTTSNode:
                     },
                 ),
             },
-        }
+    }
 
     DEFAULT_OPTIONAL_VALUES = {
-        "接口基础地址": API_BASE_URL,
+        "POST重试策略": "幂等键轻重试",
+        "校验HTTPS证书": True,
         "复用本地缓存": True,
         "跳过错误": False,
         "高级自定义_JSON": "",
@@ -160,17 +151,21 @@ class TikpanGemini31FlashTTSNode:
     def make_return(self, path="", url="", usage="", api_path="", log="", audio=None):
         return (path, url, str(usage or ""), api_path, log, audio or self.empty_audio())
 
-    def create_session(self):
+    def create_session(self, allow_post_retry=False):
         session = requests.Session()
         session.trust_env = False
+        allowed_methods = ["HEAD", "GET", "OPTIONS"]
+        if allow_post_retry:
+            allowed_methods.append("POST")
         retries = Retry(
-            total=3,
-            connect=3,
-            read=1,
-            status=3,
+            total=2,
+            connect=2,
+            read=0,
+            status=1,
             backoff_factor=1,
             status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=frozenset(["HEAD", "GET", "OPTIONS"]),
+            allowed_methods=frozenset(allowed_methods),
+            respect_retry_after_header=True,
         )
         adapter = HTTPAdapter(max_retries=retries, pool_connections=20, pool_maxsize=20)
         session.mount("http://", adapter)
@@ -314,6 +309,8 @@ class TikpanGemini31FlashTTSNode:
             },
         }
         language_code = str(language_code or "").strip()
+        if language_code == "自动":
+            language_code = ""
         if language_code:
             payload["generationConfig"]["speechConfig"]["languageCode"] = language_code
         if custom_json:
@@ -336,6 +333,8 @@ class TikpanGemini31FlashTTSNode:
             },
         }
         language_code = str(language_code or "").strip()
+        if language_code == "自动":
+            language_code = ""
         if language_code:
             payload["audio"]["language_code"] = language_code
         if custom_json:
@@ -412,7 +411,9 @@ class TikpanGemini31FlashTTSNode:
         language_code = str(values.get("语言代码") or "").strip()
         style = str(values.get("语气指令") or "").strip()
         sample_rate = int(values.get("采样率") or 24000)
-        base_url = str(values.get("接口基础地址") or API_BASE_URL).strip().rstrip("/")
+        base_url = API_HOST
+        post_retry = str(values.get("POST重试策略") or "幂等键轻重试") == "幂等键轻重试"
+        verify_tls = bool(values.get("校验HTTPS证书", True))
         use_cache = bool(values.get("复用本地缓存", True))
         skip_error = bool(values.get("跳过错误", False))
 
@@ -468,13 +469,13 @@ class TikpanGemini31FlashTTSNode:
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "User-Agent": "Tikpan-ComfyUI-Gemini-3.1-Flash-TTS/1.0",
+                "User-Agent": "Tikpan-ComfyUI-Gemini-3.1-Flash-TTS/1.1",
                 "Idempotency-Key": f"tikpan-gemini-3-1-flash-tts-preview-{cache_key[:32]}",
             }
-            session = self.create_session()
+            session = self.create_session(allow_post_retry=post_retry)
 
             try:
-                response = session.post(url, json=payload, headers=headers, timeout=(15, 300), verify=False)
+                response = session.post(url, json=payload, headers=headers, timeout=(15, 300), verify=verify_tls)
             except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
                 self.save_recovery_record(cache_key, "post_disconnected", api_path=api_path, error=str(e), recovery_path=recovery_path)
                 raise RuntimeError(
@@ -505,7 +506,8 @@ class TikpanGemini31FlashTTSNode:
             elapsed = round(time.time() - start_time, 2)
             log = (
                 f"OK {MODEL_NAME} 语音生成成功 | voice={voice} | source={source} | mime={mime_type or 'pcm'} | "
-                f"用量={usage or '上游未返回'} | 耗时={elapsed}s | 音频={audio_path}"
+                f"用量={usage or '上游未返回'} | 耗时={elapsed}s | api={API_HOST}{api_path} | "
+                f"post_retry={post_retry} | 音频={audio_path}"
             )
             self.save_recovery_record(
                 cache_key,

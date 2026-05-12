@@ -203,3 +203,181 @@ API_DISPATCH = {
     "suno": call_suno,
     "grok_video": call_grok_video,
 }
+
+
+def _safe_json_preview(value, max_len=1200):
+    try:
+        text = json.dumps(value, ensure_ascii=False, default=str)
+    except Exception:
+        text = str(value)
+    return text[:max_len]
+
+
+def _extract_response_text(res_json):
+    if isinstance(res_json, dict) and isinstance(res_json.get("output_text"), str):
+        return res_json["output_text"].strip()
+    texts = []
+
+    def scan(obj):
+        if isinstance(obj, dict):
+            if obj.get("type") in {"output_text", "text"} and isinstance(obj.get("text"), str):
+                texts.append(obj["text"])
+            if isinstance(obj.get("content"), str):
+                texts.append(obj["content"])
+            for value in obj.values():
+                scan(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                scan(item)
+
+    scan(res_json.get("output") if isinstance(res_json, dict) else res_json)
+    return "\n".join(t.strip() for t in texts if t.strip()).strip()
+
+
+def _extract_usage_text(res_json):
+    usage = res_json.get("usage") if isinstance(res_json, dict) else {}
+    if not isinstance(usage, dict):
+        return ""
+    parts = []
+    for source, label in [("input_tokens", "input"), ("output_tokens", "output"), ("total_tokens", "total")]:
+        if usage.get(source) is not None:
+            parts.append(f"{label}={usage.get(source)}")
+    details = usage.get("input_tokens_details") or {}
+    if isinstance(details, dict) and details.get("cached_tokens") is not None:
+        parts.append(f"cached={details.get('cached_tokens')}")
+    return " | ".join(parts)
+
+
+def call_openai_responses(prompt, system_prompt="", reference_images=None, extra_params=None, api_key=None):
+    key = api_key or API_KEY
+    extra_params = extra_params or {}
+    reference_images = reference_images or []
+    model = extra_params.get("model") or extra_params.get("_upstream_model") or "gpt-5-mini"
+    endpoint = extra_params.get("_route_endpoint") or "/v1/responses"
+    content = [{"type": "input_text", "text": prompt}]
+
+    for img_file in reference_images[:4]:
+        img = Image.open(img_file).convert("RGB")
+        b64 = image_to_base64(img, quality=88)
+        content.append({"type": "input_image", "image_url": f"data:image/jpeg;base64,{b64}", "detail": extra_params.get("image_detail", "auto")})
+
+    for url in str(extra_params.get("image_urls") or "").replace(",", "\n").splitlines()[:12]:
+        url = url.strip()
+        if url:
+            content.append({"type": "input_image", "image_url": url, "detail": extra_params.get("image_detail", "auto")})
+
+    for url in str(extra_params.get("file_urls") or "").replace(",", "\n").splitlines()[:8]:
+        url = url.strip()
+        if url:
+            content.append({"type": "input_file", "file_url": url})
+
+    payload = {
+        "model": model,
+        "instructions": system_prompt or "你是 Tikpan 的商业级 AI 助手，回答要准确、结构化、可执行。",
+        "input": [{"role": "user", "content": content}],
+        "reasoning": {"effort": extra_params.get("reasoning_effort", "low")},
+        "text": {"verbosity": extra_params.get("verbosity", "medium")},
+        "max_output_tokens": int(extra_params.get("max_output_tokens", 4096) or 4096),
+    }
+    if extra_params.get("output_format") == "json":
+        payload["text"]["format"] = {"type": "json_object"}
+    if str(extra_params.get("web_search", "")).lower() in {"1", "true", "yes", "on"}:
+        payload["tools"] = [{"type": "web_search_preview"}]
+
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Idempotency-Key": f"web-gpt5-mini-{uuid.uuid4().hex}",
+    }
+    resp = requests.post(f"{API_BASE_URL}{endpoint}", json=payload, headers=headers, timeout=(20, 420), verify=True)
+    if resp.status_code != 200:
+        return None, f"API 错误 ({resp.status_code}): {resp.text[:800]}"
+    try:
+        res_json = resp.json()
+    except Exception:
+        return None, f"接口返回非 JSON: {resp.text[:800]}"
+    if isinstance(res_json, dict) and res_json.get("error"):
+        return None, f"上游返回错误: {_safe_json_preview(res_json.get('error'))}"
+    answer = _extract_response_text(res_json)
+    if not answer:
+        return None, f"未提取到回答文本: {_safe_json_preview(res_json)}"
+    return {
+        "text": answer,
+        "usage": _extract_usage_text(res_json),
+        "request_id": res_json.get("id", "") if isinstance(res_json, dict) else "",
+        "raw_preview": _safe_json_preview(res_json, 2000),
+    }, None
+
+
+def call_gemini_analysis(prompt, reference_images=None, extra_params=None, api_key=None):
+    key = api_key or API_KEY
+    extra_params = extra_params or {}
+    reference_images = reference_images or []
+    model = extra_params.get("model") or extra_params.get("_upstream_model") or "gemini-3-flash-preview"
+    endpoint = extra_params.get("_route_endpoint") or f"/v1beta/models/{model}:generateContent"
+    parts = [{"text": prompt}]
+
+    for img_file in reference_images[:4]:
+        img = Image.open(img_file).convert("RGB")
+        b64 = image_to_base64(img, quality=88)
+        parts.append({"inlineData": {"mimeType": "image/jpeg", "data": b64}})
+
+    for url in str(extra_params.get("image_urls") or "").replace(",", "\n").splitlines()[:12]:
+        url = url.strip()
+        if url:
+            parts.append({"file_data": {"file_uri": url, "mime_type": "image/jpeg"}})
+
+    video_url = str(extra_params.get("video_url") or "").strip()
+    if video_url:
+        parts.append({"file_data": {"file_uri": video_url, "mime_type": "video/mp4"}})
+
+    payload = {
+        "contents": [{"role": "user", "parts": parts}],
+        "generationConfig": {
+            "temperature": float(extra_params.get("temperature", 0.3) or 0.3),
+            "maxOutputTokens": int(extra_params.get("max_output_tokens", 4096) or 4096),
+        },
+    }
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Idempotency-Key": f"web-gemini-analysis-{uuid.uuid4().hex}",
+    }
+    resp = requests.post(f"{API_BASE_URL}{endpoint}", json=payload, headers=headers, timeout=(20, 420), verify=True)
+    if resp.status_code != 200:
+        return None, f"API 错误 ({resp.status_code}): {resp.text[:800]}"
+    try:
+        res_json = resp.json()
+    except Exception:
+        return None, f"接口返回非 JSON: {resp.text[:800]}"
+    if isinstance(res_json, dict) and res_json.get("error"):
+        return None, f"上游返回错误: {_safe_json_preview(res_json.get('error'))}"
+
+    texts = []
+
+    def scan(obj):
+        if isinstance(obj, dict):
+            if isinstance(obj.get("text"), str):
+                texts.append(obj["text"])
+            for value in obj.values():
+                scan(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                scan(item)
+
+    scan(res_json.get("candidates") if isinstance(res_json, dict) else res_json)
+    answer = "\n".join(t.strip() for t in texts if t.strip()).strip()
+    if not answer:
+        return None, f"未提取到分析文本: {_safe_json_preview(res_json)}"
+    return {
+        "text": answer,
+        "usage": _extract_usage_text(res_json),
+        "request_id": res_json.get("id", "") if isinstance(res_json, dict) else "",
+        "raw_preview": _safe_json_preview(res_json, 2000),
+    }, None
+
+
+API_DISPATCH["openai_responses"] = call_openai_responses
+API_DISPATCH["gemini_analysis"] = call_gemini_analysis
