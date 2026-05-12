@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-tikpan-pro"
-version = "1.1.6"
+version = "1.1.8"
 description = "Tikpan 官方独家节点：支持 GPT-Image-2、Doubao、Suno、HappyHorse、Grok、Veo 等图像、音频与视频生成"
 readme = "README.md"
 authors = [{ name = "htrert" }]
