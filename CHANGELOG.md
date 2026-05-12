@@ -31,6 +31,10 @@
 - 语音节点新增 `POST重试策略` 与 `校验HTTPS证书`，默认启用幂等键轻重试和 HTTPS 证书校验，更适合正式商业交付。
 - Gemini TTS 的 `语言代码` 改为下拉选择，默认“自动”，降低普通用户填写语言代码的理解成本。
 
+#### 旧视频/提示词节点 HTTPS 策略迁移
+- `TikpanGeminiVideoAnalystNode`、`TikpanGrokPromptOptimizerNode`、`TikpanExclusiveVideoNode`、`TikpanVeoVideoNode` 默认启用 HTTPS 证书校验。
+- 为上述旧节点补充 `校验HTTPS证书` 开关，兼容少数本地代理/证书异常环境，同时让正式商业使用走更安全的默认值。
+
 ### Validation
 
 - 使用 Aki 自带 Python 编译检查 `__init__.py` 和 `nodes/tikpan_gemini3_flash_preview_analyst.py`。
@@ -40,6 +44,7 @@
 - 完成 GPT-5 Mini 离线契约测试：Responses payload、图片/文件 URL、联网搜索工具、JSON 输出格式、幂等哈希、本地文件 inline、大文件拦截、错误输入校验、文本与用量提取。
 - 补充 GPT-5 Mini 抽帧策略离线测试：验证抽帧数量边界、首尾覆盖、运动变化策略和抽帧标签。
 - 新增语音节点离线契约测试：验证 Gemini TTS 与 MiniMax speech 节点不再暴露接口基础地址、绑定 Tikpan 中转站、POST 重试/HTTPS 参数存在，以及核心 payload 构造稳定。
+- 使用 Aki 自带 Python 编译检查旧视频/提示词节点 HTTPS 迁移，确认四个节点语法通过且目标文件不再残留 `verify=False`。
 
 ## [v1.1.0] - 2026-05-11
 

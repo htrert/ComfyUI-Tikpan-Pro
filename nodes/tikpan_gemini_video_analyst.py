@@ -51,7 +51,8 @@ class TikpanGeminiVideoAnalystNode:
             },
             "optional": {
                 "音频流_AUDIO": ("AUDIO",),
-                "特定关注点": ("STRING", {"multiline": True, "default": "请重点关注物理规律、光影变化和人物微表情。"})
+                "特定关注点": ("STRING", {"multiline": True, "default": "请重点关注物理规律、光影变化和人物微表情。"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
             }
         }
 
@@ -60,7 +61,7 @@ class TikpanGeminiVideoAnalystNode:
     FUNCTION = "analyze_video"
     CATEGORY = "👑 Tikpan 官方独家节点"
 
-    def analyze_video(self, 获取密钥地址, Tikpan_API密钥, 视频流_IMAGE, 视频帧率_FPS, 分析模型, 音频流_AUDIO=None, 特定关注点=""):
+    def analyze_video(self, 获取密钥地址, Tikpan_API密钥, 视频流_IMAGE, 视频帧率_FPS, 分析模型, 音频流_AUDIO=None, 特定关注点="", 校验HTTPS证书=True):
         comfy.model_management.throw_exception_if_processing_interrupted()
         
         if not Tikpan_API密钥 or len(Tikpan_API密钥) < 10:
@@ -164,7 +165,13 @@ class TikpanGeminiVideoAnalystNode:
         print(f"[Tikpan Analyst] 🚀 正在呼叫 {分析模型} 发起突击...")
         
         try:
-            res = session.post(f"{HARDCODED_BASE_URL}/chat/completions", json=payload, headers=headers, verify=False, timeout=180)
+            res = session.post(
+                f"{HARDCODED_BASE_URL}/chat/completions",
+                json=payload,
+                headers=headers,
+                verify=bool(校验HTTPS证书),
+                timeout=180,
+            )
             res.raise_for_status()
             res_json = res.json()
             analysis_report = res_json.get("choices", [{}])[0].get("message", {}).get("content", str(res_json))

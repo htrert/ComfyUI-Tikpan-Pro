@@ -32,7 +32,9 @@ class TikpanExclusiveVideoNode:
                 "分辨率": (["1080P", "720P", "480P"], {"default": "720P"}),
                 "seed": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
             },
-            "optional": {}
+            "optional": {
+                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
+            }
         }
         
         # 支持 7 张参考图
@@ -53,6 +55,7 @@ class TikpanExclusiveVideoNode:
         
         if not Tikpan_API密钥 or len(Tikpan_API密钥) < 10:
             return ("❌ 请填写API密钥", "失败", "无", "请填写密钥", None)
+        verify_tls = bool(kwargs.get("校验HTTPS证书", True))
 
         headers = {"Authorization": f"Bearer {Tikpan_API密钥}", "Content-Type": "application/json"}
         session = requests.Session()
@@ -82,7 +85,7 @@ class TikpanExclusiveVideoNode:
 
         # 3. 发起创建任务
         try:
-            res = session.post(f"{HARDCODED_BASE_URL}/video/create", json=payload, headers=headers, verify=False, timeout=60).json()
+            res = session.post(f"{HARDCODED_BASE_URL}/video/create", json=payload, headers=headers, verify=verify_tls, timeout=60).json()
             task_id = res.get("id") or res.get("task_id")
             if not task_id: return ("❌ 任务创建失败", "无", "无", json.dumps(res, ensure_ascii=False), None)
         except Exception as e: return (f"❌ 网络错误: {e}", "无", "无", str(e), None)
@@ -102,7 +105,7 @@ class TikpanExclusiveVideoNode:
             wait_time += 5
 
             try:
-                status_res = session.get(f"{HARDCODED_BASE_URL}/video/query?id={task_id}", headers=headers, verify=False, timeout=30).json()
+                status_res = session.get(f"{HARDCODED_BASE_URL}/video/query?id={task_id}", headers=headers, verify=verify_tls, timeout=30).json()
                 final_data = status_res
                 data = status_res.get("data", status_res)
                 
@@ -137,7 +140,7 @@ class TikpanExclusiveVideoNode:
         comfy.model_management.throw_exception_if_processing_interrupted()
         print(f"[Tikpan Grok3] 📥 正在极速下载大片到本地...")
         try:
-            response = requests.get(video_url, verify=False, timeout=300)
+            response = requests.get(video_url, verify=verify_tls, timeout=300)
             safe_id = str(task_id).replace(":", "_")
             filename = f"Tikpan_{safe_id}.mp4"
             out_dir = folder_paths.get_output_directory()

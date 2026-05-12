@@ -29,7 +29,9 @@ class TikpanGrokPromptOptimizerNode:
                     "default": "保留原片的丝滑运镜，将背景的色调改为具有未来科技感的赛博朋克风。"
                 }),
             },
-            "optional": {}
+            "optional": {
+                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
+            }
         }
         
         # 🚀 动态对接 Grok3 的 7 图占位符系统
@@ -113,7 +115,13 @@ class TikpanGrokPromptOptimizerNode:
         print(f"\n[Tikpan Optimizer] 🧠 正在呼叫 {文本处理模型} 执行底层基因重组与语法适配...")
 
         try:
-            res = requests.post(f"{HARDCODED_BASE_URL}/chat/completions", json=payload, headers=headers, verify=False, timeout=120)
+            res = requests.post(
+                f"{HARDCODED_BASE_URL}/chat/completions",
+                json=payload,
+                headers=headers,
+                verify=bool(kwargs.get("校验HTTPS证书", True)),
+                timeout=120,
+            )
             res.raise_for_status()
             res_data = res.json()
             full_response = res_data.get("choices", [{}])[0].get("message", {}).get("content", "")

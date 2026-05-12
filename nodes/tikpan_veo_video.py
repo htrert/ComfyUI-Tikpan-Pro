@@ -58,6 +58,7 @@ class TikpanVeoVideoNode:
         inputs["optional"]["参考图_尾帧"] = ("IMAGE",)
         for i in range(1, 4):
             inputs["optional"][f"垫图_{i}"] = ("IMAGE",)
+        inputs["optional"]["校验HTTPS证书"] = ("BOOLEAN", {"default": True})
             
         return inputs
 
@@ -74,6 +75,7 @@ class TikpanVeoVideoNode:
             return ("❌ 请填写API密钥", "无", "无", "请填写密钥", None)
         if 模型选择 not in VEO_MODEL_OPTIONS:
             return ("❌ 模型选择无效", "无", "无", f"不支持的模型: {模型选择}", None)
+        verify_tls = bool(kwargs.get("校验HTTPS证书", True))
 
         # /v1/videos 使用 multipart form；/v1/video/create 使用项目内旧视频统一 JSON 格式。
         headers = {"Authorization": f"Bearer {API_密钥}"}
@@ -145,7 +147,7 @@ class TikpanVeoVideoNode:
                     f"{HARDCODED_BASE_URL}{endpoint_path}",
                     json=payload,
                     headers=json_headers,
-                    verify=False,
+                    verify=verify_tls,
                     timeout=120,
                 )
             else:
@@ -154,7 +156,7 @@ class TikpanVeoVideoNode:
                     data=form_data,
                     files=form_files if form_files else None,
                     headers=headers,
-                    verify=False,
+                    verify=verify_tls,
                     timeout=120,
                 )
             if create_resp.status_code >= 400:
@@ -207,7 +209,7 @@ class TikpanVeoVideoNode:
                         if endpoint_path == "/v1/video/create"
                         else f"{HARDCODED_BASE_URL}/v1/videos/{task_id}"
                     )
-                    status_resp = session.get(query_url, headers=headers, verify=False, timeout=30)
+                    status_resp = session.get(query_url, headers=headers, verify=verify_tls, timeout=30)
                     status_res = status_resp.json()
                     final_data = status_res
                     
@@ -232,7 +234,7 @@ class TikpanVeoVideoNode:
         comfy.model_management.throw_exception_if_processing_interrupted()
         print(f"[Veo 3.1] 📥 正在极速下载大片到本地...")
         try:
-            response = requests.get(video_url, verify=False, timeout=600)
+            response = requests.get(video_url, verify=verify_tls, timeout=600)
             if response.status_code >= 400:
                 return (
                     f"❌ 下载失败: HTTP {response.status_code}",
