@@ -1,18 +1,5 @@
 # Changelog
 
-## [v1.1.2] - 2026-05-12
-
-### New Features
-
-#### Vidu Q3 视频节点
-- 新增 `TikpanViduQ3Node`，对接 `viduq3` 参考生视频，支持 540p/720p/1080p、3-16 秒。
-- 新增 `TikpanViduQ3MixNode`，对接 `viduq3-mix` 参考生视频，支持 720p/1080p、1-16 秒。
-- 新增 `TikpanViduQ3TurboNode`，对接 `viduq3-turbo` 文生视频、图生视频、首尾帧和参考生视频。
-- 默认接口基础地址为 `https://tikpan.com`，按模式路由到 `/ent/v2/reference2video`、`/ent/v2/text2video`、`/ent/v2/img2video`、`/ent/v2/start-end2video`。
-- 新增 `recovery/vidu_q3_video` 任务记录和本地视频缓存，减少网络中断或重复运行造成的多次扣费风险。
-- POST 创建任务不对 5xx/网络波动做盲目自动重试；提交后断网会返回明确提示，建议先查看 recovery 记录或任务 ID。
-- 下载阶段校验内容类型、文件大小和错误页，避免把上游错误响应保存成 `.mp4`。
-
 ## [v1.1.0] - 2026-05-11
 
 ### 🔧 Improvements

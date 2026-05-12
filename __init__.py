@@ -11,7 +11,6 @@ from .nodes.tikpan_gemini_video_analyst import TikpanGeminiVideoAnalystNode
 from .nodes.tikpan_gemini_tts import TikpanGemini31FlashTTSNode
 from .nodes.tikpan_grok_optimizer import TikpanGrokPromptOptimizerNode
 from .nodes.tikpan_veo_video import TikpanVeoVideoNode
-from .nodes.tikpan_vidu_q3_video import TikpanViduQ3Node, TikpanViduQ3MixNode, TikpanViduQ3TurboNode
 from .nodes.tikpan_gpt_image_node import TikpanGptImage2Node
 from .nodes.tikpan_gpt_image_2_gen import TikpanGptImage2GenNode
 from .nodes.tikpan_gpt_image_2_edit import TikpanGptImage2EditNode
@@ -37,9 +36,6 @@ NODE_CLASS_MAPPINGS = {
     "TikpanGrokPromptOptimizerNode": TikpanGrokPromptOptimizerNode,
     "TikpanGptImage2Node": TikpanGptImage2Node,
     "TikpanVeoVideoNode": TikpanVeoVideoNode,
-    "TikpanViduQ3Node": TikpanViduQ3Node,
-    "TikpanViduQ3MixNode": TikpanViduQ3MixNode,
-    "TikpanViduQ3TurboNode": TikpanViduQ3TurboNode,
     "TikpanGptImage2GenNode": TikpanGptImage2GenNode,
     "TikpanGptImage2EditNode": TikpanGptImage2EditNode,
     "TikpanGptImage2OfficialNode": TikpanGptImage2OfficialNode,
@@ -66,9 +62,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanGrokPromptOptimizerNode": "🧠 Tikpan：Grok多图剧本重构专家",
     "TikpanGptImage2Node": "👑 Tikpan：gpt-image-2-all图片生成",
     "TikpanVeoVideoNode": "🚀 Tikpan: Veo 3.1 多模型视频生成",
-    "TikpanViduQ3Node": "🎬 Tikpan: viduq3 参考生视频",
-    "TikpanViduQ3MixNode": "🎬 Tikpan: viduq3-mix 参考生视频",
-    "TikpanViduQ3TurboNode": "🎬 Tikpan: viduq3-turbo 多模式视频",
     "TikpanGptImage2GenNode": "🎨 Tikpan: GPT-Image-2-all 视觉建筑师(生成)",
     "TikpanGptImage2EditNode": "💉 Tikpan: GPT-Image-2-all 视觉整形师(修改)",
     "TikpanGptImage2OfficialNode": "💎 Tikpan: GPT-Image-2 官方正式版(生图)",
