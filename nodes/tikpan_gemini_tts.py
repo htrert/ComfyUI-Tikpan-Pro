@@ -24,41 +24,53 @@ MODEL_NAME = "gemini-3.1-flash-tts-preview"
 RECOVERY_DIR = Path(__file__).resolve().parents[1] / "recovery" / "gemini_3_1_flash_tts_preview"
 
 
+GEMINI_TTS_VOICES = [
+    ("Kore", "Firm", "坚定清晰", "适合商务说明、教程、权威旁白"),
+    ("Puck", "Upbeat", "活泼明快", "适合短视频、欢迎语、轻松口播"),
+    ("Charon", "Informative", "信息型", "适合知识讲解、产品介绍"),
+    ("Zephyr", "Bright", "明亮", "适合积极、清爽的叙述"),
+    ("Fenrir", "Excitable", "兴奋有能量", "适合广告、活动预告"),
+    ("Aoede", "Breezy", "轻松随和", "适合自然聊天、生活方式内容"),
+    ("Leda", "Youthful", "年轻感", "适合年轻角色、社媒内容"),
+    ("Orus", "Firm", "坚定男声感", "适合决策说明、严肃内容"),
+    ("Callirrhoe", "Easy-going", "随和自然", "适合温和讲解"),
+    ("Autonoe", "Bright", "明亮女声感", "适合轻快叙述"),
+    ("Enceladus", "Breathy", "气声柔和", "适合情绪化、亲密旁白"),
+    ("Iapetus", "Clear", "清楚直白", "适合播报、说明"),
+    ("Umbriel", "Easy-going", "轻松自然", "适合聊天感表达"),
+    ("Algieba", "Smooth", "顺滑稳定", "适合商业旁白"),
+    ("Despina", "Smooth", "柔顺", "适合温柔说明"),
+    ("Erinome", "Clear", "清晰", "适合标准朗读"),
+    ("Algenib", "Gravelly", "颗粒感", "适合成熟角色、质感旁白"),
+    ("Rasalgethi", "Informative", "知识型", "适合教程、科普"),
+    ("Laomedeia", "Upbeat", "轻快", "适合活泼内容"),
+    ("Achernar", "Soft", "柔和", "适合温柔叙事"),
+    ("Alnilam", "Firm", "坚定", "适合正式讲解"),
+    ("Schedar", "Even", "平稳", "适合长文本朗读"),
+    ("Gacrux", "Mature", "成熟", "适合品牌、纪录片旁白"),
+    ("Pulcherrima", "Forward", "直接有推进感", "适合营销、行动号召"),
+    ("Achird", "Friendly", "友好", "适合客服、引导语"),
+    ("Zubenelgenubi", "Casual", "随意口语", "适合聊天、轻内容"),
+    ("Vindemiatrix", "Gentle", "温柔", "适合舒缓旁白"),
+    ("Sadachbia", "Lively", "生动", "适合故事、角色内容"),
+    ("Sadaltager", "Knowledgeable", "知识感", "适合专业讲解"),
+    ("Sulafat", "Warm", "温暖", "适合欢迎语、情感叙述"),
+]
+
+
+def gemini_voice_label(item):
+    voice_name, style, zh_style, usage = item
+    return f"{voice_name}｜{zh_style}｜{style}｜{usage}"
+
+
+GEMINI_VOICE_OPTIONS = [gemini_voice_label(item) for item in GEMINI_TTS_VOICES] + [
+    "自定义 voice_name｜在下方填写"
+]
+
+
 class TikpanGemini31FlashTTSNode:
     @classmethod
     def INPUT_TYPES(cls):
-        voices = [
-            "Kore",
-            "Puck",
-            "Charon",
-            "Zephyr",
-            "Fenrir",
-            "Aoede",
-            "Leda",
-            "Orus",
-            "Callirrhoe",
-            "Autonoe",
-            "Enceladus",
-            "Iapetus",
-            "Umbriel",
-            "Algieba",
-            "Despina",
-            "Erinome",
-            "Algenib",
-            "Rasalgethi",
-            "Laomedeia",
-            "Achernar",
-            "Alnilam",
-            "Schedar",
-            "Gacrux",
-            "Pulcherrima",
-            "Achird",
-            "Zubenelgenubi",
-            "Vindemiatrix",
-            "Sadachbia",
-            "Sadaltager",
-            "Sulafat",
-        ]
         return {
             "required": {
                 "💵_福利_💵": (
@@ -80,7 +92,7 @@ class TikpanGemini31FlashTTSNode:
                     ["geminitts 原生", "gemini 原生", "openai 兼容"],
                     {"default": "geminitts 原生"},
                 ),
-                "音色": (voices, {"default": "Kore"}),
+                "音色": (GEMINI_VOICE_OPTIONS, {"default": gemini_voice_label(GEMINI_TTS_VOICES[0])}),
                 "语气指令": (
                     "STRING",
                     {
@@ -94,6 +106,13 @@ class TikpanGemini31FlashTTSNode:
                 "校验HTTPS证书": ("BOOLEAN", {"default": True}),
             },
             "optional": {
+                "自定义voice_name": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "tooltip": "选择“自定义 voice_name”时填写，用于官方新增音色或中转站自定义别名。",
+                    },
+                ),
                 "复用本地缓存": (
                     "BOOLEAN",
                     {
@@ -122,6 +141,7 @@ class TikpanGemini31FlashTTSNode:
     DEFAULT_OPTIONAL_VALUES = {
         "POST重试策略": "幂等键轻重试",
         "校验HTTPS证书": True,
+        "自定义voice_name": "",
         "复用本地缓存": True,
         "跳过错误": False,
         "高级自定义_JSON": "",
@@ -289,7 +309,21 @@ class TikpanGemini31FlashTTSNode:
             return text
         return f"{style}: {text}"
 
+    def resolve_voice_name(self, selected_voice, custom_voice_name=""):
+        selected_voice = str(selected_voice or "").strip()
+        custom_voice_name = str(custom_voice_name or "").strip()
+        if not selected_voice:
+            selected_voice = gemini_voice_label(GEMINI_TTS_VOICES[0])
+        if selected_voice.startswith("自定义"):
+            if not custom_voice_name:
+                raise ValueError("已选择自定义 voice_name，但没有填写“自定义voice_name”。")
+            return custom_voice_name
+        if "｜" in selected_voice:
+            return selected_voice.split("｜", 1)[0].strip()
+        return selected_voice
+
     def build_gemini_payload(self, text, voice, language_code, style, custom_json):
+        voice = self.resolve_voice_name(voice)
         payload = {
             "contents": [
                 {
@@ -318,6 +352,7 @@ class TikpanGemini31FlashTTSNode:
         return payload
 
     def build_openai_payload(self, text, voice, language_code, style, custom_json):
+        voice = self.resolve_voice_name(voice)
         payload = {
             "model": MODEL_NAME,
             "messages": [
@@ -407,7 +442,7 @@ class TikpanGemini31FlashTTSNode:
         api_key = str(values.get("API_密钥") or "").strip()
         text = str(values.get("合成文本") or "").strip()
         call_mode = str(values.get("调用方式") or "geminitts 原生")
-        voice = str(values.get("音色") or "Kore").strip()
+        voice = self.resolve_voice_name(values.get("音色") or "Kore", values.get("自定义voice_name"))
         language_code = str(values.get("语言代码") or "").strip()
         style = str(values.get("语气指令") or "").strip()
         sample_rate = int(values.get("采样率") or 24000)

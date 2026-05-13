@@ -18,6 +18,7 @@ from .tikpan_happyhorse_common import (
     is_success_status,
     video_from_path,
 )
+from .tikpan_node_options import normalize_seed
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -49,7 +50,7 @@ class TikpanVeoVideoNode:
                 "Veo专属提示词": ("STRING", {"multiline": True, "default": "请在此直接输入您的视频提示词..."}),
                 "模型选择": (VEO_MODEL_OPTIONS, {"default": "veo_3_1-lite"}),
                 "比例": (["16:9", "9:16"], {"default": "16:9"}),
-                "seed": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
             },
             "optional": {}
         }
@@ -68,7 +69,7 @@ class TikpanVeoVideoNode:
     FUNCTION = "execute"
     CATEGORY = "👑 Tikpan 官方独家节点"
 
-    def execute(self, 获取密钥请访问, API_密钥, Veo专属提示词, 模型选择, 比例, seed, **kwargs):
+    def execute(self, 获取密钥请访问, API_密钥, Veo专属提示词, 模型选择, 比例, 随机种子=888888, **kwargs):
         comfy.model_management.throw_exception_if_processing_interrupted()
         
         if not API_密钥 or len(API_密钥) < 10:
@@ -76,6 +77,7 @@ class TikpanVeoVideoNode:
         if 模型选择 not in VEO_MODEL_OPTIONS:
             return ("❌ 模型选择无效", "无", "无", f"不支持的模型: {模型选择}", None)
         verify_tls = bool(kwargs.get("校验HTTPS证书", True))
+        seed = normalize_seed(kwargs.get("seed", 随机种子), default=888888, maximum=2147483647)
 
         # /v1/videos 使用 multipart form；/v1/video/create 使用项目内旧视频统一 JSON 格式。
         headers = {"Authorization": f"Bearer {API_密钥}"}

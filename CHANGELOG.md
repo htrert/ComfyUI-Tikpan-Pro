@@ -1,5 +1,23 @@
 # Changelog
 
+## [v1.1.10] - 2026-05-13
+
+### Improvements
+
+- 全面复查 ComfyUI 节点输入参数，继续补齐中文参数名，并保留旧工作流英文 key 兼容读取。
+- 新增共享参数选项工具，统一下拉项原始值解析、旧参数兼容读取、视频时长解析和随机种子规范化。
+- 将旧工作流中的 `seed=-1` 规范化为默认固定种子 `888888`，新节点界面不再展示负数随机种子；同时修复 seed 上限边界取模问题。
+- Suno 节点新增模型版本、风格预设、人声性别等下拉项，并通过“发送高级Suno参数”开关控制 `style_weight`、`weirdness_constraint`、`vocal_gender` 等高级字段是否透传。
+- Nano Banana Pro / Gemini 图像节点补齐分辨率、画面比例、输出 token 说明，并兼容 Gemini REST `responseFormat.image` 与 SDK/中转层 `imageConfig` 两种图像尺寸配置写法。
+- HappyHorse、Veo、Grok、Doubao、GPT Image、任务查询等节点继续统一中文化 `API_密钥`、`生成指令`、`水印`、`视频时长`、`最长等待秒数`、`查询间隔秒数` 等字段。
+- 新增豆包 TTS 2.0 节点注册，继续绑定 Tikpan 中转站与对应语音合成端点。
+
+### Validation
+
+- 使用 Aki 自带 Python 通过 `compileall` 编译检查 `nodes` 与 `tests`。
+- 新增并通过节点契约离线测试，覆盖 seed 规范化、Suno 下拉/高级参数门控、Nano Banana Pro 图像尺寸 payload、Gemini 图像字段兼容。
+- 通过语音节点、Gemini 3 Flash Preview 分析节点、GPT-5.4 Mini Responses 节点离线测试。
+
 ## [v1.1.9] - 2026-05-12
 
 ### New Features

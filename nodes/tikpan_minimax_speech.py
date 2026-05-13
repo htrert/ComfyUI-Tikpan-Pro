@@ -25,6 +25,80 @@ DEFAULT_API_BASE_URL = MINIMAX_API_BASE_URL
 RECOVERY_ROOT = Path(__file__).resolve().parents[1] / "recovery"
 
 
+MINIMAX_SYSTEM_VOICES = [
+    ("中文普通话", "可靠管理者", "稳重商务男声，适合企业旁白", "Chinese (Mandarin)_Reliable_Executive"),
+    ("中文普通话", "新闻主播", "标准播报风格，适合资讯解说", "Chinese (Mandarin)_News_Anchor"),
+    ("中文普通话", "洒脱青年", "年轻自然男声，适合口播", "Chinese (Mandarin)_Unrestrained_Young_Man"),
+    ("中文普通话", "成熟女性", "沉稳女声，适合品牌叙事", "Chinese (Mandarin)_Mature_Woman"),
+    ("中文普通话", "傲娇小姐", "角色感女声", "Arrogant_Miss"),
+    ("中文普通话", "机甲机器人", "机械质感角色音", "Robot_Armor"),
+    ("中文普通话", "热心阿姨", "亲切生活化女声", "Chinese (Mandarin)_Kind-hearted_Antie"),
+    ("中文普通话", "港风空乘", "港风服务播报", "Chinese (Mandarin)_HK_Flight_Attendant"),
+    ("中文普通话", "幽默老人", "年长幽默角色音", "Chinese (Mandarin)_Humorous_Elder"),
+    ("中文普通话", "绅士男声", "礼貌沉稳男声", "Chinese (Mandarin)_Gentleman"),
+    ("中文普通话", "暖心闺蜜", "亲近自然女声", "Chinese (Mandarin)_Warm_Bestie"),
+    ("中文普通话", "倔强朋友", "个性角色音", "Chinese (Mandarin)_Stubborn_Friend"),
+    ("中文普通话", "甜美女声", "甜美自然", "Chinese (Mandarin)_Sweet_Lady"),
+    ("中文普通话", "南方青年", "南方口音男声", "Chinese (Mandarin)_Southern_Young_Man"),
+    ("中文普通话", "智慧女性", "成熟知性", "Chinese (Mandarin)_Wise_Women"),
+    ("中文普通话", "温柔青年", "柔和男声", "Chinese (Mandarin)_Gentle_Youth"),
+    ("中文普通话", "暖心女孩", "温暖女声", "Chinese (Mandarin)_Warm_Girl"),
+    ("中文普通话", "男播音员", "标准播音男声", "Chinese (Mandarin)_Male_Announcer"),
+    ("中文普通话", "慈祥长者", "年长亲切男声", "Chinese (Mandarin)_Kind-hearted_Elder"),
+    ("中文普通话", "可爱精灵", "可爱角色音", "Chinese (Mandarin)_Cute_Spirit"),
+    ("中文普通话", "电台主持", "电台节目风格", "Chinese (Mandarin)_Radio_Host"),
+    ("中文普通话", "抒情声音", "柔和叙事", "Chinese (Mandarin)_Lyrical_Voice"),
+    ("中文普通话", "直爽男孩", "清爽男声", "Chinese (Mandarin)_Straightforward_Boy"),
+    ("中文普通话", "真诚成年人", "自然真诚", "Chinese (Mandarin)_Sincere_Adult"),
+    ("中文普通话", "温和长辈", "温柔年长声线", "Chinese (Mandarin)_Gentle_Senior"),
+    ("中文普通话", "清脆女孩", "清亮女声", "Chinese (Mandarin)_Crisp_Girl"),
+    ("中文普通话", "纯真男孩", "少年感", "Chinese (Mandarin)_Pure-hearted_Boy"),
+    ("中文普通话", "柔软女孩", "轻柔女声", "Chinese (Mandarin)_Soft_Girl"),
+    ("中文普通话", "知性女孩", "知性年轻女声", "Chinese (Mandarin)_IntellectualGirl"),
+    ("中文普通话", "暖心少女", "温暖甜美", "Chinese (Mandarin)_Warm_HeartedGirl"),
+    ("中文普通话", "松弛女孩", "轻松自然", "Chinese (Mandarin)_Laid_BackGirl"),
+    ("中文普通话", "探索女孩", "好奇活泼", "Chinese (Mandarin)_ExplorativeGirl"),
+    ("中文普通话", "热心阿姨 2", "亲切长辈女声", "Chinese (Mandarin)_Warm-HeartedAunt"),
+    ("中文普通话", "害羞女孩", "害羞柔和", "Chinese (Mandarin)_BashfulGirl"),
+    ("英语", "Expressive Narrator", "表现力旁白", "English_expressive_narrator"),
+    ("英语", "Radiant Girl", "明亮女声", "English_radiant_girl"),
+    ("英语", "Magnetic Male", "磁性男声", "English_magnetic_voiced_man"),
+    ("英语", "Upbeat Woman", "积极女声", "English_Upbeat_Woman"),
+    ("英语", "Trustworthy Man", "可信赖男声", "English_Trustworth_Man"),
+    ("英语", "Calm Woman", "冷静女声", "English_CalmWoman"),
+    ("英语", "Deep Voice Man", "低沉男声", "English_ManWithDeepVoice"),
+    ("英语", "Friendly Guy", "友好男声", "English_FriendlyPerson"),
+    ("日语", "知性前辈", "知性成熟", "Japanese_IntellectualSenior"),
+    ("日语", "果断公主", "角色女声", "Japanese_DecisivePrincess"),
+    ("日语", "忠诚骑士", "角色男声", "Japanese_LoyalKnight"),
+    ("日语", "冷静女王", "冷感角色", "Japanese_ColdQueen"),
+    ("粤语", "专业女主持", "粤语播报女声", "Cantonese_ProfessionalHost (F)"),
+    ("粤语", "温柔女士", "粤语温柔女声", "Cantonese_GentleLady"),
+    ("粤语", "专业男主持", "粤语播报男声", "Cantonese_ProfessionalHost (M)"),
+    ("粤语", "俏皮男声", "粤语活泼男声", "Cantonese_PlayfulMan"),
+    ("韩语", "温柔女士", "韩语温柔女声", "Korean_SoothingLady"),
+    ("韩语", "可靠姐姐", "韩语成熟女声", "Korean_ReliableSister"),
+    ("西语", "Narrator", "西语旁白", "Spanish_Narrator"),
+    ("葡语", "Narrator", "葡语旁白", "Portuguese_Narrator"),
+    ("法语", "Male Narrator", "法语男旁白", "French_MaleNarrator"),
+    ("印尼语", "Sweet Girl", "印尼语甜美女声", "Indonesian_SweetGirl"),
+    ("德语", "Friendly Man", "德语友好男声", "German_FriendlyMan"),
+    ("俄语", "Reliable Man", "俄语可靠男声", "Russian_ReliableMan"),
+    ("泰语", "Serene Man", "泰语沉静男声", "Thai_male_1_sample8"),
+    ("印地语", "News Anchor", "印地语新闻女声", "hindi_female_1_v2"),
+]
+
+
+def minimax_voice_label(item):
+    language, name, desc, voice_id = item
+    return f"{language}｜{name}｜{desc}｜{voice_id}"
+
+
+MINIMAX_VOICE_OPTIONS = [minimax_voice_label(item) for item in MINIMAX_SYSTEM_VOICES] + [
+    "自定义 voice_id｜在下方填写"
+]
+
+
 class TikpanMiniMaxSpeech28BaseNode:
     MODEL_NAME = "speech-2.8-hd"
     MODEL_TITLE = "speech-2.8-hd 高清语音合成"
@@ -81,13 +155,7 @@ class TikpanMiniMaxSpeech28BaseNode:
                     ["同步语音 /t2a_v2", "异步语音 /t2a_async_v2"],
                     {"default": "同步语音 /t2a_v2"},
                 ),
-                "音色ID": (
-                    "STRING",
-                    {
-                        "default": "Chinese (Mandarin)_Reliable_Executive",
-                        "tooltip": "可填写系统音色、复刻音色或音色设计得到的 voice_id。",
-                    },
-                ),
+                "音色": (MINIMAX_VOICE_OPTIONS, {"default": minimax_voice_label(MINIMAX_SYSTEM_VOICES[0])}),
                 "语言增强": (languages, {"default": "auto"}),
                 "语速": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.05}),
                 "音量": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.1}),
@@ -104,6 +172,13 @@ class TikpanMiniMaxSpeech28BaseNode:
                 "校验HTTPS证书": ("BOOLEAN", {"default": True}),
             },
             "optional": {
+                "自定义voice_id": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "tooltip": "选择“自定义 voice_id”时填写；也兼容复刻音色、音色设计和官方新上线 voice_id。",
+                    },
+                ),
                 "同步返回格式": (["hex", "url"], {"default": "hex"}),
                 "发音字典_tone_每行一条": (
                     "STRING",
@@ -163,6 +238,7 @@ class TikpanMiniMaxSpeech28BaseNode:
     DEFAULT_OPTIONAL_VALUES = {
         "POST重试策略": "幂等键轻重试",
         "校验HTTPS证书": True,
+        "自定义voice_id": "",
         "同步返回格式": "hex",
         "发音字典_tone_每行一条": "",
         "音色混合_JSON": "",
@@ -352,6 +428,19 @@ class TikpanMiniMaxSpeech28BaseNode:
                 merged[key] = value
         return merged
 
+    def resolve_voice_id(self, selected_voice, custom_voice_id=""):
+        selected_voice = str(selected_voice or "").strip()
+        custom_voice_id = str(custom_voice_id or "").strip()
+        if not selected_voice:
+            selected_voice = minimax_voice_label(MINIMAX_SYSTEM_VOICES[0])
+        if selected_voice.startswith("自定义"):
+            if not custom_voice_id:
+                raise ValueError("已选择自定义 voice_id，但没有填写“自定义voice_id”。")
+            return custom_voice_id
+        if "｜" in selected_voice:
+            return selected_voice.split("｜")[-1].strip()
+        return selected_voice
+
     def build_payload(self, kwargs, async_mode):
         values = dict(self.DEFAULT_OPTIONAL_VALUES)
         values.update(kwargs)
@@ -359,7 +448,10 @@ class TikpanMiniMaxSpeech28BaseNode:
         model = values.get("模型", self.MODEL_NAME)
         if model not in {self.MODEL_NAME}:
             model = self.MODEL_NAME
-        voice_id = str(values.get("音色ID") or "").strip()
+        voice_id = self.resolve_voice_id(
+            values.get("音色") or values.get("音色ID"),
+            values.get("自定义voice_id"),
+        )
         audio_format = values.get("音频格式", "mp3")
         language_boost = values.get("语言增强", "auto")
         emotion = values.get("情绪", "默认不传")

@@ -17,12 +17,25 @@ from urllib3.util.retry import Retry
 import comfy.model_management
 import comfy.utils
 
+try:
+    from .tikpan_node_options import option_value, pick
+except Exception:
+    import importlib.util
+
+    _options_spec = importlib.util.spec_from_file_location(
+        "tikpan_node_options", Path(__file__).with_name("tikpan_node_options.py")
+    )
+    _options_module = importlib.util.module_from_spec(_options_spec)
+    _options_spec.loader.exec_module(_options_module)
+    option_value = _options_module.option_value
+    pick = _options_module.pick
+
 
 API_HOST = "https://tikpan.com"
 API_BASE_URL = API_HOST
-MODEL_NAME = "gpt-5-mini"
+MODEL_NAME = "gpt-5.4-mini"
 MODEL_OPTIONS = [MODEL_NAME]
-RECOVERY_DIR = Path(__file__).resolve().parents[1] / "recovery" / "gpt5_mini_responses"
+RECOVERY_DIR = Path(__file__).resolve().parents[1] / "recovery" / "gpt5_4_mini_responses"
 MAX_INLINE_IMAGE_BYTES = 4 * 1024 * 1024
 MAX_FILE_INLINE_BYTES = 16 * 1024 * 1024
 MAX_IMAGE_PARTS = 16
@@ -37,7 +50,7 @@ class TikpanGPT5MiniResponsesNode:
         return {
             "required": {
                 "福利说明": (
-                    ["gpt-5-mini 多模态文本/图片推理 | /v1/responses | 按输入/输出/缓存命中 Tokens 计费"],
+                    ["gpt-5.4-mini 多模态文本/图片推理 | /v1/responses | 按输入/输出/缓存命中 Tokens 计费"],
                 ),
                 "获取密钥地址": (
                     ["👉 https://tikpan.com 获取 Tikpan API Key"],
@@ -76,16 +89,22 @@ class TikpanGPT5MiniResponsesNode:
                     ["中文报告", "Markdown结构化", "JSON结构化", "提示词优化"],
                     {"default": "Markdown结构化"},
                 ),
-                "reasoning_effort": (["minimal", "low", "medium", "high"], {"default": "low"}),
-                "verbosity": (["low", "medium", "high"], {"default": "medium"}),
-                "max_output_tokens": ("INT", {"default": 4096, "min": 256, "max": 32768, "step": 256}),
-                "temperature": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05}),
-                "图片细节": (["auto", "low", "high"], {"default": "auto"}),
+                "推理强度": (
+                    ["最省｜minimal", "低｜low", "中｜medium", "高｜high"],
+                    {"default": "低｜low"},
+                ),
+                "回答详细度": (
+                    ["简洁｜low", "适中｜medium", "详细｜high"],
+                    {"default": "适中｜medium"},
+                ),
+                "最大输出Token": ("INT", {"default": 4096, "min": 256, "max": 32768, "step": 256}),
+                "创意温度": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05}),
+                "图片细节": (["自动｜auto", "低清省费用｜low", "高清细节｜high"], {"default": "自动｜auto"}),
                 "抽帧策略": (
                     ["均匀覆盖", "按秒抽帧", "首尾加密", "运动变化优先", "混合智能"],
                     {"default": "混合智能"},
                 ),
-                "视频帧率_FPS": ("INT", {"default": 24, "min": 1, "max": 120, "step": 1}),
+                "视频帧率FPS": ("INT", {"default": 24, "min": 1, "max": 120, "step": 1}),
                 "最大抽帧数": ("INT", {"default": 12, "min": 1, "max": MAX_FRAME_PARTS, "step": 1}),
                 "启用联网搜索": ("BOOLEAN", {"default": False}),
                 "URL错误处理": (["严格报错", "跳过坏链接并写日志"], {"default": "严格报错"}),
@@ -110,7 +129,7 @@ class TikpanGPT5MiniResponsesNode:
                 "视频帧_IMAGE": (
                     "IMAGE",
                     {
-                        "tooltip": "LoadVideo 等节点输出的视频帧 IMAGE。gpt-5-mini 不原生读视频，节点会抽帧作为多张图片分析。",
+                        "tooltip": "LoadVideo 等节点输出的视频帧 IMAGE。gpt-5.4-mini 会按抽帧图片进行视频内容分析。",
                     },
                 ),
                 "文件URL列表": (
@@ -400,7 +419,7 @@ class TikpanGPT5MiniResponsesNode:
         task = values.get("任务类型", "通用问答")
         user_question = str(values.get("用户问题") or "").strip()
         output_format = values.get("输出格式", "Markdown结构化")
-        detail = values.get("图片细节", "auto")
+        detail = option_value(values.get("图片细节", "自动｜auto"), "auto")
         skip_invalid_url = str(values.get("URL错误处理") or "严格报错") == "跳过坏链接并写日志" or bool(values.get("跳过错误", False))
         content = [
             {
@@ -431,7 +450,7 @@ class TikpanGPT5MiniResponsesNode:
 
         frame_items = self.frames_to_image_items(
             values.get("视频帧_IMAGE"),
-            values.get("视频帧率_FPS", 24),
+            pick(values, "视频帧率FPS", "视频帧率_FPS", default=24),
             values.get("最大抽帧数", 12),
             detail,
             values.get("抽帧策略", "混合智能"),
@@ -478,11 +497,11 @@ class TikpanGPT5MiniResponsesNode:
                     "content": content,
                 }
             ],
-            "reasoning": {"effort": values.get("reasoning_effort", "low")},
-            "text": {"verbosity": values.get("verbosity", "medium")},
-            "max_output_tokens": int(values.get("max_output_tokens", 4096)),
+            "reasoning": {"effort": option_value(pick(values, "推理强度", "reasoning_effort", default="低｜low"), "low")},
+            "text": {"verbosity": option_value(pick(values, "回答详细度", "verbosity", default="适中｜medium"), "medium")},
+            "max_output_tokens": int(pick(values, "最大输出Token", "max_output_tokens", default=4096)),
         }
-        temperature = float(values.get("temperature", 1.0))
+        temperature = float(pick(values, "创意温度", "temperature", default=1.0))
         if temperature != 1.0:
             payload["temperature"] = temperature
         if values.get("输出格式") == "JSON结构化":
@@ -509,7 +528,7 @@ class TikpanGPT5MiniResponsesNode:
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     def read_cache(self, cache_key):
-        path = RECOVERY_DIR / f"tikpan-gpt-5-mini-responses-{cache_key[:32]}.json"
+        path = RECOVERY_DIR / f"tikpan-gpt-5-4-mini-responses-{cache_key[:32]}.json"
         if path.exists() and path.stat().st_size > 16:
             try:
                 return json.loads(path.read_text(encoding="utf-8"))
@@ -526,7 +545,7 @@ class TikpanGPT5MiniResponsesNode:
             "status": status,
             **fields,
         }
-        latest_path = RECOVERY_DIR / f"tikpan-gpt-5-mini-responses-{cache_key[:32]}.json"
+        latest_path = RECOVERY_DIR / f"tikpan-gpt-5-4-mini-responses-{cache_key[:32]}.json"
         events_path = RECOVERY_DIR / "events.jsonl"
         latest_path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
         with events_path.open("a", encoding="utf-8") as handle:
@@ -691,14 +710,14 @@ class TikpanGPT5MiniResponsesNode:
             )
             recovery_path = self.save_recovery_record(cache_key, "pending", api_path=api_path, payload_preview=payload_preview)
             media_summary = self.media_summary_text()
-            print(f"[Tikpan-GPT5MiniResponses] START {model} | {media_summary} | recovery={recovery_path}", flush=True)
+            print(f"[Tikpan-GPT54MiniResponses] START {model} | {media_summary} | recovery={recovery_path}", flush=True)
 
             headers = {
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "User-Agent": "Tikpan-ComfyUI-GPT-5-Mini-Responses/1.1",
-                "Idempotency-Key": f"tikpan-gpt-5-mini-responses-{cache_key[:32]}",
+                "User-Agent": "Tikpan-ComfyUI-GPT-5.4-Mini-Responses/1.2",
+                "Idempotency-Key": f"tikpan-gpt-5-4-mini-responses-{cache_key[:32]}",
             }
             session = self.create_session(allow_post_retry=post_retry)
             url = f"{base_url}{api_path}"
@@ -708,17 +727,17 @@ class TikpanGPT5MiniResponsesNode:
             except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
                 self.save_recovery_record(cache_key, "post_disconnected", api_path=api_path, error=str(e), recovery_path=recovery_path)
                 raise RuntimeError(
-                    "网络在提交后断开：上游可能已经收到并扣费。请先检查 recovery/gpt5_mini_responses，"
+                    "网络在提交后断开：上游可能已经收到并扣费。请先检查 recovery/gpt5_4_mini_responses，"
                     f"不要立刻改参数重复提交。cache_key={cache_key[:32]} | recovery={recovery_path}"
                 )
 
             pbar.update_absolute(60, 100)
             if response.status_code != 200:
-                raise RuntimeError(f"GPT-5 Mini Responses 请求失败 | HTTP {response.status_code} | {self.safe_response_text(response)}")
+                raise RuntimeError(f"GPT-5.4 Mini Responses 请求失败 | HTTP {response.status_code} | {self.safe_response_text(response)}")
             try:
                 res_json = response.json()
             except Exception:
-                raise RuntimeError(f"GPT-5 Mini Responses 接口返回非 JSON: {self.safe_response_text(response)}")
+                raise RuntimeError(f"GPT-5.4 Mini Responses 接口返回非 JSON: {self.safe_response_text(response)}")
             if isinstance(res_json, dict) and res_json.get("error"):
                 raise RuntimeError(f"上游返回错误: {self.safe_json_text(res_json.get('error'))}")
 
@@ -748,7 +767,7 @@ class TikpanGPT5MiniResponsesNode:
                 response_preview=self.safe_json_text(res_json, 2200),
             )
             pbar.update_absolute(100, 100)
-            print(f"[Tikpan-GPT5MiniResponses] {log}", flush=True)
+            print(f"[Tikpan-GPT54MiniResponses] {log}", flush=True)
             return self.make_return(answer, prompt, structured, usage, log)
 
         except Exception as e:
@@ -765,5 +784,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "TikpanGPT5MiniResponsesNode": "🧠 Tikpan: GPT-5 Mini 多模态推理",
+    "TikpanGPT5MiniResponsesNode": "🧠 Tikpan: GPT-5.4 Mini 多模态推理",
 }

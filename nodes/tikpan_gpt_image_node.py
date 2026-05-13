@@ -6,6 +6,7 @@ from io import BytesIO
 from PIL import Image
 import comfy.utils
 import comfy.model_management
+from .tikpan_node_options import normalize_seed
 
 # 🔐 依然是咱们的硬核中转站地址
 API_BASE_URL = "https://tikpan.com"
@@ -19,10 +20,10 @@ class TikpanGptImage2Node:
                 "API_密钥": ("STRING", {"default": "sk-"}),
                 "提示词": ("STRING", {"multiline": True, "default": "一位穿着赛博朋克装甲的极客，正在操作复杂的全息工作流，4k，大师级画质..."}),
                 "模型": (["gpt-image-2-all"], {"default": "gpt-image-2-all"}),
-                "尺寸": (["1024x1024", "1792x1024", "1024x1792"], {"default": "1024x1024"}),
-                "品质": (["standard", "hd"], {"default": "hd"}),
-                "风格": (["vivid", "natural"], {"default": "vivid"}),
-                "seed": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
+                "尺寸": (["1:1 方图｜1024x1024", "16:9 横图｜1792x1024", "9:16 竖图｜1024x1792"], {"default": "1:1 方图｜1024x1024"}),
+                "品质": (["标准｜standard", "高清｜hd"], {"default": "高清｜hd"}),
+                "风格": (["鲜艳创意｜vivid", "自然真实｜natural"], {"default": "鲜艳创意｜vivid"}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
             },
         }
 
@@ -31,10 +32,16 @@ class TikpanGptImage2Node:
     FUNCTION = "generate_image"
     CATEGORY = "👑 Tikpan 官方独家节点"
 
-    def generate_image(self, 获取密钥请访问, API_密钥, 提示词, 模型, 尺寸, 品质, 风格, seed):
+    def generate_image(self, 获取密钥请访问, API_密钥, 提示词, 模型, 尺寸, 品质, 风格, 随机种子):
         # 1. 进度条初始化
         pbar = comfy.utils.ProgressBar(100)
         print(f"[Tikpan-Img] 🚀 正在调用 GPT-Image-2 核心渲染引擎...", flush=True)
+        session = requests.Session()
+        session.trust_env = False
+        尺寸 = str(尺寸).split("｜")[-1].strip()
+        品质 = str(品质).split("｜")[-1].strip()
+        风格 = str(风格).split("｜")[-1].strip()
+        seed = normalize_seed(随机种子, default=888888, maximum=2147483647)
         
         if not API_密钥 or len(API_密钥) < 10:
             return (self.empty_image(), "❌ 请填写有效的 API 密钥")
@@ -52,6 +59,7 @@ class TikpanGptImage2Node:
             "size": 尺寸,
             "quality": 品质,
             "style": 风格,
+            "seed": seed,
             "user": "tikpan_geek_user"
         }
 
@@ -59,7 +67,7 @@ class TikpanGptImage2Node:
         try:
             pbar.update(20)
             url = f"{API_BASE_URL}/v1/images/generations"
-            response = requests.post(url, json=payload, headers=headers, timeout=120)
+            response = session.post(url, json=payload, headers=headers, timeout=120)
             
             if response.status_code != 200:
                 return (self.empty_image(), f"❌ 请求失败: {response.text}")
@@ -73,7 +81,7 @@ class TikpanGptImage2Node:
             # 4. 下载图像并转换为 Tensor
             pbar.update(50)
             print(f"[Tikpan-Img] 📥 图像渲染完成，正在回传本地...", flush=True)
-            img_res = requests.get(image_url, timeout=60)
+            img_res = session.get(image_url, timeout=60)
             img = Image.open(BytesIO(img_res.content)).convert("RGB")
             
             # 转换为 ComfyUI 要求的 Tensor 格式 [B, H, W, C]

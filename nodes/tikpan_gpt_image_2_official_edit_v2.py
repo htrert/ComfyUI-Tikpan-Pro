@@ -18,6 +18,7 @@ from .tikpan_gpt_image_recovery import (
     save_recovery_record,
     short_hash,
 )
+from .tikpan_node_options import BACKGROUND_OPTIONS, QUALITY_OPTIONS, option_value
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -46,8 +47,8 @@ class TikpanGptImage2OfficialEditV2:
                     ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "21:9", "9:21"],
                     {"default": "Auto"},
                 ),
-                "画质": (["auto", "low", "medium", "high"], {"default": "medium"}),
-                "背景模式": (["auto", "opaque", "transparent"], {"default": "auto"}),
+                "画质": (QUALITY_OPTIONS, {"default": "均衡质量｜medium"}),
+                "背景模式": (BACKGROUND_OPTIONS, {"default": "自动背景｜auto"}),
                 "遮罩反相": ("BOOLEAN", {"default": False}),
                 "提示增强": ("BOOLEAN", {"default": True}),
                 "超时秒数": ("INT", {"default": 300, "min": 30, "max": 1800, "step": 10}),
@@ -86,8 +87,8 @@ class TikpanGptImage2OfficialEditV2:
             n = int(kwargs.get("生成张数", 1))
             res_tier = kwargs.get("分辨率档位", "2K")
             aspect = kwargs.get("画面比例", "Auto")
-            quality = kwargs.get("画质", "medium")
-            bg = kwargs.get("背景模式", "auto")
+            quality = option_value(kwargs.get("画质", "均衡质量｜medium"), "medium")
+            bg = option_value(kwargs.get("背景模式", "自动背景｜auto"), "auto")
             invert_mask = bool(kwargs.get("遮罩反相", False))
             boost_prompt = bool(kwargs.get("提示增强", True))
             timeout = int(kwargs.get("超时秒数", 300))

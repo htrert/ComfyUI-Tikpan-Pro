@@ -11,6 +11,7 @@ import urllib3
 from PIL import Image
 
 import comfy.utils
+from .tikpan_node_options import normalize_seed
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -60,9 +61,24 @@ class TikpanNanoBananaProNode:
                     ],
                     {"default": "1:1 | 1:1正方形"},
                 ),
-                "seed": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
                 "温度": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 2.0, "step": 0.1}),
-                "max_tokens": ("INT", {"default": 4096, "min": 1, "max": 32768}),
+                "最大输出Token数": (
+                    "INT",
+                    {
+                        "default": 4096,
+                        "min": 1,
+                        "max": 32768,
+                        "tooltip": "仅控制随图返回的文字预算；图片尺寸由“分辨率/画面比例”控制。",
+                    },
+                ),
+                "启用谷歌搜索": (
+                    "BOOLEAN",
+                    {
+                        "default": False,
+                        "tooltip": "仅 Gemini 原生模式透传 google_search 工具；图像任务通常保持关闭。",
+                    },
+                ),
             },
             "optional": {
                 f"参考图_{i}": ("IMAGE",) for i in range(1, 15)
@@ -336,7 +352,7 @@ class TikpanNanoBananaProNode:
 
         return "", "not_found"
 
-    def build_gemini_payload(self, prompt, image_tensors, 分辨率, 画面比例, seed, 温度):
+    def build_gemini_payload(self, prompt, image_tensors, 分辨率, 画面比例, seed, 温度, 启用谷歌搜索=False):
         aspect_ratio = self.parse_aspect_ratio(画面比例)
 
         parts = [{"text": prompt}]
@@ -344,8 +360,8 @@ class TikpanNanoBananaProNode:
         for img_tensor in image_tensors:
             parts.append(self.tensor_to_inline_data_part(img_tensor))
 
-        # 正确的 Gemini 原生 payload 结构：
-        # generationConfig.imageConfig.imageSize + generationConfig.imageConfig.aspectRatio
+        # REST examples use responseFormat.image; SDK examples expose the same
+        # controls as imageConfig, so keep both for Tikpan gateway compatibility.
         image_size_val = 分辨率 if 分辨率 in ("1K", "2K", "4K") else None
 
         image_config = {"aspectRatio": aspect_ratio}
@@ -354,6 +370,7 @@ class TikpanNanoBananaProNode:
 
         generation_config = {
             "responseModalities": ["TEXT", "IMAGE"],
+            "responseFormat": {"image": image_config},
             "imageConfig": image_config,
         }
 
@@ -372,6 +389,8 @@ class TikpanNanoBananaProNode:
             ],
             "generationConfig": generation_config,
         }
+        if 启用谷歌搜索:
+            payload["tools"] = [{"google_search": {}}]
 
         return payload
 
@@ -403,6 +422,7 @@ class TikpanNanoBananaProNode:
             "max_tokens": int(max_tokens),
             "modalities": ["text", "image"],
             "image_config": image_config,
+            "response_format": {"image": image_config},
         }
 
         if seed > 0:
@@ -441,9 +461,9 @@ class TikpanNanoBananaProNode:
         修改指令,
         分辨率,
         画面比例,
-        seed,
-        温度,
-        max_tokens,
+        随机种子=888888,
+        温度=0.7,
+        最大输出Token数=4096,
         **kwargs
     ):
         pbar = comfy.utils.ProgressBar(100)
@@ -457,6 +477,9 @@ class TikpanNanoBananaProNode:
         if not prompt:
             return (self.black_image(), "❌ 修改指令不能为空")
 
+        随机种子 = normalize_seed(kwargs.get("seed", 随机种子), default=888888, maximum=2147483647)
+        最大输出Token数 = int(kwargs.get("max_tokens", kwargs.get("最大Token数", 最大输出Token数)) or 4096)
+        启用谷歌搜索 = bool(kwargs.get("启用谷歌搜索", False))
         aspect_ratio = self.parse_aspect_ratio(画面比例)
 
         image_tensors = []
@@ -473,11 +496,11 @@ class TikpanNanoBananaProNode:
 
             if 调用方式 == "gemini原生":
                 url = f"{API_BASE_URL}/v1beta/models/{模型}:generateContent"
-                payload = self.build_gemini_payload(prompt, image_tensors, 分辨率, 画面比例, seed, 温度)
+                payload = self.build_gemini_payload(prompt, image_tensors, 分辨率, 画面比例, 随机种子, 温度, 启用谷歌搜索)
                 api_name = f"/v1beta/models/{模型}:generateContent"
             else:
                 url = f"{API_BASE_URL}/v1/chat/completions"
-                payload = self.build_chat_payload(模型, prompt, image_tensors, 分辨率, 画面比例, seed, 温度, max_tokens)
+                payload = self.build_chat_payload(模型, prompt, image_tensors, 分辨率, 画面比例, 随机种子, 温度, 最大输出Token数)
                 api_name = "/v1/chat/completions"
 
             headers = {
@@ -599,5 +622,3 @@ class TikpanNanoBananaProNode:
                 session.close()
             except Exception:
                 pass
-
-

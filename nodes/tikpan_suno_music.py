@@ -10,6 +10,7 @@ import folder_paths
 
 import comfy.utils
 import comfy.model_management
+from .tikpan_node_options import SUNO_MODEL_OPTIONS, SUNO_STYLE_OPTIONS, SUNO_VOCAL_GENDER_OPTIONS, option_value
 
 # 屏蔽 verify=False 告警
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -45,15 +46,30 @@ class TikpanSunoMusicNode:
                         "default": "写一首伤感的粤语情歌",
                     },
                 ),
+                "风格预设": (
+                    SUNO_STYLE_OPTIONS,
+                    {"default": "流行｜Pop｜pop"},
+                ),
                 "风格标签": ("STRING", {"default": "pop, romantic"}),
                 "模型版本": (
-                    ["chirp-v3-0", "chirp-v3-5", "chirp-v4", "chirp-auk", "chirp-v5", "chirp-fenix"],
-                    {"default": "chirp-fenix"},
+                    SUNO_MODEL_OPTIONS,
+                    {"default": "Fenix 高质量实验｜chirp-fenix"},
                 ),
                 "生成纯音乐": ("BOOLEAN", {"default": False}),
             },
             "optional": {
                 "负面风格标签": ("STRING", {"default": ""}),
+                "发送高级Suno参数": (
+                    "BOOLEAN",
+                    {
+                        "default": False,
+                        "tooltip": "开启后才透传人声性别、自动歌词、风格权重、创意随机度等高级字段；关闭时保持旧版稳定载荷。",
+                    },
+                ),
+                "人声性别": (SUNO_VOCAL_GENDER_OPTIONS, {"default": "默认不传｜"}),
+                "自动生成歌词": ("BOOLEAN", {"default": False}),
+                "风格权重": ("FLOAT", {"default": 0.65, "min": 0.0, "max": 1.0, "step": 0.05}),
+                "创意随机度": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "🎤_续写_歌曲ID": ("STRING", {"default": ""}),
                 "⏱️_续写起始秒数": ("FLOAT", {"default": 0.0, "min": 0, "max": 600}),
                 "🎭_歌手风格_PersonaID": ("STRING", {"default": ""}),
@@ -189,26 +205,69 @@ class TikpanSunoMusicNode:
         title = str(title or "").strip()
         return title if title else default_title
 
-    def build_payload(self, mode, title, prompt, tags, negative_tags, mv, make_instrumental, continue_clip_id, continue_at, persona_id, artist_clip_id):
+    def normalize_tags(self, preset, custom_tags):
+        preset_value = option_value(preset, "")
+        custom_tags = str(custom_tags or "").strip()
+        if preset_value == "custom":
+            return custom_tags
+        if custom_tags:
+            return f"{preset_value}, {custom_tags}" if preset_value else custom_tags
+        return preset_value
+
+    def build_payload(
+        self,
+        mode,
+        title,
+        prompt,
+        tags,
+        negative_tags,
+        mv,
+        make_instrumental,
+        continue_clip_id,
+        continue_at,
+        persona_id,
+        artist_clip_id,
+        send_advanced=False,
+        vocal_gender="",
+        auto_lyrics=False,
+        style_weight=0.65,
+        weirdness_constraint=0.3,
+    ):
         payload = {
             "mv": mv,
             "make_instrumental": make_instrumental,
         }
+        if send_advanced:
+            payload["style_weight"] = float(style_weight)
+            payload["weirdness_constraint"] = float(weirdness_constraint)
+            if vocal_gender:
+                payload["vocal_gender"] = vocal_gender
 
         if mode == "灵感模式":
+            if send_advanced:
+                payload["custom_mode"] = False
+                payload["task_type"] = "create_music"
             payload["gpt_description_prompt"] = prompt
             payload["prompt"] = prompt
 
         elif mode == "自定义模式":
+            if send_advanced:
+                payload["custom_mode"] = True
+                payload["task_type"] = "create_music"
             payload["title"] = self.normalize_title(title, "命中注定")
             payload["prompt"] = prompt
             payload["tags"] = tags if tags else "pop"
             payload["negative_tags"] = negative_tags
             payload["generation_type"] = "TEXT"
+            if send_advanced:
+                payload["auto_lyrics"] = bool(auto_lyrics)
 
         elif mode == "续写模式":
             if not continue_clip_id:
                 raise ValueError("续写模式需要提供歌曲ID")
+            if send_advanced:
+                payload["custom_mode"] = True
+                payload["task_type"] = "extend_music"
             payload["title"] = self.normalize_title(title, "续写歌曲")
             payload["prompt"] = prompt
             payload["tags"] = tags if tags else "pop"
@@ -223,6 +282,9 @@ class TikpanSunoMusicNode:
             if not persona_id:
                 raise ValueError("歌手风格模式需要提供PersonaID")
 
+            if send_advanced:
+                payload["custom_mode"] = True
+                payload["task_type"] = "persona_music"
             payload["title"] = self.normalize_title(title, "歌手风格歌曲")
             payload["prompt"] = prompt
             payload["tags"] = tags if tags else "pop"
@@ -230,7 +292,6 @@ class TikpanSunoMusicNode:
             payload["generation_type"] = "TEXT"
             payload["persona_id"] = persona_id
             payload["artist_clip_id"] = artist_clip_id
-            payload["vocal_gender"] = ""
             payload["task"] = "artist_consistency"
 
             tau_map = {
@@ -412,10 +473,15 @@ class TikpanSunoMusicNode:
         mode = kwargs.get("🎵_生成模式", "自定义模式")
         title = str(kwargs.get("歌曲标题") or "").strip()
         prompt = str(kwargs.get("创作提示词") or "").strip()
-        tags = str(kwargs.get("风格标签") or "").strip()
+        tags = self.normalize_tags(kwargs.get("风格预设", ""), kwargs.get("风格标签"))
         negative_tags = str(kwargs.get("负面风格标签") or "").strip()
-        mv = kwargs.get("模型版本", "chirp-fenix")
+        mv = option_value(kwargs.get("模型版本", "chirp-fenix"), "chirp-fenix")
         make_instrumental = bool(kwargs.get("生成纯音乐", False))
+        send_advanced = bool(kwargs.get("发送高级Suno参数", False))
+        vocal_gender = option_value(kwargs.get("人声性别", ""), "")
+        auto_lyrics = bool(kwargs.get("自动生成歌词", False))
+        style_weight = float(kwargs.get("风格权重", 0.65) or 0.65)
+        weirdness_constraint = float(kwargs.get("创意随机度", 0.3) or 0.3)
 
         continue_clip_id = str(kwargs.get("🎤_续写_歌曲ID") or "").strip()
         continue_at = float(kwargs.get("⏱️_续写起始秒数") or 0.0)
@@ -446,6 +512,11 @@ class TikpanSunoMusicNode:
                 continue_at=continue_at,
                 persona_id=persona_id,
                 artist_clip_id=artist_clip_id,
+                send_advanced=send_advanced,
+                vocal_gender=vocal_gender,
+                auto_lyrics=auto_lyrics,
+                style_weight=style_weight,
+                weirdness_constraint=weirdness_constraint,
             )
         except ValueError as e:
             return self.make_return(prompt=prompt, log_text=f"❌ 错误：{str(e)}", tags=tags, title=title)

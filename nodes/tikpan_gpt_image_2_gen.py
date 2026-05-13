@@ -8,6 +8,7 @@ from io import BytesIO
 from PIL import Image
 import comfy.utils
 from .tikpan_gpt_image_recovery import get_with_retry, make_idempotency_key, safe_json_for_log, save_recovery_record, short_hash
+from .tikpan_node_options import normalize_seed
 
 # 🔐 Tikpan 官方聚合路由
 API_BASE_URL = "https://tikpan.com"
@@ -23,9 +24,8 @@ class TikpanGptImage2GenNode:
                 "模型": (["gpt-image-2-all"], {"default": "gpt-image-2-all"}),
                 "分辨率档位": (["512", "1K", "2K", "4K"], {"default": "1K"}),
                 "画面比例": (["1:1", "16:9", "9:16", "21:9", "4:3", "3:4"], {"default": "1:1"}),
-                "品质": (["standard", "hd"], {"default": "hd"}),
-                "seed": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
-                "代理端口": ("STRING", {"default": "10808"}),
+                "品质": (["标准｜standard", "高清｜hd"], {"default": "高清｜hd"}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
             },
             "optional": {
                 f"参考图_{i}": ("IMAGE",) for i in range(1, 15)
@@ -37,12 +37,14 @@ class TikpanGptImage2GenNode:
     FUNCTION = "generate"
     CATEGORY = "👑 Tikpan 官方独家节点"
 
-    def generate(self, 获取密钥请访问, API_密钥, 生成指令, 模型, 分辨率档位, 画面比例, 品质, seed, 代理端口, **kwargs):
+    def generate(self, 获取密钥请访问, API_密钥, 生成指令, 模型, 分辨率档位, 画面比例, 品质, 随机种子=888888, **kwargs):
         pbar = comfy.utils.ProgressBar(100)
         print(f"[Tikpan-Gen] 🚀 GPT-Image-2 视觉建筑师正在构筑画面...", flush=True)
 
-        # 🟢 1. 代理隧道配置
-        proxies = {"http": f"http://127.0.0.1:{代理端口}", "https": f"http://127.0.0.1:{代理端口}"} if 代理端口 else None
+        session = requests.Session()
+        session.trust_env = False
+        品质 = str(品质).split("｜")[-1].strip()
+        seed = normalize_seed(kwargs.get("seed", 随机种子), default=888888, maximum=2147483647)
 
         # 🟢 2. 智能尺寸动态计算 (老板最关心的逻辑)
         res_map = {"512": 512, "1K": 1024, "2K": 2048, "4K": 4096}
@@ -107,7 +109,7 @@ class TikpanGptImage2GenNode:
             pbar.update(20)
             url = f"{API_BASE_URL}/v1/chat/completions"
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=300, proxies=proxies)
+                response = session.post(url, json=payload, headers=headers, timeout=300)
             except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
                 save_recovery_record(
                     "all_generation",
@@ -156,7 +158,7 @@ class TikpanGptImage2GenNode:
             )
 
             if img_raw.startswith("http"):
-                img_res = get_with_retry(requests.Session(), img_raw, timeout=(10, 120), proxies=proxies, attempts=4)
+                img_res = get_with_retry(session, img_raw, timeout=(10, 120), attempts=4)
                 final_img = Image.open(BytesIO(img_res.content)).convert("RGB")
             else:
                 # 执行暴力字符清洗

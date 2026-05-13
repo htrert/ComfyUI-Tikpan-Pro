@@ -11,6 +11,7 @@ import urllib3
 from PIL import Image
 
 import comfy.utils
+from .tikpan_node_options import normalize_seed
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -54,7 +55,7 @@ class TikpanGeminiImageMaxNode:
                     ["gemini原生", "images_generations", "chat_completions"],
                     {"default": "gemini原生"},
                 ),
-                "seed": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
             },
             "optional": {
                 f"参考图_{i}": ("IMAGE",) for i in range(1, 15)
@@ -396,7 +397,7 @@ class TikpanGeminiImageMaxNode:
         else:
             return [{"role": "user", "content": prompt}]
 
-    def execute(self, 获取密钥请访问, API_密钥, 修改指令, 模型, 分辨率, 画面比例, 调用方式, seed, **kwargs):
+    def execute(self, 获取密钥请访问, API_密钥, 修改指令, 模型, 分辨率, 画面比例, 调用方式, 随机种子=888888, **kwargs):
         pbar = comfy.utils.ProgressBar(100)
         print("[Tikpan-ChatProbe] 🚀 节点已启动...", flush=True)
 
@@ -407,6 +408,8 @@ class TikpanGeminiImageMaxNode:
         prompt = str(修改指令 or "").strip()
         if not prompt:
             return (self.black_image(), "❌ 修改指令不能为空")
+
+        seed = normalize_seed(kwargs.get("seed", 随机种子), default=888888, maximum=2147483647)
 
         image_size_val = 分辨率 if 分辨率 in ("1K", "2K", "4K") else "2K" if 分辨率 != "none" else None
 
@@ -449,6 +452,7 @@ class TikpanGeminiImageMaxNode:
             if image_size_val:
                 image_config["imageSize"] = image_size_val
             gen_config["imageConfig"] = image_config
+            gen_config["responseFormat"] = {"image": image_config}
 
             payload = {
                 "contents": [{"role": "user", "parts": parts}],
@@ -488,6 +492,7 @@ class TikpanGeminiImageMaxNode:
             if image_size_val:
                 image_config["image_size"] = image_size_val
             payload["image_config"] = image_config
+            payload["response_format"] = {"image": image_config}
 
             if image_size_val:
                 payload["image_size"] = image_size_val

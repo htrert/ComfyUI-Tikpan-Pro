@@ -27,6 +27,7 @@ from .tikpan_happyhorse_common import (
     is_success_status,
     video_from_path,
 )
+from .tikpan_node_options import pick
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -98,20 +99,20 @@ class TikpanTaskFetcherNode:
         return {
             "required": {
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "api_key": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-")}),
-                "task_id": ("STRING", {"default": ""}),
-                "file_prefix": (
+                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-")}),
+                "任务ID": ("STRING", {"default": ""}),
+                "文件名前缀": (
                     "STRING",
                     {
                         "default": "Tikpan_Task",
                         "tooltip": "下载文件的前缀名，例如 HappyHorse_T2V、HappyHorse_I2V 等",
                     },
                 ),
-                "max_wait_seconds": (
+                "最长等待秒数": (
                     "INT",
                     {"default": 600, "min": 30, "max": 3600, "step": 10},
                 ),
-                "poll_interval": (
+                "查询间隔秒数": (
                     "INT",
                     {"default": 10, "min": 5, "max": 60, "step": 5},
                 ),
@@ -124,13 +125,13 @@ class TikpanTaskFetcherNode:
     FUNCTION = "fetch_and_download"
     CATEGORY = "👑 Tikpan 官方独家节点"
 
-    def fetch_and_download(
-        self, api_key, task_id, file_prefix, max_wait_seconds, poll_interval
-    ):
+    def fetch_and_download(self, **kwargs):
         try:
-            api_key = str(api_key or "").strip()
-            task_id = str(task_id or "").strip()
-            file_prefix = str(file_prefix or "Tikpan_Task").strip()
+            api_key = str(pick(kwargs, "API_密钥", "api_key", default="") or "").strip()
+            task_id = str(pick(kwargs, "任务ID", "task_id", default="") or "").strip()
+            file_prefix = str(pick(kwargs, "文件名前缀", "file_prefix", default="Tikpan_Task") or "Tikpan_Task").strip()
+            max_wait_seconds = int(pick(kwargs, "最长等待秒数", "max_wait_seconds", default=600) or 600)
+            poll_interval = int(pick(kwargs, "查询间隔秒数", "poll_interval", default=10) or 10)
 
             if not api_key or len(api_key) < 10:
                 return ("", "", "", "❌ 错误：请填写有效的 API 密钥", None)

@@ -60,7 +60,7 @@ def test_responses_payload_contract_and_hash():
     )
 
     content = payload["input"][0]["content"]
-    assert payload["model"] == "gpt-5-mini"
+    assert payload["model"] == module.MODEL_NAME
     assert payload["reasoning"]["effort"] == "low"
     assert payload["text"]["format"]["type"] == "json_object"
     assert payload["tools"][0]["type"] == "web_search_preview"

@@ -12,6 +12,7 @@ from PIL import Image
 import comfy.utils
 import comfy.model_management
 from .tikpan_happyhorse_common import video_from_path
+from .tikpan_node_options import normalize_seed
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -30,7 +31,7 @@ class TikpanExclusiveVideoNode:
                 "模型选择": (["grok-video-3", "grok-video-3-10s"], {"default": "grok-video-3"}),
                 "比例": (["9:16", "16:9", "1:1", "4:3", "3:4", "21:9", "9:21"], {"default": "9:16"}),
                 "分辨率": (["1080P", "720P", "480P"], {"default": "720P"}),
-                "seed": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
             },
             "optional": {
                 "校验HTTPS证书": ("BOOLEAN", {"default": True}),
@@ -50,12 +51,13 @@ class TikpanExclusiveVideoNode:
     FUNCTION = "execute"
     CATEGORY = "👑 Tikpan 官方独家节点"
 
-    def execute(self, 获取密钥请访问, Tikpan_API密钥, Grok3专属提示词, 模型选择, 比例, 分辨率, seed, **kwargs):
+    def execute(self, 获取密钥请访问, Tikpan_API密钥, Grok3专属提示词, 模型选择, 比例, 分辨率, 随机种子=888888, **kwargs):
         comfy.model_management.throw_exception_if_processing_interrupted()
         
         if not Tikpan_API密钥 or len(Tikpan_API密钥) < 10:
             return ("❌ 请填写API密钥", "失败", "无", "请填写密钥", None)
         verify_tls = bool(kwargs.get("校验HTTPS证书", True))
+        seed = normalize_seed(kwargs.get("seed", 随机种子), default=888888, maximum=2147483647)
 
         headers = {"Authorization": f"Bearer {Tikpan_API密钥}", "Content-Type": "application/json"}
         session = requests.Session()

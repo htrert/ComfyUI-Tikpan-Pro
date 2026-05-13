@@ -40,6 +40,7 @@ from .tikpan_happyhorse_common import (
     normalize_resolution,
     video_from_path,
 )
+from .tikpan_node_options import VIDEO_DURATION_OPTIONS, WATERMARK_OPTIONS, normalize_seed, option_int, pick
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -114,39 +115,39 @@ class TikpanHappyHorseI2VNode:
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1虚拟美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "api_key": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-")}),
-                "prompt": (
+                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-")}),
+                "生成指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "一只猫在草地上奔跑，阳光洒在身上，尾巴轻轻摇晃",
                     },
                 ),
-                "mode": (
+                "执行方式": (
                     ["同步 (等待生成并下载)", "异步 (仅提交任务)"],
                     {"default": "同步 (等待生成并下载)"},
                 ),
-                "resolution": (
+                "清晰度": (
                     ["720P", "1080P"],
                     {"default": "1080P"},
                 ),
-                "duration": (
-                    "INT",
-                    {"default": 5, "min": 3, "max": 15, "step": 1},
+                "视频时长": (
+                    VIDEO_DURATION_OPTIONS,
+                    {"default": "5秒｜5"},
                 ),
-                "watermark": (
-                    ["无水印", "有水印"],
+                "水印": (
+                    WATERMARK_OPTIONS,
                     {"default": "无水印"},
                 ),
-                "seed": (
+                "随机种子": (
                     "INT",
-                    {"default": -1, "min": -1, "max": 2147483647},
+                    {"default": 888888, "min": 0, "max": 2147483647},
                 ),
-                "max_wait_seconds": (
+                "最长等待秒数": (
                     "INT",
                     {"default": 600, "min": 30, "max": 3600, "step": 10},
                 ),
-                "poll_interval": (
+                "查询间隔秒数": (
                     "INT",
                     {"default": 10, "min": 5, "max": 60, "step": 5},
                 ),
@@ -300,7 +301,7 @@ class TikpanHappyHorseI2VNode:
             },
         }
 
-        # seed 为 -1 时不传，让 API 随机生成
+        # 新工作流使用非负 seed；旧工作流的 -1 会在入口处规范化。
         if seed >= 0:
             payload["parameters"]["seed"] = seed
 
@@ -469,15 +470,15 @@ class TikpanHappyHorseI2VNode:
     def generate_video(self, **kwargs):
         try:
             # 解析参数
-            api_key = str(kwargs.get("api_key") or "").strip()
-            prompt = str(kwargs.get("prompt") or "").strip()
-            mode = str(kwargs.get("mode") or "同步 (等待生成并下载)")
-            resolution = normalize_resolution(str(kwargs.get("resolution") or "1080P"))
-            duration = int(kwargs.get("duration") or 5)
-            watermark = kwargs.get("watermark") == "有水印"
-            seed = int(kwargs.get("seed") or -1)
-            max_wait_seconds = int(kwargs.get("max_wait_seconds") or 600)
-            poll_interval = int(kwargs.get("poll_interval") or 10)
+            api_key = str(pick(kwargs, "API_密钥", "api_key", default="") or "").strip()
+            prompt = str(pick(kwargs, "生成指令", "prompt", default="") or "").strip()
+            mode = str(pick(kwargs, "执行方式", "mode", default="同步 (等待生成并下载)") or "同步 (等待生成并下载)")
+            resolution = normalize_resolution(str(pick(kwargs, "清晰度", "resolution", default="1080P") or "1080P"))
+            duration = option_int(pick(kwargs, "视频时长", "duration", default="5秒｜5"), default=5, minimum=3, maximum=15)
+            watermark = pick(kwargs, "水印", "watermark", default="无水印") == "有水印"
+            seed = normalize_seed(pick(kwargs, "随机种子", "seed", default=888888), default=888888)
+            max_wait_seconds = int(pick(kwargs, "最长等待秒数", "max_wait_seconds", default=600) or 600)
+            poll_interval = int(pick(kwargs, "查询间隔秒数", "poll_interval", default=10) or 10)
             img_tensor = kwargs.get("首帧图片")
             manual_url = str(kwargs.get("图片URL") or "").strip()
 

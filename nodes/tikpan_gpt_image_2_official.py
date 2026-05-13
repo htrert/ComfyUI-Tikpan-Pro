@@ -21,6 +21,14 @@ from .tikpan_gpt_image_recovery import (
     save_recovery_record,
     short_hash,
 )
+from .tikpan_node_options import (
+    IMAGE_FORMAT_OPTIONS,
+    MODERATION_OPTIONS,
+    QUALITY_OPTIONS,
+    normalize_seed,
+    option_value,
+    pick,
+)
 
 # 避免部分图片截断时报错
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -73,29 +81,29 @@ class TikpanGptImage2OfficialNode:
                 ),
 
                 "画质与推理强度": (
-                    ["auto", "low", "medium", "high"],
+                    QUALITY_OPTIONS,
                     {
-                        "default": "medium",
-                        "tooltip": "【auto/low】：速度更快、消耗更低。\n【medium/high】：画面细节更丰富，适合高品质创作。"
+                        "default": "均衡质量｜medium",
+                        "tooltip": "速度优先选“快速低消耗”，商业成片优先选“均衡质量”或“高质量细节”。"
                     }
                 ),
 
                 "审核强度": (
-                    ["auto", "low", "high"],
+                    MODERATION_OPTIONS,
                     {
-                        "default": "auto",
-                        "tooltip": "【low】：更宽松。\n【high】：更严格。"
+                        "default": "自动审核｜auto",
+                        "tooltip": "一般保持自动审核；需要更严格的商用内容风控时选严格审核。"
                     }
                 ),
 
-                "seed": ("INT", {
+                "随机种子": ("INT", {
                     "default": 888888,
                     "min": 0,
                     "max": 0xffffffffffffffff
                 }),
             },
             "optional": {
-                "返回格式": (["png", "webp", "jpg"], {"default": "png"}),
+                "返回格式": (IMAGE_FORMAT_OPTIONS, {"default": "PNG｜png"}),
                 "跳过错误": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "开启后，网络异常、余额不足或接口异常时返回黑图，避免工作流中断。"
@@ -116,10 +124,12 @@ class TikpanGptImage2OfficialNode:
         model = kwargs.get("模型", "gpt-image-2")
         tier = kwargs.get("分辨率档位", "1K (1024)")
         aspect_ratio = kwargs.get("画面比例", "1:1")
-        quality = kwargs.get("画质与推理强度", "medium")
-        moderation = kwargs.get("审核强度", "auto")
-        output_format = kwargs.get("返回格式", "png")
-        seed = int(kwargs.get("seed", 0))
+        quality = option_value(kwargs.get("画质与推理强度", "均衡质量｜medium"), "medium")
+        moderation = option_value(kwargs.get("审核强度", "自动审核｜auto"), "auto")
+        output_format = option_value(kwargs.get("返回格式", "PNG｜png"), "png")
+        if output_format == "jpeg":
+            output_format = "jpg"
+        seed = normalize_seed(pick(kwargs, "随机种子", "seed", default=888888), default=888888)
         skip_error = kwargs.get("跳过错误", False)
 
         pbar = comfy.utils.ProgressBar(100)

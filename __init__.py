@@ -22,6 +22,7 @@ from .nodes.tikpan_grok_videos import TikpanGrokVideoNode
 from .nodes.tikpan_suno_music import TikpanSunoMusicNode
 from .nodes.tikpan_minimax_speech import TikpanMiniMaxSpeech28HDNode, TikpanMiniMaxSpeech28TurboNode
 from .nodes.tikpan_doubao_image import TikpanDoubaoImageNode
+from .nodes.tikpan_doubao_tts import TikpanDoubaoTTS20Node
 from .nodes.tikpan_nano_banana_pro import TikpanNanoBananaProNode
 from .nodes.tikpan_task_fetcher import TikpanTaskFetcherNode
 
@@ -49,6 +50,7 @@ NODE_CLASS_MAPPINGS = {
     "TikpanMiniMaxSpeech28HDNode": TikpanMiniMaxSpeech28HDNode,
     "TikpanMiniMaxSpeech28TurboNode": TikpanMiniMaxSpeech28TurboNode,
     "TikpanDoubaoImageNode": TikpanDoubaoImageNode,
+    "TikpanDoubaoTTS20Node": TikpanDoubaoTTS20Node,
     "TikpanNanoBananaProNode": TikpanNanoBananaProNode,
     "TikpanTaskFetcherNode": TikpanTaskFetcherNode,
 }
@@ -64,7 +66,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanGeminiVideoAnalystNode": "👁️ Tikpan：AI音视频双轨智能解构",
     "TikpanGemini31FlashTTSNode": "🎙️ Tikpan: Gemini 3.1 Flash TTS Preview",
     "TikpanGemini3FlashPreviewAnalystNode": "🧠 Tikpan: Gemini 3 Flash Preview 图片/视频分析",
-    "TikpanGPT5MiniResponsesNode": "🧠 Tikpan: GPT-5 Mini 多模态推理",
+    "TikpanGPT5MiniResponsesNode": "🧠 Tikpan: GPT-5.4 Mini 多模态推理",
     "TikpanGrokPromptOptimizerNode": "🧠 Tikpan：Grok多图剧本重构专家",
     "TikpanGptImage2Node": "👑 Tikpan：gpt-image-2-all图片生成",
     "TikpanVeoVideoNode": "🚀 Tikpan: Veo 3.1 多模型视频生成",
@@ -77,6 +79,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanMiniMaxSpeech28HDNode": "🎙️ Tikpan: speech-2.8-hd 高清语音合成",
     "TikpanMiniMaxSpeech28TurboNode": "🎙️ Tikpan: speech-2.8-turbo 极速语音合成",
     "TikpanDoubaoImageNode": "🎨 Tikpan: 豆包图像生成",
+    "TikpanDoubaoTTS20Node": "🎙️ Tikpan: 豆包语音合成 2.0",
     "TikpanNanoBananaProNode": "🍌 Tikpan: Nano Banana Pro",
     "TikpanTaskFetcherNode": "🔍 Tikpan：异步任务查询与下载",
 }

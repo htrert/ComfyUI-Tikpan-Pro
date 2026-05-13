@@ -22,8 +22,9 @@ class TikpanGptImage2EditNode:
                 "底图": ("IMAGE",), # 需要修改的原图
                 "修改指令": ("STRING", {"multiline": True, "default": "请把图中的人物换成一位穿着西装的男士，背景保持不变..."}),
                 "模型": (["gpt-image-2-all"], {"default": "gpt-image-2-all"}),
-                "品质": (["standard", "hd"], {"default": "hd"}),
-                "代理端口": ("STRING", {"default": "10808"}),
+                "输出尺寸": (["沿用底图尺寸", "512", "1K", "2K", "4K"], {"default": "沿用底图尺寸"}),
+                "画面比例": (["沿用底图比例", "1:1", "16:9", "9:16", "21:9", "4:3", "3:4"], {"default": "沿用底图比例"}),
+                "品质": (["标准｜standard", "高清｜hd"], {"default": "高清｜hd"}),
             },
             "optional": {
                 "遮罩_Mask": ("MASK",), # 告诉 AI 哪里需要动手术（可选）
@@ -36,12 +37,13 @@ class TikpanGptImage2EditNode:
     FUNCTION = "edit"
     CATEGORY = "👑 Tikpan 官方独家节点"
 
-    def edit(self, 获取密钥请访问, API_密钥, 底图, 修改指令, 模型, 品质, 代理端口, 遮罩_Mask=None, 产品参考图=None):
+    def edit(self, 获取密钥请访问, API_密钥, 底图, 修改指令, 模型, 输出尺寸="沿用底图尺寸", 画面比例="沿用底图比例", 品质="高清｜hd", 遮罩_Mask=None, 产品参考图=None):
         pbar = comfy.utils.ProgressBar(100)
         print(f"[Tikpan-Edit] 💉 视觉整形医生正在手术室就位...", flush=True)
 
-        # 🟢 1. 代理隧道
-        proxies = {"http": f"http://127.0.0.1:{代理端口}", "https": f"http://127.0.0.1:{代理端口}"} if 代理端口 else None
+        session = requests.Session()
+        session.trust_env = False
+        品质 = str(品质).split("｜")[-1].strip()
 
         # 🟢 2. 图像预处理
         # GPT-Image-2 Edit 要求底图和遮罩尺寸一致
@@ -51,6 +53,21 @@ class TikpanGptImage2EditNode:
 
         base_img = tensor_to_pil(底图)
         width, height = base_img.size
+
+        if 输出尺寸 != "沿用底图尺寸":
+            res_map = {"512": 512, "1K": 1024, "2K": 2048, "4K": 4096}
+            base_val = res_map.get(输出尺寸, 1024)
+            if 画面比例 == "沿用底图比例":
+                w_ratio, h_ratio = width, height
+            else:
+                w_ratio, h_ratio = map(int, 画面比例.split(":"))
+            if w_ratio >= h_ratio:
+                width = base_val
+                height = int(base_val * (h_ratio / w_ratio))
+            else:
+                height = base_val
+                width = int(base_val * (w_ratio / h_ratio))
+
         # 工业对齐
         width, height = (width // 8) * 8, (height // 8) * 8
         base_img = base_img.resize((width, height), Image.LANCZOS)
@@ -111,7 +128,7 @@ class TikpanGptImage2EditNode:
             pbar.update(30)
             url = f"{API_BASE_URL}/v1/chat/completions" # 使用统一聊天绘图路由
             try:
-                response = requests.post(url, json=payload, headers=headers, timeout=300, proxies=proxies)
+                response = session.post(url, json=payload, headers=headers, timeout=300)
             except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
                 save_recovery_record(
                     "all_edit",
@@ -157,7 +174,7 @@ class TikpanGptImage2EditNode:
             )
 
             if img_raw.startswith("http"):
-                img_res = get_with_retry(requests.Session(), img_raw, timeout=(10, 120), proxies=proxies, attempts=4)
+                img_res = get_with_retry(session, img_raw, timeout=(10, 120), attempts=4)
                 final_img = Image.open(BytesIO(img_res.content)).convert("RGB")
             else:
                 b64_clean = re.sub(r'[^A-Za-z0-9+/=]', '', img_raw.split("base64,")[-1])

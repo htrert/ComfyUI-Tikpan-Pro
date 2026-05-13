@@ -14,6 +14,7 @@ from PIL import Image
 import comfy.utils
 import comfy.model_management
 from .tikpan_happyhorse_common import video_from_path
+from .tikpan_node_options import GROK_ASPECT_OPTIONS, GROK_DURATION_OPTIONS, normalize_seed, option_value, pick
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -34,24 +35,24 @@ class TikpanGrokVideoNode:
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "api_key": ("STRING", {"default": "sk-"}),
-                "prompt": (
+                "API_密钥": ("STRING", {"default": "sk-"}),
+                "生成指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "一段极具视觉冲击力的赛博朋克城市夜景，霓虹灯闪烁，飞行汽车穿梭...",
                     },
                 ),
-                "model": (["grok-videos"], {"default": "grok-videos"}),
-                "duration": (["6s", "10s"], {"default": "6s"}),
-                "aspect_ratio": (["16:9", "9:16", "1024x1024"], {"default": "16:9"}),
-                "seed": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+                "模型": (["grok-videos"], {"default": "grok-videos"}),
+                "视频时长": (GROK_DURATION_OPTIONS, {"default": "6秒｜6s"}),
+                "画面比例": (GROK_ASPECT_OPTIONS, {"default": "16:9 横屏｜16:9"}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
             },
             "optional": {
-                "ref_image_1": ("IMAGE",),
-                "ref_image_2": ("IMAGE",),
-                "ref_image_3": ("IMAGE",),
-                "ref_image_4": ("IMAGE",),
+                "参考图1": ("IMAGE",),
+                "参考图2": ("IMAGE",),
+                "参考图3": ("IMAGE",),
+                "参考图4": ("IMAGE",),
             },
         }
 
@@ -79,13 +80,13 @@ class TikpanGrokVideoNode:
     def generate_video(self, **kwargs):
         print(f"[Tikpan-GrokVideo] 📦 收到参数: {list(kwargs.keys())}", flush=True)
 
-        api_key = str(kwargs.get("api_key") or "").strip()
-        prompt = str(kwargs.get("prompt") or "").strip()
-        model = kwargs.get("model") or "grok-videos"
-        duration = kwargs.get("duration") or "6s"
-        aspect_ratio = kwargs.get("aspect_ratio") or "16:9"
+        api_key = str(pick(kwargs, "API_密钥", "api_key", default="") or "").strip()
+        prompt = str(pick(kwargs, "生成指令", "prompt", default="") or "").strip()
+        model = pick(kwargs, "模型", "model", default="grok-videos") or "grok-videos"
+        duration = option_value(pick(kwargs, "视频时长", "duration", default="6秒｜6s"), "6s")
+        aspect_ratio = option_value(pick(kwargs, "画面比例", "aspect_ratio", default="16:9 横屏｜16:9"), "16:9")
         size = self.normalize_size(aspect_ratio)
-        seed = int(kwargs.get("seed", 0))
+        seed = normalize_seed(pick(kwargs, "随机种子", "seed", default=888888), default=888888)
 
         pbar = comfy.utils.ProgressBar(100)
 
@@ -103,7 +104,7 @@ class TikpanGrokVideoNode:
 
         images_b64 = []
         for i in range(1, 5):
-            img_tensor = kwargs.get(f"ref_image_{i}")
+            img_tensor = pick(kwargs, f"参考图{i}", f"ref_image_{i}", default=None)
             if img_tensor is not None:
                 try:
                     images_b64.append(self.tensor_to_jpeg_data_url(img_tensor, quality=85))

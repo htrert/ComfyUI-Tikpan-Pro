@@ -32,6 +32,14 @@ from PIL import Image
 import comfy.utils
 import urllib3
 import traceback
+from .tikpan_node_options import (
+    IMAGE_FORMAT_OPTIONS,
+    ON_OFF_AUTO_OPTIONS,
+    RESPONSE_FORMAT_OPTIONS,
+    WATERMARK_OPTIONS,
+    option_value,
+    pick,
+)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -67,23 +75,23 @@ class TikpanDoubaoImageNode:
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1虚拟美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "api_key": ("STRING", {"default": ""}),
-                "prompt": (
+                "API_密钥": ("STRING", {"default": ""}),
+                "生成指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "一张极致高清的赛博朋克风格产品展示图，霓虹灯光效果，细腻质感",
                     },
                 ),
-                "size_mode": (
-                    ["品质档位", "比例尺寸"],
+                "尺寸模式": (
+                    ["品质档位", "按比例输出精确尺寸"],
                     {"default": "品质档位"},
                 ),
-                "size_quality": (
+                "清晰度档位": (
                     ["2K", "3K"],
                     {"default": "2K"},
                 ),
-                "aspect_ratio": (
+                "画面比例": (
                     [
                         "1:1 正方形",
                         "4:3 横版",
@@ -96,38 +104,38 @@ class TikpanDoubaoImageNode:
                     ],
                     {"default": "1:1 正方形"},
                 ),
-                "output_format": (
-                    ["jpeg", "png"],
-                    {"default": "jpeg"},
+                "图片格式": (
+                    IMAGE_FORMAT_OPTIONS[:2],
+                    {"default": "JPEG｜jpeg"},
                 ),
-                "response_format": (
-                    ["url", "b64_json"],
-                    {"default": "url"},
+                "返回方式": (
+                    RESPONSE_FORMAT_OPTIONS,
+                    {"default": "云端链接｜url"},
                 ),
-                "watermark": (
-                    ["无水印", "有水印"],
+                "水印": (
+                    WATERMARK_OPTIONS,
                     {"default": "无水印"},
                 ),
                 "联网搜索增强": (
-                    ["关闭", "自动"],
+                    ON_OFF_AUTO_OPTIONS,
                     {"default": "关闭"},
                 ),
                 "多图生成": (
-                    ["关闭", "自动"],
+                    ON_OFF_AUTO_OPTIONS,
                     {"default": "关闭"},
                 ),
                 "最多生成张数": (
                     "INT",
                     {"default": 4, "min": 1, "max": 15},
                 ),
-                "multi_image_fallback": (
+                "多图失败处理": (
                     ["严格报错", "自动降级为首图"],
                     {"default": "严格报错"},
                 ),
             },
             "optional": {
-                "input_image": ("IMAGE", {"tooltip": "参考图，支持单张或多张（Batch 最多14张）"}),
-                "image_url_or_base64": (
+                "参考图": ("IMAGE", {"tooltip": "参考图，支持单张或多张（Batch 最多14张）"}),
+                "图片URL或Base64": (
                     "STRING",
                     {
                         "multiline": True,
@@ -135,7 +143,7 @@ class TikpanDoubaoImageNode:
                         "tooltip": "可手动输入参考图 URL 或 Base64；支持多行，一行一个；可与 input_image 合并，最多14张",
                     },
                 ),
-                "negative_prompt": (
+                "负面提示词": (
                     "STRING",
                     {
                         "multiline": True,
@@ -356,21 +364,23 @@ class TikpanDoubaoImageNode:
     def generate_image(self, **kwargs):
         print("[Tikpan-Doubao] 📦 收到参数", flush=True)
 
-        api_key = str(kwargs.get("api_key") or "").strip()
-        prompt = str(kwargs.get("prompt") or "").strip()
-        size_mode = kwargs.get("size_mode", "品质档位")
-        size_quality = str(kwargs.get("size_quality", "2K") or "2K").strip()
-        aspect_ratio = str(kwargs.get("aspect_ratio", "1:1 正方形") or "1:1 正方形").strip()
-        output_format = str(kwargs.get("output_format", "jpeg") or "jpeg").strip().lower()
-        response_format = str(kwargs.get("response_format", "url") or "url").strip()
-        watermark = kwargs.get("watermark", "无水印")
+        api_key = str(pick(kwargs, "API_密钥", "api_key", default="") or "").strip()
+        prompt = str(pick(kwargs, "生成指令", "prompt", default="") or "").strip()
+        size_mode = option_value(pick(kwargs, "尺寸模式", "size_mode", default="品质档位"), "品质档位")
+        if size_mode == "按比例输出精确尺寸":
+            size_mode = "比例尺寸"
+        size_quality = str(option_value(pick(kwargs, "清晰度档位", "size_quality", default="2K"), "2K")).strip()
+        aspect_ratio = str(pick(kwargs, "画面比例", "aspect_ratio", default="1:1 正方形") or "1:1 正方形").strip()
+        output_format = str(option_value(pick(kwargs, "图片格式", "output_format", default="JPEG｜jpeg"), "jpeg")).strip().lower()
+        response_format = str(option_value(pick(kwargs, "返回方式", "response_format", default="云端链接｜url"), "url")).strip()
+        watermark = pick(kwargs, "水印", "watermark", default="无水印")
         web_search = kwargs.get("联网搜索增强", "关闭")
         multi_image = kwargs.get("多图生成", "关闭")
         max_images = int(kwargs.get("最多生成张数", 4))
-        multi_image_fallback = kwargs.get("multi_image_fallback", "严格报错")
-        input_image = kwargs.get("input_image")
-        image_url_or_base64 = str(kwargs.get("image_url_or_base64") or "").strip()
-        negative_prompt = str(kwargs.get("negative_prompt") or "").strip()
+        multi_image_fallback = pick(kwargs, "多图失败处理", "multi_image_fallback", default="严格报错")
+        input_image = pick(kwargs, "参考图", "input_image", default=None)
+        image_url_or_base64 = str(pick(kwargs, "图片URL或Base64", "image_url_or_base64", default="") or "").strip()
+        negative_prompt = str(pick(kwargs, "负面提示词", "negative_prompt", default="") or "").strip()
 
         model = "doubao-seedream-5-0-260128"
         size, size_display = self.resolve_size(size_mode, size_quality, aspect_ratio)

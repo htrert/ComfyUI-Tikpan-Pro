@@ -44,14 +44,14 @@ class TikpanGeminiVideoAnalystNode:
         return {
             "required": {
                 "获取密钥地址": (["👉 https://tikpan.com (官方授权Key获取点)"], ),
-                "Tikpan_API密钥": ("STRING", {"default": "sk-"}),
-                "视频流_IMAGE": ("IMAGE",), 
-                "视频帧率_FPS": ("INT", {"default": 24, "min": 8, "max": 60, "tooltip": "用于计算视频真实物理时长"}),
-                "分析模型": (["gemini-3.1-flash", "gemini-3.1-pro", "gpt-4o"], {"default": "gemini-3.1-flash"}),
+                "API_密钥": ("STRING", {"default": "sk-"}),
+                "视频流_IMAGE": ("IMAGE",),
+                "视频帧率FPS": ("INT", {"default": 24, "min": 8, "max": 60, "tooltip": "用于计算视频真实物理时长"}),
+                "分析模型": (["gemini-3.1-flash", "gemini-3.1-pro", "gpt-5.4-mini", "gpt-4o"], {"default": "gemini-3.1-flash"}),
             },
             "optional": {
                 "音频流_AUDIO": ("AUDIO",),
-                "特定关注点": ("STRING", {"multiline": True, "default": "请重点关注物理规律、光影变化和人物微表情。"}),
+                "重点分析要求": ("STRING", {"multiline": True, "default": "请重点关注物理规律、光影变化和人物微表情。"}),
                 "校验HTTPS证书": ("BOOLEAN", {"default": True}),
             }
         }
@@ -61,13 +61,27 @@ class TikpanGeminiVideoAnalystNode:
     FUNCTION = "analyze_video"
     CATEGORY = "👑 Tikpan 官方独家节点"
 
-    def analyze_video(self, 获取密钥地址, Tikpan_API密钥, 视频流_IMAGE, 视频帧率_FPS, 分析模型, 音频流_AUDIO=None, 特定关注点="", 校验HTTPS证书=True):
+    def analyze_video(
+        self,
+        获取密钥地址,
+        API_密钥=None,
+        视频流_IMAGE=None,
+        视频帧率FPS=24,
+        分析模型="gemini-3.1-flash",
+        音频流_AUDIO=None,
+        重点分析要求="",
+        校验HTTPS证书=True,
+        **kwargs,
+    ):
+        API_密钥 = API_密钥 or kwargs.get("Tikpan_API密钥") or kwargs.get("API密钥")
+        视频帧率FPS = kwargs.get("视频帧率_FPS", 视频帧率FPS)
+        重点分析要求 = 重点分析要求 or kwargs.get("特定关注点", "")
         comfy.model_management.throw_exception_if_processing_interrupted()
-        
-        if not Tikpan_API密钥 or len(Tikpan_API密钥) < 10:
+
+        if not API_密钥 or len(API_密钥) < 10:
             return ("❌ 请填写API密钥: 请前往 https://tikpan.com 获取", )
 
-        headers = {"Authorization": f"Bearer {Tikpan_API密钥}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {API_密钥}", "Content-Type": "application/json"}
         session = requests.Session()
         session.trust_env = False
 
@@ -75,7 +89,7 @@ class TikpanGeminiVideoAnalystNode:
         # 1. 🧠 AI 极限体积熔断与动态降质算法 (完美规避 10MB 限制)
         # ====================================================================
         total_frames = 视频流_IMAGE.shape[0]
-        duration_seconds = total_frames / float(视频帧率_FPS)
+        duration_seconds = total_frames / float(视频帧率FPS)
         
         # 策略：强制 1秒 1帧，最高 60 帧
         extract_count = max(4, int(duration_seconds))
@@ -142,7 +156,7 @@ class TikpanGeminiVideoAnalystNode:
         【4. 场景与氛围 (Environment)】：微小环境细节、年代感。
         【5. 视听双轨脚本 (Script & Audio)】：如提供音频，请提取对白/情绪；如无音频，请通过唇语和动作**反向推演虚构一段剧情脚本**。
         
-        用户重点关注：{特定关注点}
+        用户重点关注：{重点分析要求}
         """
 
         content_list = [{"type": "text", "text": system_prompt}]

@@ -17,6 +17,19 @@ from urllib3.util.retry import Retry
 import comfy.model_management
 import comfy.utils
 
+try:
+    from .tikpan_node_options import option_value, pick
+except Exception:
+    import importlib.util
+
+    _options_spec = importlib.util.spec_from_file_location(
+        "tikpan_node_options", Path(__file__).with_name("tikpan_node_options.py")
+    )
+    _options_module = importlib.util.module_from_spec(_options_spec)
+    _options_spec.loader.exec_module(_options_module)
+    option_value = _options_module.option_value
+    pick = _options_module.pick
+
 
 API_HOST = "https://tikpan.com"
 API_BASE_URL = API_HOST
@@ -65,14 +78,17 @@ class TikpanGemini3FlashPreviewAnalystNode:
                     ["中文报告", "Markdown结构化", "JSON结构化", "提示词优化"],
                     {"default": "Markdown结构化"},
                 ),
-                "max_output_tokens": ("INT", {"default": 4096, "min": 256, "max": 32768, "step": 256}),
-                "temperature": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 2.0, "step": 0.05}),
-                "media_resolution": (["默认", "low", "medium", "high"], {"default": "默认"}),
+                "最大输出Token": ("INT", {"default": 4096, "min": 256, "max": 32768, "step": 256}),
+                "创意温度": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 2.0, "step": 0.05}),
+                "媒体解析度": (
+                    ["默认", "低清省费用｜low", "均衡｜medium", "高清细节｜high"],
+                    {"default": "默认"},
+                ),
                 "抽帧策略": (
                     ["均匀覆盖", "按秒抽帧", "首尾加密", "运动变化优先", "混合智能"],
                     {"default": "混合智能"},
                 ),
-                "视频帧率_FPS": ("INT", {"default": 24, "min": 1, "max": 120, "step": 1}),
+                "视频帧率FPS": ("INT", {"default": 24, "min": 1, "max": 120, "step": 1}),
                 "最大抽帧数": ("INT", {"default": 24, "min": 1, "max": MAX_FRAME_PARTS, "step": 1}),
                 "视频输入策略": (
                     ["自动优先抽帧", "只用抽帧", "只用视频原件", "抽帧+视频原件(高成本)"],
@@ -453,7 +469,7 @@ class TikpanGemini3FlashPreviewAnalystNode:
 
         frame_parts, frame_count = self.frames_to_parts(
             values.get("视频帧_IMAGE"),
-            values.get("视频帧率_FPS", 24),
+            pick(values, "视频帧率FPS", "视频帧率_FPS", default=24),
             values.get("最大抽帧数", 24),
             values.get("抽帧策略", "混合智能"),
         ) if use_frames else ([], 0)
@@ -475,10 +491,10 @@ class TikpanGemini3FlashPreviewAnalystNode:
             raise ValueError("请至少输入一张图片、一个视频 URL、一个本地小视频，或连接 视频帧_IMAGE。")
 
         generation_config = {
-            "temperature": float(values.get("temperature", 0.3)),
-            "maxOutputTokens": int(values.get("max_output_tokens", 4096)),
+            "temperature": float(pick(values, "创意温度", "temperature", default=0.3)),
+            "maxOutputTokens": int(pick(values, "最大输出Token", "max_output_tokens", default=4096)),
         }
-        media_resolution = str(values.get("media_resolution") or "默认")
+        media_resolution = option_value(pick(values, "媒体解析度", "media_resolution", default="默认"), "默认")
         if media_resolution != "默认":
             generation_config["mediaResolution"] = media_resolution
 
