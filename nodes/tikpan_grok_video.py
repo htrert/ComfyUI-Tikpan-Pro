@@ -12,7 +12,7 @@ from PIL import Image
 import comfy.utils
 import comfy.model_management
 from .tikpan_happyhorse_common import video_from_path
-from .tikpan_node_options import normalize_seed
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, normalize_seed
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -34,29 +34,31 @@ class TikpanExclusiveVideoNode:
                 "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "校验HTTPS证书": ("BOOLEAN", {"default": True}),
             }
         }
-        
+
         # 支持 7 张参考图
         for i in range(1, 8):
             inputs["optional"][f"参考图_{i}"] = ("IMAGE",)
-            
+
         return inputs
 
     # 🚀 4 个标准输出口，绝对不会再报 tuple index out of range 错
     RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "VIDEO")
     RETURN_NAMES = ("📁_本地保存路径", "🏷️_任务ID", "🔗_视频云端直链", "📄_完整日志", "🎬_视频输出")
-    OUTPUT_NODE = True 
+    OUTPUT_NODE = True
     FUNCTION = "execute"
     CATEGORY = "👑 Tikpan 官方独家节点"
 
     def execute(self, 获取密钥请访问, Tikpan_API密钥, Grok3专属提示词, 模型选择, 比例, 分辨率, 随机种子=888888, **kwargs):
         comfy.model_management.throw_exception_if_processing_interrupted()
-        
+
         if not Tikpan_API密钥 or len(Tikpan_API密钥) < 10:
             return ("❌ 请填写API密钥", "失败", "无", "请填写密钥", None)
         verify_tls = bool(kwargs.get("校验HTTPS证书", True))
+        api_base_url = f"{normalize_api_host(kwargs.get('中转站地址', API_HOST_OPTIONS[0]))}/v1"
         seed = normalize_seed(kwargs.get("seed", 随机种子), default=888888, maximum=2147483647)
 
         headers = {"Authorization": f"Bearer {Tikpan_API密钥}", "Content-Type": "application/json"}
@@ -71,14 +73,14 @@ class TikpanExclusiveVideoNode:
                 i_arr = 255. * img_tensor[0].cpu().numpy()
                 p_img = Image.fromarray(np.clip(i_arr, 0, 255).astype(np.uint8))
                 buf = BytesIO()
-                p_img.save(buf, format="JPEG", quality=85) 
+                p_img.save(buf, format="JPEG", quality=85)
                 imgs_b64.append(base64.b64encode(buf.getvalue()).decode("utf-8"))
 
         # 2. 组装请求 (保持原厂底层协议绝对不变)
         payload = {
-            "model": 模型选择, 
-            "prompt": Grok3专属提示词, 
-            "aspect_ratio": 比例, 
+            "model": 模型选择,
+            "prompt": Grok3专属提示词,
+            "aspect_ratio": 比例,
             "size": 分辨率,
             "seed": seed
         }
@@ -87,7 +89,7 @@ class TikpanExclusiveVideoNode:
 
         # 3. 发起创建任务
         try:
-            res = session.post(f"{HARDCODED_BASE_URL}/video/create", json=payload, headers=headers, verify=verify_tls, timeout=60).json()
+            res = session.post(f"{api_base_url}/video/create", json=payload, headers=headers, verify=verify_tls, timeout=60).json()
             task_id = res.get("id") or res.get("task_id")
             if not task_id: return ("❌ 任务创建失败", "无", "无", json.dumps(res, ensure_ascii=False), None)
         except Exception as e: return (f"❌ 网络错误: {e}", "无", "无", str(e), None)
@@ -97,7 +99,7 @@ class TikpanExclusiveVideoNode:
         video_url = ""
         last_progress = 0
         final_data = {}
-        
+
         # 4. 轮询状态 (加入防焦虑心跳系统)
         wait_time = 0
         for _ in range(240): # 放宽到最多等 20 分钟
@@ -107,10 +109,10 @@ class TikpanExclusiveVideoNode:
             wait_time += 5
 
             try:
-                status_res = session.get(f"{HARDCODED_BASE_URL}/video/query?id={task_id}", headers=headers, verify=verify_tls, timeout=30).json()
+                status_res = session.get(f"{api_base_url}/video/query?id={task_id}", headers=headers, verify=verify_tls, timeout=30).json()
                 final_data = status_res
                 data = status_res.get("data", status_res)
-                
+
                 # 🚀 心跳日志：每 15 秒报一次平安，让你知道它没卡死！
                 if wait_time % 15 == 0:
                     print(f"[Tikpan Grok3] ⏳ 云端渲染中，没卡死，请耐心等待... (已耗时: {wait_time} 秒)")
@@ -132,7 +134,7 @@ class TikpanExclusiveVideoNode:
                     break
                 if state in ["failed", "error"]:
                     return ("❌ 渲染失败", str(task_id), "无", json.dumps(status_res, ensure_ascii=False), None)
-            except Exception as e: 
+            except Exception as e:
                 print(f"[Tikpan Grok3] ⚠️ 查询状态遇到网络波动 (自动重试中): {e}")
 
         if not video_url:
@@ -147,7 +149,7 @@ class TikpanExclusiveVideoNode:
             filename = f"Tikpan_{safe_id}.mp4"
             out_dir = folder_paths.get_output_directory()
             path = os.path.join(out_dir, filename)
-            
+
             with open(path, "wb") as f: f.write(response.content)
             print(f"[Tikpan Grok3] 🎉 下载成功！赶快去 output 文件夹看吧！路径: {path}\n")
             return (path, str(task_id), video_url, json.dumps(final_data, ensure_ascii=False, indent=2), video_from_path(path))

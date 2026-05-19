@@ -6,7 +6,7 @@
 <p align="center">
   <img src="[https://img.shields.io/badge/Official-Tikpan.com-red?style=for-the-badge](https://img.shields.io/badge/Official-Tikpan.com-red?style=for-the-badge)" alt="Tikpan Official">
   <img src="[https://img.shields.io/badge/ComfyUI-Registry-green?style=for-the-badge](https://img.shields.io/badge/ComfyUI-Registry-green?style=for-the-badge)" alt="Registry">
-  <img src="[https://img.shields.io/badge/Version-0.0.9-blue?style=for-the-badge](https://img.shields.io/badge/Version-0.0.9-blue?style=for-the-badge)" alt="Version">
+  <img src="[https://img.shields.io/badge/Version-1.2.0-blue?style=for-the-badge](https://img.shields.io/badge/Version-1.2.0-blue?style=for-the-badge)" alt="Version">
 </p>
 
 **ComfyUI-Tikpan-Pro** 是由 [攀升AI (Tikpan.com)](https://tikpan.com/) 官方发布的深度集成插件。专为 **TikTok 电商矩阵运营**、**高阶内容创作**及 **AI 工作流自动化**设计，通过接入自有的高稳定性 API 渠道，为全球创作者提供顶级的模型生成能力。

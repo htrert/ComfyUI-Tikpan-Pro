@@ -4,6 +4,7 @@ import base64
 import time
 import requests
 import urllib3
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host
 import numpy as np
 import io
 import wave
@@ -50,6 +51,7 @@ class TikpanGeminiVideoAnalystNode:
                 "分析模型": (["gemini-3.1-flash", "gemini-3.1-pro", "gpt-5.4-mini", "gpt-4o"], {"default": "gemini-3.1-flash"}),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "音频流_AUDIO": ("AUDIO",),
                 "重点分析要求": ("STRING", {"multiline": True, "default": "请重点关注物理规律、光影变化和人物微表情。"}),
                 "校验HTTPS证书": ("BOOLEAN", {"default": True}),
@@ -82,6 +84,7 @@ class TikpanGeminiVideoAnalystNode:
             return ("❌ 请填写API密钥: 请前往 https://tikpan.com 获取", )
 
         headers = {"Authorization": f"Bearer {API_密钥}", "Content-Type": "application/json"}
+        api_base_url = f"{normalize_api_host(kwargs.get('中转站地址', API_HOST_OPTIONS[0]))}/v1"
         session = requests.Session()
         session.trust_env = False
 
@@ -90,11 +93,11 @@ class TikpanGeminiVideoAnalystNode:
         # ====================================================================
         total_frames = 视频流_IMAGE.shape[0]
         duration_seconds = total_frames / float(视频帧率FPS)
-        
+
         # 策略：强制 1秒 1帧，最高 60 帧
         extract_count = max(4, int(duration_seconds))
         extract_count = min(extract_count, 60)
-        
+
         # 根据帧数动态调整压缩率和分辨率
         if extract_count > 30:
             target_res, jpeg_quality = 480, 65
@@ -105,12 +108,12 @@ class TikpanGeminiVideoAnalystNode:
 
         print(f"\n[Tikpan Analyst] 🎬 视频时长: {duration_seconds:.1f}秒 (共{total_frames}帧)。")
         print(f"[Tikpan Analyst] ⚙️ 计划抽取: {extract_count} 帧，动态分辨率: {target_res}px，压缩率: {jpeg_quality}")
-        
+
         indices = np.linspace(0, total_frames - 1, extract_count, dtype=int)
         base64_images = []
         current_payload_size = 0
         MAX_SAFE_SIZE = 8 * 1024 * 1024 # 绝对安全线：8 MB (留出 2MB 空间给音频和文本)
-        
+
         for idx in indices:
             i_arr = 255. * 视频流_IMAGE[idx:idx+1].cpu().numpy()[0]
             pil_img = Image.fromarray(np.clip(i_arr, 0, 255).astype(np.uint8))
@@ -118,13 +121,13 @@ class TikpanGeminiVideoAnalystNode:
             buf = BytesIO()
             pil_img.save(buf, format="JPEG", quality=jpeg_quality)
             b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
-            
+
             # 体积熔断检测
             str_size = len(b64_str)
             if current_payload_size + str_size > MAX_SAFE_SIZE:
                 print(f"[Tikpan Analyst] ⚠️ 触发 8MB 极限熔断保护！提前截断，最终使用 {len(base64_images)} 帧以保证请求成功。")
                 break
-                
+
             base64_images.append(b64_str)
             current_payload_size += str_size
 
@@ -149,21 +152,21 @@ class TikpanGeminiVideoAnalystNode:
         system_prompt = f"""
         你是一位顶级的好莱坞电影解析师、AI视频提示词专家和编剧。
         请你从以下维度深度解构视频，为 Sora/Grok3 级别的模型提供绝佳的重绘提示词素材：
-        
+
         【1. 摄影机与运镜 (Camera & Motion)】：推、拉、摇、移，焦段与景深。
         【2. 主体物理动作 (Physics & Actions)】：主体行为细节，材质/衣物的物理互动。
         【3. 光影与美学 (Lighting & Color)】：光源方向、质感、色彩基调。
         【4. 场景与氛围 (Environment)】：微小环境细节、年代感。
         【5. 视听双轨脚本 (Script & Audio)】：如提供音频，请提取对白/情绪；如无音频，请通过唇语和动作**反向推演虚构一段剧情脚本**。
-        
+
         用户重点关注：{重点分析要求}
         """
 
         content_list = [{"type": "text", "text": system_prompt}]
-        
+
         for b64 in base64_images:
             content_list.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
-            
+
         if audio_b64:
             content_list.append({
                 "type": "input_audio",
@@ -177,10 +180,10 @@ class TikpanGeminiVideoAnalystNode:
         }
 
         print(f"[Tikpan Analyst] 🚀 正在呼叫 {分析模型} 发起突击...")
-        
+
         try:
             res = session.post(
-                f"{HARDCODED_BASE_URL}/chat/completions",
+                f"{api_base_url}/chat/completions",
                 json=payload,
                 headers=headers,
                 verify=bool(校验HTTPS证书),
@@ -194,5 +197,5 @@ class TikpanGeminiVideoAnalystNode:
 
         comfy.model_management.throw_exception_if_processing_interrupted()
         print(f"[Tikpan Analyst] ✅ 深度解析完成！")
-        
+
         return (analysis_report.strip(), )

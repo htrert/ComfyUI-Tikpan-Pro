@@ -11,7 +11,7 @@ import urllib3
 from PIL import Image
 
 import comfy.utils
-from .tikpan_node_options import normalize_seed
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, normalize_seed
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -81,7 +81,8 @@ class TikpanNanoBananaProNode:
                 ),
             },
             "optional": {
-                f"参考图_{i}": ("IMAGE",) for i in range(1, 15)
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                **{f"参考图_{i}": ("IMAGE",) for i in range(1, 15)},
             },
         }
 
@@ -470,6 +471,7 @@ class TikpanNanoBananaProNode:
         print("[Tikpan-NanoBananaPro] 🍌 开始请求...", flush=True)
 
         api_key = str(API_密钥 or "").strip()
+        api_host = normalize_api_host(kwargs.get("中转站地址", API_HOST_OPTIONS[0]))
         if not api_key or api_key == "sk-":
             return (self.black_image(), "❌ 请填写有效的 API 密钥")
 
@@ -499,7 +501,7 @@ class TikpanNanoBananaProNode:
                 payload = self.build_gemini_payload(prompt, image_tensors, 分辨率, 画面比例, 随机种子, 温度, 启用谷歌搜索)
                 api_name = f"/v1beta/models/{模型}:generateContent"
             else:
-                url = f"{API_BASE_URL}/v1/chat/completions"
+                url = f"{api_host}/v1/chat/completions"
                 payload = self.build_chat_payload(模型, prompt, image_tensors, 分辨率, 画面比例, 随机种子, 温度, 最大输出Token数)
                 api_name = "/v1/chat/completions"
 

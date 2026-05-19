@@ -33,6 +33,8 @@ import comfy.utils
 import urllib3
 import traceback
 from .tikpan_node_options import (
+    API_HOST_OPTIONS,
+    normalize_api_host,
     IMAGE_FORMAT_OPTIONS,
     ON_OFF_AUTO_OPTIONS,
     RESPONSE_FORMAT_OPTIONS,
@@ -134,6 +136,7 @@ class TikpanDoubaoImageNode:
                 ),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "参考图": ("IMAGE", {"tooltip": "参考图，支持单张或多张（Batch 最多14张）"}),
                 "图片URL或Base64": (
                     "STRING",
@@ -281,20 +284,78 @@ class TikpanDoubaoImageNode:
         return image_list, len(image_list), "array"
 
     def decode_one_image_item(self, img_data, response_format):
-        if response_format == "b64_json" and "b64_json" in img_data:
+        if not isinstance(img_data, dict):
+            return None, "unknown", "unknown"
+
+        b64_keys = ("b64_json", "image_base64", "base64", "image")
+        url_keys = ("url", "image_url", "imageUrl")
+
+        for key in url_keys:
+            value = img_data.get(key)
+            if isinstance(value, str) and value.startswith("http"):
+                img_pil = self.download_image(value)
+                if img_pil is not None:
+                    return img_pil, f"{img_pil.size[0]}x{img_pil.size[1]}", key
+
+        for key in b64_keys:
+            value = img_data.get(key)
+            if not isinstance(value, str) or value.startswith("http"):
+                continue
             try:
-                img_raw = base64.b64decode(img_data["b64_json"])
+                clean = value.split("base64,")[-1]
+                img_raw = base64.b64decode(clean)
                 img_pil = Image.open(BytesIO(img_raw)).convert("RGB")
-                return img_pil, f"{img_pil.size[0]}x{img_pil.size[1]}", "b64_json"
+                return img_pil, f"{img_pil.size[0]}x{img_pil.size[1]}", key
             except Exception as e:
-                print(f"[Tikpan-Doubao] ⚠️ Base64 解码失败: {e}", flush=True)
+                print(f"[Tikpan-Doubao] WARNING {key} decode failed: {e}", flush=True)
 
-        if "url" in img_data:
-            img_pil = self.download_image(img_data["url"])
-            if img_pil is not None:
-                return img_pil, f"{img_pil.size[0]}x{img_pil.size[1]}", "url"
+        return None, "unknown", "unknown"
 
-        return None, "未知", "unknown"
+    def normalize_response_data_list(self, res_json):
+        if not isinstance(res_json, dict):
+            return []
+
+        items = []
+        seen = set()
+
+        def add_item(item):
+            if not isinstance(item, dict):
+                return
+            identity = (
+                item.get("url")
+                or item.get("image_url")
+                or item.get("imageUrl")
+                or item.get("b64_json")
+                or item.get("image_base64")
+                or item.get("base64")
+                or item.get("image")
+                or json.dumps(item, ensure_ascii=False, sort_keys=True, default=str)
+            )
+            identity = str(identity)
+            if identity in seen:
+                return
+            seen.add(identity)
+            items.append(item)
+
+        data = res_json.get("data")
+        if isinstance(data, dict):
+            add_item(data)
+        elif isinstance(data, list):
+            for item in data:
+                add_item(item)
+
+        for key in ("result", "output", "images"):
+            value = res_json.get(key)
+            if isinstance(value, dict):
+                add_item(value)
+            elif isinstance(value, list):
+                for item in value:
+                    add_item(item)
+
+        if not items:
+            add_item(res_json)
+
+        return items
 
     def post_with_response_format_fallback(self, url, headers, payload):
         """
@@ -365,6 +426,7 @@ class TikpanDoubaoImageNode:
         print("[Tikpan-Doubao] 📦 收到参数", flush=True)
 
         api_key = str(pick(kwargs, "API_密钥", "api_key", default="") or "").strip()
+        api_host = normalize_api_host(pick(kwargs, "中转站地址", "api_host", default=API_HOST_OPTIONS[0]))
         prompt = str(pick(kwargs, "生成指令", "prompt", default="") or "").strip()
         size_mode = option_value(pick(kwargs, "尺寸模式", "size_mode", default="品质档位"), "品质档位")
         if size_mode == "按比例输出精确尺寸":
@@ -394,7 +456,7 @@ class TikpanDoubaoImageNode:
 
         print(f"[Tikpan-Doubao] 🚀 启动 | 模型: {model} | 尺寸: {size_display}", flush=True)
 
-        url = "https://tikpan.com/v1/images/generations"
+        url = f"{api_host}/v1/images/generations"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -492,7 +554,7 @@ class TikpanDoubaoImageNode:
 
             print(f"[Tikpan-Doubao] 📋 响应: {json.dumps(res_json, ensure_ascii=False)[:1500]}", flush=True)
 
-            data_list = res_json.get("data", [])
+            data_list = self.normalize_response_data_list(res_json)
             if not data_list:
                 return (
                     self.black_image(),

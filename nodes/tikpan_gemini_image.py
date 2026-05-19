@@ -11,7 +11,7 @@ import urllib3
 from PIL import Image
 
 import comfy.utils
-from .tikpan_node_options import normalize_seed
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, normalize_seed
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -58,7 +58,8 @@ class TikpanGeminiImageMaxNode:
                 "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
             },
             "optional": {
-                f"参考图_{i}": ("IMAGE",) for i in range(1, 15)
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                **{f"参考图_{i}": ("IMAGE",) for i in range(1, 15)},
             },
         }
 
@@ -410,6 +411,7 @@ class TikpanGeminiImageMaxNode:
             return (self.black_image(), "❌ 修改指令不能为空")
 
         seed = normalize_seed(kwargs.get("seed", 随机种子), default=888888, maximum=2147483647)
+        api_host = normalize_api_host(kwargs.get("中转站地址", API_HOST_OPTIONS[0]))
 
         image_size_val = 分辨率 if 分辨率 in ("1K", "2K", "4K") else "2K" if 分辨率 != "none" else None
 
@@ -462,7 +464,7 @@ class TikpanGeminiImageMaxNode:
             api_name = f"/v1beta/models/{模型}:generateContent"
         elif 调用方式 == "images_generations":
             # ===== /v1/images/generations 端点 =====
-            url = f"{API_BASE_URL}/v1/images/generations"
+            url = f"{api_host}/v1/images/generations"
             payload = {
                 "model": 模型,
                 "prompt": prompt,
@@ -476,7 +478,7 @@ class TikpanGeminiImageMaxNode:
             api_name = "/v1/images/generations"
         else:
             # ===== /v1/chat/completions 端点（兼容模式，全格式覆盖）=====
-            url = f"{API_BASE_URL}/v1/chat/completions"
+            url = f"{api_host}/v1/chat/completions"
             messages = self.build_messages(prompt, image_data_urls)
 
             payload = {

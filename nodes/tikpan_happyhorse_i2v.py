@@ -40,7 +40,7 @@ from .tikpan_happyhorse_common import (
     normalize_resolution,
     video_from_path,
 )
-from .tikpan_node_options import VIDEO_DURATION_OPTIONS, WATERMARK_OPTIONS, normalize_seed, option_int, pick
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, VIDEO_DURATION_OPTIONS, WATERMARK_OPTIONS, normalize_seed, option_int, pick
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -153,6 +153,7 @@ class TikpanHappyHorseI2VNode:
                 ),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "首帧图片": ("IMAGE", {"tooltip": "首帧图片，将作为视频的第一帧（优先级低于手动 URL）"}),
                 "图片URL": (
                     "STRING",
@@ -214,9 +215,9 @@ class TikpanHappyHorseI2VNode:
         upload_headers = {"Authorization": f"Bearer {api_key}"}
         files = {"file": ("frame.jpg", img_bytes, "image/jpeg")}
         upload_endpoints = [
-            f"{BASE_URL}/alibailian/api/v1/upload",
-            f"{BASE_URL}/v1/upload",
-            f"{BASE_URL}/upload",
+            f"{base_url}/alibailian/api/v1/upload",
+            f"{base_url}/v1/upload",
+            f"{base_url}/upload",
         ]
 
         last_error = None
@@ -245,7 +246,8 @@ class TikpanHappyHorseI2VNode:
                     )
                     if url:
                         if not url.startswith("http"):
-                            url = f"{BASE_URL}/{url.lstrip('/')}"
+                            base_url = getattr(self, "api_base_url", BASE_URL)
+                            url = f"{base_url}/{url.lstrip('/')}"
                         print(f"[HappyHorse-I2V] ✅ 上传成功: {url[:100]}", flush=True)
                         return url
                     else:
@@ -275,7 +277,8 @@ class TikpanHappyHorseI2VNode:
         提交异步视频生成任务
         返回 (success: bool, task_id_or_error: str)
         """
-        url = f"{BASE_URL}/alibailian/api/v1/services/aigc/video-generation/video-synthesis"
+        base_url = getattr(self, "api_base_url", BASE_URL)
+        url = f"{base_url}/alibailian/api/v1/services/aigc/video-generation/video-synthesis"
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -358,7 +361,8 @@ class TikpanHappyHorseI2VNode:
         轮询任务状态，直至成功/失败/超时
         返回 (success: bool, video_url_or_error: str, raw_response: dict)
         """
-        url = f"{BASE_URL}/alibailian/api/v1/tasks/{task_id}"
+        base_url = getattr(self, "api_base_url", BASE_URL)
+        url = f"{base_url}/alibailian/api/v1/tasks/{task_id}"
         headers = {"Authorization": f"Bearer {api_key}"}
 
         print(f"[HappyHorse-I2V] 🔄 开始轮询（每 {poll_interval} 秒，最长 {max_wait_seconds}s）...", flush=True)
@@ -471,6 +475,7 @@ class TikpanHappyHorseI2VNode:
         try:
             # 解析参数
             api_key = str(pick(kwargs, "API_密钥", "api_key", default="") or "").strip()
+            self.api_base_url = normalize_api_host(pick(kwargs, "中转站地址", "api_host", default=API_HOST_OPTIONS[0]))
             prompt = str(pick(kwargs, "生成指令", "prompt", default="") or "").strip()
             mode = str(pick(kwargs, "执行方式", "mode", default="同步 (等待生成并下载)") or "同步 (等待生成并下载)")
             resolution = normalize_resolution(str(pick(kwargs, "清晰度", "resolution", default="1080P") or "1080P"))

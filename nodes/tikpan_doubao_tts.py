@@ -14,6 +14,19 @@ from urllib3.util.retry import Retry
 
 import folder_paths
 
+try:
+    from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host
+except Exception:
+    import importlib.util
+
+    _options_spec = importlib.util.spec_from_file_location(
+        "tikpan_node_options", Path(__file__).with_name("tikpan_node_options.py")
+    )
+    _options_module = importlib.util.module_from_spec(_options_spec)
+    _options_spec.loader.exec_module(_options_module)
+    API_HOST_OPTIONS = _options_module.API_HOST_OPTIONS
+    normalize_api_host = _options_module.normalize_api_host
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -98,6 +111,7 @@ class TikpanDoubaoTTS20Node:
                 "校验HTTPS证书": ("BOOLEAN", {"default": True}),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "自定义voice_type": (
                     "STRING",
                     {
@@ -373,7 +387,8 @@ class TikpanDoubaoTTS20Node:
             payload, voice_type = self.build_payload(values, request_id)
             resource_id = str(values.get("资源ID") or DEFAULT_RESOURCE_ID)
             api_path = str(values.get("接口路径") or API_PATH)
-            url = f"{API_HOST}{api_path if api_path.startswith('/') else '/' + api_path}"
+            api_host = normalize_api_host(values.get("中转站地址"))
+            url = f"{api_host}{api_path if api_path.startswith('/') else '/' + api_path}"
             audio_format = str(values.get("音频格式") or "mp3")
             verify = bool(values.get("校验HTTPS证书", True))
             cache_key = self.cache_key(payload, resource_id, api_path)

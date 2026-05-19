@@ -8,7 +8,7 @@ from io import BytesIO
 from PIL import Image
 import comfy.utils
 from .tikpan_gpt_image_recovery import get_with_retry, make_idempotency_key, safe_json_for_log, save_recovery_record, short_hash
-from .tikpan_node_options import normalize_seed
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, normalize_seed
 
 # 🔐 Tikpan 官方聚合路由
 API_BASE_URL = "https://tikpan.com"
@@ -20,7 +20,7 @@ class TikpanGptImage2GenNode:
             "required": {
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"], ),
                 "API_密钥": ("STRING", {"default": "sk-"}),
-                "生成指令": ("STRING", {"multiline": True, "default": "请参考提供的 Image_1 到 Image_14 的视觉特征，生成一张极致高清的..."}),
+                "生成指令": ("STRING", {"multiline": True, "default": "请参考提供的 Image_1 到 Image_16 的视觉特征，生成一张极致高清的..."}),
                 "模型": (["gpt-image-2-all"], {"default": "gpt-image-2-all"}),
                 "分辨率档位": (["512", "1K", "2K", "4K"], {"default": "1K"}),
                 "画面比例": (["1:1", "16:9", "9:16", "21:9", "4:3", "3:4"], {"default": "1:1"}),
@@ -28,7 +28,8 @@ class TikpanGptImage2GenNode:
                 "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
             },
             "optional": {
-                f"参考图_{i}": ("IMAGE",) for i in range(1, 15)
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                **{f"参考图_{i}": ("IMAGE",) for i in range(1, 17)},
             }
         }
 
@@ -45,12 +46,13 @@ class TikpanGptImage2GenNode:
         session.trust_env = False
         品质 = str(品质).split("｜")[-1].strip()
         seed = normalize_seed(kwargs.get("seed", 随机种子), default=888888, maximum=2147483647)
+        api_host = normalize_api_host(kwargs.get("中转站地址", API_HOST_OPTIONS[0]))
 
         # 🟢 2. 智能尺寸动态计算 (老板最关心的逻辑)
         res_map = {"512": 512, "1K": 1024, "2K": 2048, "4K": 4096}
         base_val = res_map.get(分辨率档位, 1024)
         w_ratio, h_ratio = map(int, 画面比例.split(':'))
-        
+
         # 以 base_val 为长边进行缩放
         if w_ratio >= h_ratio:
             width = base_val
@@ -58,15 +60,15 @@ class TikpanGptImage2GenNode:
         else:
             height = base_val
             width = int(base_val * (w_ratio / h_ratio))
-        
+
         # 对齐到 8 的倍数（工业标准）
         width, height = (width // 8) * 8, (height // 8) * 8
         target_res = f"{width}x{height}"
 
-        # 🟢 3. 构造多模态 Payload (支持 14 路图)
+        # 🟢 3. 构造多模态 Payload (支持 16 路图)
         content = [{"type": "text", "text": f"### GENERATE TASK ###\n{生成指令}\n\n[Format: {画面比例}, Size: {target_res}, Quality: {品质}]"}]
-        
-        for i in range(1, 15):
+
+        for i in range(1, 17):
             img_tensor = kwargs.get(f"参考图_{i}")
             if img_tensor is not None:
                 # 转换参考图
@@ -77,7 +79,7 @@ class TikpanGptImage2GenNode:
                 buf = BytesIO()
                 p_img.save(buf, format="JPEG", quality=75)
                 b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
-                
+
                 content.append({"type": "text", "text": f"Reference Image_{i}:"})
                 content.append({
                     "type": "image_url",
@@ -107,7 +109,7 @@ class TikpanGptImage2GenNode:
 
         try:
             pbar.update(20)
-            url = f"{API_BASE_URL}/v1/chat/completions"
+            url = f"{api_host}/v1/chat/completions"
             try:
                 response = session.post(url, json=payload, headers=headers, timeout=300)
             except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
@@ -123,10 +125,10 @@ class TikpanGptImage2GenNode:
                     "上游可能已经接收并执行了绘图请求，但本地等待响应时断开。"
                     f"请用相同参数重跑以复用幂等键。 Idempotency-Key: {idempotency_key} | recovery: {recovery_path}"
                 )
-            
+
             if response.status_code != 200:
                 return (self.black_image(), f"❌ API 报错: {response.text}")
-            
+
             res_json = response.json()
             save_recovery_record(
                 "all_generation",
@@ -139,11 +141,7 @@ class TikpanGptImage2GenNode:
             pbar.update(70)
 
             # 🟢 4. 暴力解码与清洗 (解决断流与格式混乱)
-            img_raw = ""
-            if "choices" in res_json:
-                img_raw = res_json["choices"][0]["message"].get("content", "")
-            elif "data" in res_json:
-                img_raw = res_json["data"][0].get("url") or res_json["data"][0].get("b64_json")
+            img_raw = self.extract_image_pointer(res_json)
 
             if not img_raw:
                 return (self.black_image(), f"⚠️ 未捕捉到图像数据: {json.dumps(res_json)}")
@@ -158,20 +156,15 @@ class TikpanGptImage2GenNode:
             )
 
             if img_raw.startswith("http"):
-                img_res = get_with_retry(session, img_raw, timeout=(10, 120), attempts=4)
-                final_img = Image.open(BytesIO(img_res.content)).convert("RGB")
+                final_img = self.load_result_image(session, img_raw)
             else:
                 # 执行暴力字符清洗
-                b64_clean = re.sub(r'[^A-Za-z0-9+/=]', '', img_raw.split("base64,")[-1])
-                missing_padding = len(b64_clean) % 4
-                if missing_padding: b64_clean += '=' * (4 - missing_padding)
-                img_bytes = base64.b64decode(b64_clean)
-                final_img = Image.open(BytesIO(img_bytes)).convert("RGB")
-            
+                final_img = self.load_result_image(session, img_raw)
+
             # 转换回 ComfyUI Tensor
             img_np = np.array(final_img).astype(np.float32) / 255.0
             out_tensor = torch.from_numpy(img_np)[None, ...]
-            
+
             pbar.update(100)
             if img_raw.startswith("http"):
                 return (out_tensor, f"success | size: {target_res} | upstream_image_url: {img_raw}")
@@ -183,3 +176,88 @@ class TikpanGptImage2GenNode:
 
     def black_image(self):
         return torch.zeros((1, 512, 512, 3))
+
+    def extract_image_pointer(self, res_json):
+        seen = set()
+
+        def add(value):
+            if not isinstance(value, str):
+                return ""
+            value = value.strip()
+            if not value or value in seen:
+                return ""
+            seen.add(value)
+            if value.startswith(("http://", "https://", "data:image")):
+                return value
+            if len(value) > 80 and re.search(r"^[A-Za-z0-9+/=\s\r\n]+$", value):
+                return value
+            return ""
+
+        def from_item(item):
+            if isinstance(item, str):
+                return add(item)
+            if not isinstance(item, dict):
+                return ""
+            for key in ("url", "image_url", "imageUrl", "b64_json", "image_base64", "base64", "image"):
+                found = add(item.get(key))
+                if found:
+                    return found
+            nested = item.get("image_url")
+            if isinstance(nested, dict):
+                found = add(nested.get("url"))
+                if found:
+                    return found
+            content = item.get("content")
+            if isinstance(content, list):
+                for part in content:
+                    found = from_item(part)
+                    if found:
+                        return found
+            return ""
+
+        if not isinstance(res_json, dict):
+            return ""
+
+        for choice in res_json.get("choices", []) or []:
+            message = choice.get("message", {}) if isinstance(choice, dict) else {}
+            found = from_item(message)
+            if found:
+                return found
+
+        data = res_json.get("data")
+        if isinstance(data, list):
+            for item in data:
+                found = from_item(item)
+                if found:
+                    return found
+        else:
+            found = from_item(data)
+            if found:
+                return found
+
+        for key in ("result", "output", "images"):
+            value = res_json.get(key)
+            if isinstance(value, list):
+                for item in value:
+                    found = from_item(item)
+                    if found:
+                        return found
+            else:
+                found = from_item(value)
+                if found:
+                    return found
+
+        return from_item(res_json)
+
+    def load_result_image(self, session, img_raw):
+        img_raw = str(img_raw).strip()
+        if img_raw.startswith(("http://", "https://")):
+            img_res = get_with_retry(session, img_raw, timeout=(10, 120), attempts=4)
+            return Image.open(BytesIO(img_res.content)).convert("RGB")
+
+        b64_clean = re.sub(r"[^A-Za-z0-9+/=]", "", img_raw.split("base64,")[-1])
+        missing_padding = len(b64_clean) % 4
+        if missing_padding:
+            b64_clean += "=" * (4 - missing_padding)
+        img_bytes = base64.b64decode(b64_clean)
+        return Image.open(BytesIO(img_bytes)).convert("RGB")

@@ -18,7 +18,7 @@ import comfy.model_management
 import comfy.utils
 
 try:
-    from .tikpan_node_options import option_value, pick
+    from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, option_value, pick
 except Exception:
     import importlib.util
 
@@ -27,6 +27,8 @@ except Exception:
     )
     _options_module = importlib.util.module_from_spec(_options_spec)
     _options_spec.loader.exec_module(_options_module)
+    API_HOST_OPTIONS = _options_module.API_HOST_OPTIONS
+    normalize_api_host = _options_module.normalize_api_host
     option_value = _options_module.option_value
     pick = _options_module.pick
 
@@ -101,6 +103,7 @@ class TikpanGemini3FlashPreviewAnalystNode:
                 "校验HTTPS证书": ("BOOLEAN", {"default": True}),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "图片1": ("IMAGE",),
                 "图片2": ("IMAGE",),
                 "图片3": ("IMAGE",),
@@ -678,7 +681,7 @@ class TikpanGemini3FlashPreviewAnalystNode:
         start = time.time()
         values = dict(kwargs)
         api_key = str(values.get("API_密钥") or "").strip()
-        base_url = API_HOST
+        base_url = normalize_api_host(pick(values, "中转站地址", "api_host", default=API_HOST_OPTIONS[0]))
         model = str(values.get("模型") or MODEL_NAME).strip()
         use_cache = bool(values.get("复用本地缓存", True))
         skip_error = bool(values.get("跳过错误", False))
@@ -753,7 +756,7 @@ class TikpanGemini3FlashPreviewAnalystNode:
             log = (
                 f"OK {model} 分析完成 | {media_summary} | finish_reason={finish_reason} | safety={safety} | "
                 f"max_output_tokens={payload.get('generationConfig', {}).get('maxOutputTokens')} | "
-                f"usage={usage or '上游未返回'} | elapsed={elapsed}s | api={API_HOST}{api_path} | post_retry={post_retry}"
+                f"usage={usage or '上游未返回'} | elapsed={elapsed}s | api={base_url}{api_path} | post_retry={post_retry}"
             )
             self.save_recovery_record(
                 cache_key,

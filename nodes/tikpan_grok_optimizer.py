@@ -2,6 +2,7 @@
 import json
 import requests
 import urllib3
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host
 import comfy.utils
 import comfy.model_management
 
@@ -19,25 +20,26 @@ class TikpanGrokPromptOptimizerNode:
                 "Tikpan_API密钥": ("STRING", {"default": "sk-"}),
                 "文本处理模型": (["gpt-5.4-mini", "gpt-4o", "gpt-4-turbo", "claude-3.5-sonnet"], {"default": "gpt-5.4-mini"}),
                 "Gemini原片拆解报告": ("STRING", {"forceInput": True, "multiline": True, "tooltip": "连接Gemini视频分析节点的输出"}),
-                
+
                 "核心产品与植入场景": ("STRING", {
-                    "multiline": True, 
+                    "multiline": True,
                     "default": "【产品名称】：\n【核心功能/卖点】：\n【期望植入的场景或动作】：\n(例如：将原片中主角手里拿的水杯，替换成我的 @img1 某某香水，喷洒时要有闪耀的光影)"
                 }),
                 "氛围与运镜微调": ("STRING", {
-                    "multiline": True, 
+                    "multiline": True,
                     "default": "保留原片的丝滑运镜，将背景的色调改为具有未来科技感的赛博朋克风。"
                 }),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "校验HTTPS证书": ("BOOLEAN", {"default": True}),
             }
         }
-        
+
         # 🚀 动态对接 Grok3 的 7 图占位符系统
         for i in range(1, 8):
             inputs["optional"][f"图{i}_对应的主体描述"] = ("STRING", {"default": "", "tooltip": f"告诉GPT，@img{i} 到底是个什么东西？比如：一台银色的笔记本电脑"})
-            
+
         return inputs
 
     RETURN_TYPES = ("STRING", "STRING")
@@ -47,12 +49,13 @@ class TikpanGrokPromptOptimizerNode:
 
     def optimize_prompt(self, 获取密钥地址, Tikpan_API密钥, 文本处理模型, Gemini原片拆解报告, 核心产品与植入场景, 氛围与运镜微调, **kwargs):
         comfy.model_management.throw_exception_if_processing_interrupted()
-        
+
         if not Tikpan_API密钥 or len(Tikpan_API密钥) < 10:
             return ("❌ 请填写API密钥", "请前往 https://tikpan.com 获取")
 
         headers = {"Authorization": f"Bearer {Tikpan_API密钥}", "Content-Type": "application/json"}
-        
+        api_base_url = f"{normalize_api_host(kwargs.get('中转站地址', API_HOST_OPTIONS[0]))}/v1"
+
         # ====================================================================
         # 1. 🧠 构建多图占位符映射字典
         # ====================================================================
@@ -61,7 +64,7 @@ class TikpanGrokPromptOptimizerNode:
             desc = kwargs.get(f"图{i}_对应的主体描述", "").strip()
             if desc:
                 img_mappings.append(f"- @img{i} 代表：{desc}")
-                
+
         mapping_str = "\n".join(img_mappings)
         if not mapping_str:
             mapping_str = "用户本次没有提供特定参考图绑定。"
@@ -72,12 +75,12 @@ class TikpanGrokPromptOptimizerNode:
         system_prompt = """
         你是一位好莱坞级别的 AI 视频分镜编剧，同时也是精通 Grok-3 视频生成底层逻辑的顶级 Prompt 工程师。
         你的任务是：接收【原视频的拆解报告】，将用户指定的【新产品/新主体】完美、自然地“移植”到原视频的骨架中，生成一段极具画面感的纯英文 Grok-3 视频提示词。
-        
+
         ⚠️【绝对核心规则：Grok-3 多图锚点语法】⚠️
         用户可能会提供多个参考图。在 Grok-3 的语法中，必须使用 `@img1`, `@img2` 等标签紧贴在主体描述之前，来进行精准特征绑定！
         错误写法：A man holding a sword (@img1) running.
         正确写法：@img1 A man holding a sword running. / A person drives a @img2 red sports car.
-        
+
         【生成要求】：
         1. 深入分析【原片拆解报告】，保留其精髓（机位运动、物理规律、构图）。
         2. 根据用户的【核心产品与植入场景】，将旧主体替换为新主体，动作必须符合物理逻辑。
@@ -88,16 +91,16 @@ class TikpanGrokPromptOptimizerNode:
 
         user_prompt = f"""
         请根据以下信息开始重构：
-        
+
         === 原片底层拆解报告 ===
         {Gemini原片拆解报告}
-        
+
         === 新产品与植入要求 ===
         {核心产品与植入场景}
-        
+
         === 氛围与运镜调整 ===
         {氛围与运镜微调}
-        
+
         === 本次可用的图像锚点映射 ===
         {mapping_str}
         请务必在最终的英文 Prompt 中，在对应主体的英文单词前，精准植入上述 @img 标签！
@@ -116,7 +119,7 @@ class TikpanGrokPromptOptimizerNode:
 
         try:
             res = requests.post(
-                f"{HARDCODED_BASE_URL}/chat/completions",
+                f"{api_base_url}/chat/completions",
                 json=payload,
                 headers=headers,
                 verify=bool(kwargs.get("校验HTTPS证书", True)),
@@ -125,7 +128,7 @@ class TikpanGrokPromptOptimizerNode:
             res.raise_for_status()
             res_data = res.json()
             full_response = res_data.get("choices", [{}])[0].get("message", {}).get("content", "")
-            
+
             # 解析 <think> 思考过程和最终 Prompt
             if "<think>" in full_response and "</think>" in full_response:
                 think_part = full_response.split("</think>")[0].replace("<think>", "").strip()
@@ -133,7 +136,7 @@ class TikpanGrokPromptOptimizerNode:
             else:
                 think_part = "模型未返回标准思考格式。"
                 final_prompt = full_response.strip()
-                
+
             # 去除可能包含的 markdown 代码块符号
             if final_prompt.startswith("```"):
                 final_prompt = "\n".join(final_prompt.split("\n")[1:])

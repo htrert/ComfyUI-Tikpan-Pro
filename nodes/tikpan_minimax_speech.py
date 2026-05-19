@@ -16,6 +16,19 @@ import comfy.model_management
 import comfy.utils
 import folder_paths
 
+try:
+    from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host
+except Exception:
+    import importlib.util
+
+    _options_spec = importlib.util.spec_from_file_location(
+        "tikpan_node_options", Path(__file__).with_name("tikpan_node_options.py")
+    )
+    _options_module = importlib.util.module_from_spec(_options_spec)
+    _options_spec.loader.exec_module(_options_module)
+    API_HOST_OPTIONS = _options_module.API_HOST_OPTIONS
+    normalize_api_host = _options_module.normalize_api_host
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -172,6 +185,7 @@ class TikpanMiniMaxSpeech28BaseNode:
                 "校验HTTPS证书": ("BOOLEAN", {"default": True}),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "自定义voice_id": (
                     "STRING",
                     {
@@ -687,7 +701,8 @@ class TikpanMiniMaxSpeech28BaseNode:
         skip_error = bool(values.get("跳过错误", False))
         use_cache = bool(values.get("复用本地缓存", True))
         audio_format = values.get("音频格式", "mp3")
-        base_url = MINIMAX_API_BASE_URL
+        api_host = normalize_api_host(pick(values, "中转站地址", "api_host", default=API_HOST_OPTIONS[0]))
+        base_url = f"{api_host}/minimax/v1"
         post_retry = str(values.get("POST重试策略") or "幂等键轻重试") == "幂等键轻重试"
         verify_tls = bool(values.get("校验HTTPS证书", True))
 

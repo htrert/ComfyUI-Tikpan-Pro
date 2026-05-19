@@ -7,6 +7,19 @@ provider values.  Dropdown labels use the pattern ``中文说明｜raw_value``.
 OPTION_SEPARATOR = "｜"
 
 
+TIKPAN_API_HOST = "https://tikpan.com"
+API_HOST_OPTIONS = [TIKPAN_API_HOST]
+
+
+def normalize_api_host(value=None, default=TIKPAN_API_HOST):
+    """Return a supported relay host without a trailing slash."""
+    text = option_value(value, default)
+    host = str(text or default).strip().rstrip("/")
+    if host in API_HOST_OPTIONS:
+        return host
+    return str(default).strip().rstrip("/")
+
+
 def option_value(value, default=""):
     """Return the raw API value from a Chinese dropdown label."""
     if value is None:

@@ -15,6 +15,19 @@ from urllib3.util.retry import Retry
 import comfy.utils
 import folder_paths
 
+try:
+    from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host
+except Exception:
+    import importlib.util
+
+    _options_spec = importlib.util.spec_from_file_location(
+        "tikpan_node_options", Path(__file__).with_name("tikpan_node_options.py")
+    )
+    _options_module = importlib.util.module_from_spec(_options_spec)
+    _options_spec.loader.exec_module(_options_module)
+    API_HOST_OPTIONS = _options_module.API_HOST_OPTIONS
+    normalize_api_host = _options_module.normalize_api_host
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -106,6 +119,7 @@ class TikpanGemini31FlashTTSNode:
                 "校验HTTPS证书": ("BOOLEAN", {"default": True}),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "自定义voice_name": (
                     "STRING",
                     {
@@ -446,7 +460,7 @@ class TikpanGemini31FlashTTSNode:
         language_code = str(values.get("语言代码") or "").strip()
         style = str(values.get("语气指令") or "").strip()
         sample_rate = int(values.get("采样率") or 24000)
-        base_url = API_HOST
+        base_url = normalize_api_host(pick(values, "中转站地址", "api_host", default=API_HOST_OPTIONS[0]))
         post_retry = str(values.get("POST重试策略") or "幂等键轻重试") == "幂等键轻重试"
         verify_tls = bool(values.get("校验HTTPS证书", True))
         use_cache = bool(values.get("复用本地缓存", True))
@@ -541,7 +555,7 @@ class TikpanGemini31FlashTTSNode:
             elapsed = round(time.time() - start_time, 2)
             log = (
                 f"OK {MODEL_NAME} 语音生成成功 | voice={voice} | source={source} | mime={mime_type or 'pcm'} | "
-                f"用量={usage or '上游未返回'} | 耗时={elapsed}s | api={API_HOST}{api_path} | "
+                f"用量={usage or '上游未返回'} | 耗时={elapsed}s | api={base_url}{api_path} | "
                 f"post_retry={post_retry} | 音频={audio_path}"
             )
             self.save_recovery_record(

@@ -18,7 +18,7 @@ from .tikpan_happyhorse_common import (
     is_success_status,
     video_from_path,
 )
-from .tikpan_node_options import normalize_seed
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, normalize_seed
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -52,31 +52,34 @@ class TikpanVeoVideoNode:
                 "比例": (["16:9", "9:16"], {"default": "16:9"}),
                 "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
             },
-            "optional": {}
+            "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+            },
         }
-        
+
         inputs["optional"]["参考图_首帧"] = ("IMAGE",)
         inputs["optional"]["参考图_尾帧"] = ("IMAGE",)
         for i in range(1, 4):
             inputs["optional"][f"垫图_{i}"] = ("IMAGE",)
         inputs["optional"]["校验HTTPS证书"] = ("BOOLEAN", {"default": True})
-            
+
         return inputs
 
     RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "VIDEO")
     RETURN_NAMES = ("📁_本地保存路径", "🏷️_任务ID", "🔗_视频云端直链", "📄_完整日志", "🎬_视频输出")
-    OUTPUT_NODE = True 
+    OUTPUT_NODE = True
     FUNCTION = "execute"
     CATEGORY = "👑 Tikpan 官方独家节点"
 
     def execute(self, 获取密钥请访问, API_密钥, Veo专属提示词, 模型选择, 比例, 随机种子=888888, **kwargs):
         comfy.model_management.throw_exception_if_processing_interrupted()
-        
+
         if not API_密钥 or len(API_密钥) < 10:
             return ("❌ 请填写API密钥", "无", "无", "请填写密钥", None)
         if 模型选择 not in VEO_MODEL_OPTIONS:
             return ("❌ 模型选择无效", "无", "无", f"不支持的模型: {模型选择}", None)
         verify_tls = bool(kwargs.get("校验HTTPS证书", True))
+        api_host = normalize_api_host(kwargs.get("中转站地址", API_HOST_OPTIONS[0]))
         seed = normalize_seed(kwargs.get("seed", 随机种子), default=888888, maximum=2147483647)
 
         # /v1/videos 使用 multipart form；/v1/video/create 使用项目内旧视频统一 JSON 格式。
@@ -90,7 +93,7 @@ class TikpanVeoVideoNode:
             i_arr = 255. * img_tensor[0].cpu().numpy()
             p_img = Image.fromarray(np.clip(i_arr, 0, 255).astype(np.uint8))
             buf = BytesIO()
-            p_img.save(buf, format="JPEG", quality=85) 
+            p_img.save(buf, format="JPEG", quality=85)
             return buf.getvalue()
 
         def bytes_to_data_url(image_bytes):
@@ -114,13 +117,13 @@ class TikpanVeoVideoNode:
 
         # 🚀 重点3：把文本参数和文件参数分开打包 (data 放文本，files 放图片)
         form_data = {
-            "model": 模型选择, 
-            "prompt": Veo专属提示词, 
+            "model": 模型选择,
+            "prompt": Veo专属提示词,
             "aspect_ratio": 比例,
             "seed": str(seed) # 表单要求全是字符串
         }
         endpoint_path = "/v1/video/create" if 模型选择 in VEO_CREATE_ENDPOINT_MODELS else "/v1/videos"
-        
+
         form_files = []
         if first_frame_bytes:
             # 格式：("字段名", ("文件名", 文件二进制流, "MIME类型"))
@@ -146,7 +149,7 @@ class TikpanVeoVideoNode:
                 if reference_images:
                     payload["images"] = [bytes_to_data_url(image_bytes) for image_bytes in reference_images]
                 create_resp = session.post(
-                    f"{HARDCODED_BASE_URL}{endpoint_path}",
+                    f"{api_host}{endpoint_path}",
                     json=payload,
                     headers=json_headers,
                     verify=verify_tls,
@@ -154,7 +157,7 @@ class TikpanVeoVideoNode:
                 )
             else:
                 create_resp = session.post(
-                    f"{HARDCODED_BASE_URL}{endpoint_path}",
+                    f"{api_host}{endpoint_path}",
                     data=form_data,
                     files=form_files if form_files else None,
                     headers=headers,
@@ -170,7 +173,7 @@ class TikpanVeoVideoNode:
                     None,
                 )
             res = create_resp.json()
-            
+
             task_id = (
                 res.get("id")
                 or res.get("task_id")
@@ -181,13 +184,13 @@ class TikpanVeoVideoNode:
                 task_id = task_id or res["data"].get("id") or res["data"].get("task_id") or res["data"].get("taskId")
 
             direct_url = extract_video_url(res)
-            
+
             if direct_url:
                 video_url = direct_url
                 task_id = task_id or "sync_task"
-            elif not task_id: 
+            elif not task_id:
                 return ("❌ 任务创建失败", "无", "无", json.dumps(res, ensure_ascii=False), None)
-                
+
         except Exception as e:
             return (f"❌ 网络/表单错误: {e}", "无", "无", str(e), None)
 
@@ -195,7 +198,7 @@ class TikpanVeoVideoNode:
         pbar = comfy.utils.ProgressBar(100)
         video_url = direct_url if 'direct_url' in locals() and direct_url else ""
         final_data = res
-        
+
         # 轮询状态
         if not video_url:
             wait_time = 0
@@ -207,19 +210,19 @@ class TikpanVeoVideoNode:
 
                 try:
                     query_url = (
-                        f"{HARDCODED_BASE_URL}/v1/video/query?id={task_id}"
+                        f"{api_host}/v1/video/query?id={task_id}"
                         if endpoint_path == "/v1/video/create"
-                        else f"{HARDCODED_BASE_URL}/v1/videos/{task_id}"
+                        else f"{api_host}/v1/videos/{task_id}"
                     )
                     status_resp = session.get(query_url, headers=headers, verify=verify_tls, timeout=30)
                     status_res = status_resp.json()
                     final_data = status_res
-                    
+
                     if wait_time % 15 == 0:
                         print(f"[Veo 3.1] ⏳ 云端渲染中，请耐心等待... 模型: {模型选择} | 已耗时: {wait_time} 秒")
 
                     state = extract_task_status(status_res)
-                    
+
                     if is_success_status(state):
                         pbar.update_absolute(100, 100)
                         print(f"[Veo 3.1] ✅ 渲染完成！总耗时: {wait_time} 秒")
@@ -267,7 +270,7 @@ class TikpanVeoVideoNode:
             filename = f"Tikpan_Veo_{safe_model}_{safe_id}.mp4"
             out_dir = folder_paths.get_output_directory()
             path = os.path.join(out_dir, filename)
-            
+
             with open(path, "wb") as f: f.write(response.content)
             video_output = video_from_path(path)
             log_text = (

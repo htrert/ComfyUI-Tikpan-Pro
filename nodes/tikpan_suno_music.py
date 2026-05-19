@@ -10,7 +10,7 @@ import folder_paths
 
 import comfy.utils
 import comfy.model_management
-from .tikpan_node_options import SUNO_MODEL_OPTIONS, SUNO_STYLE_OPTIONS, SUNO_VOCAL_GENDER_OPTIONS, option_value
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, SUNO_MODEL_OPTIONS, SUNO_STYLE_OPTIONS, SUNO_VOCAL_GENDER_OPTIONS, option_value
 
 # 屏蔽 verify=False 告警
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -58,6 +58,7 @@ class TikpanSunoMusicNode:
                 "生成纯音乐": ("BOOLEAN", {"default": False}),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "负面风格标签": ("STRING", {"default": ""}),
                 "发送高级Suno参数": (
                     "BOOLEAN",
@@ -394,10 +395,10 @@ class TikpanSunoMusicNode:
             print(f"[Tikpan-Suno] ⚠️ 音频流解码失败，只返回文件路径: {e}", flush=True)
             return self.empty_audio()
 
-    def fetch_status(self, session, headers, task_id):
+    def fetch_status(self, session, headers, task_id, api_base_url=API_BASE_URL):
         fetch_urls = [
-            f"{API_BASE_URL}/suno/fetch/{task_id}",
-            f"{API_BASE_URL}/suno/fetch?id={task_id}",
+            f"{api_base_url}/suno/fetch/{task_id}",
+            f"{api_base_url}/suno/fetch?id={task_id}",
         ]
 
         last_response = None
@@ -422,7 +423,7 @@ class TikpanSunoMusicNode:
                 return response
 
         response = session.post(
-            f"{API_BASE_URL}/suno/fetch",
+            f"{api_base_url}/suno/fetch",
             json={"ids": [task_id]},
             headers=headers,
             timeout=(15, 30),
@@ -470,6 +471,7 @@ class TikpanSunoMusicNode:
 
     def generate_music(self, **kwargs):
         api_key = str(kwargs.get("API_密钥") or "").strip()
+        api_base_url = f"{normalize_api_host(kwargs.get('中转站地址', API_HOST_OPTIONS[0]))}/v1"
         mode = kwargs.get("🎵_生成模式", "自定义模式")
         title = str(kwargs.get("歌曲标题") or "").strip()
         prompt = str(kwargs.get("创作提示词") or "").strip()
@@ -537,7 +539,7 @@ class TikpanSunoMusicNode:
             print(f"[Tikpan-Suno] 📋 请求参数: {self.safe_json_text(payload, 400)}", flush=True)
 
             response = session.post(
-                f"{API_BASE_URL}/suno/submit/music",
+                f"{api_base_url}/suno/submit/music",
                 json=payload,
                 headers=headers,
                 timeout=(15, 60),
@@ -570,7 +572,7 @@ class TikpanSunoMusicNode:
                 comfy.model_management.throw_exception_if_processing_interrupted()
 
                 try:
-                    status_response = self.fetch_status(session, headers, task_id)
+                    status_response = self.fetch_status(session, headers, task_id, api_base_url)
 
                     if status_response is None or status_response.status_code != 200:
                         continue

@@ -22,6 +22,8 @@ from .tikpan_gpt_image_recovery import (
     short_hash,
 )
 from .tikpan_node_options import (
+    API_HOST_OPTIONS,
+    normalize_api_host,
     IMAGE_FORMAT_OPTIONS,
     MODERATION_OPTIONS,
     QUALITY_OPTIONS,
@@ -103,6 +105,7 @@ class TikpanGptImage2OfficialNode:
                 }),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "返回格式": (IMAGE_FORMAT_OPTIONS, {"default": "PNG｜png"}),
                 "跳过错误": ("BOOLEAN", {
                     "default": False,
@@ -120,6 +123,7 @@ class TikpanGptImage2OfficialNode:
         start_time = time.time()
 
         api_key = (kwargs.get("API_密钥") or "").strip()
+        api_host = normalize_api_host(pick(kwargs, "中转站地址", "api_host", default=API_HOST_OPTIONS[0]))
         prompt = (kwargs.get("生成指令") or "").strip()
         model = kwargs.get("模型", "gpt-image-2")
         tier = kwargs.get("分辨率档位", "1K (1024)")
@@ -209,7 +213,7 @@ class TikpanGptImage2OfficialNode:
                 size=target_res,
             )
 
-            url = f"{API_BASE_URL}/v1/images/generations"
+            url = f"{api_host}/v1/images/generations"
             pbar.update(25)
 
             try:
@@ -476,33 +480,73 @@ class TikpanGptImage2OfficialNode:
             return "无法解析上游响应"
 
     def extract_image_result(self, res_json):
+        seen = set()
+
+        def extract_one(item):
+            if not isinstance(item, dict):
+                return None
+            url = item.get("url") or item.get("image_url") or item.get("imageUrl")
+            if url:
+                return url, "url"
+            image_value = item.get("image")
+            if isinstance(image_value, str) and image_value.startswith("http"):
+                return image_value, "url"
+            b64 = item.get("b64_json") or item.get("image_base64") or item.get("base64")
+            if not b64 and isinstance(image_value, str):
+                b64 = image_value
+            data_value = item.get("data")
+            if not b64 and isinstance(data_value, str) and data_value.startswith("data:image"):
+                b64 = data_value
+            if b64:
+                return b64, "b64"
+            return None
+
+        def add(parsed):
+            if not parsed:
+                return None
+            key = (str(parsed[0]), parsed[1])
+            if key in seen:
+                return None
+            seen.add(key)
+            return parsed
+
         data = res_json.get("data", [])
-        if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
-            item = data[0]
-            img_raw = item.get("url") or item.get("b64_json") or item.get("image_base64")
-            if img_raw:
-                return img_raw, "url" if item.get("url") else "b64"
+        if isinstance(data, dict):
+            parsed = add(extract_one(data))
+            if parsed:
+                return parsed
+        elif isinstance(data, list):
+            for item in data:
+                parsed = add(extract_one(item))
+                if parsed:
+                    return parsed
 
-        if isinstance(res_json.get("result"), dict):
-            item = res_json["result"]
-            img_raw = item.get("url") or item.get("b64_json") or item.get("image_base64")
-            if img_raw:
-                return img_raw, "url" if item.get("url") else "b64"
+        for key in ("result", "output", "images"):
+            value = res_json.get(key)
+            if isinstance(value, dict):
+                parsed = add(extract_one(value))
+                if parsed:
+                    return parsed
+            elif isinstance(value, list):
+                for item in value:
+                    parsed = add(extract_one(item))
+                    if parsed:
+                        return parsed
 
-        img_raw = res_json.get("url") or res_json.get("b64_json") or res_json.get("image_base64")
-        if img_raw:
-            return img_raw, "url" if res_json.get("url") else "b64"
+        parsed = add(extract_one(res_json))
+        if parsed:
+            return parsed
 
         return None, None
 
     def load_result_image(self, session, img_raw, raw_type):
         if raw_type == "url" or str(img_raw).startswith("http"):
             r = get_with_retry(session, img_raw, timeout=(15, 180), verify=False, attempts=4)
-            return Image.open(BytesIO(r.content))
+            return Image.open(BytesIO(r.content)).convert("RGB")
 
         b64_clean = img_raw.split("base64,")[-1] if isinstance(img_raw, str) else img_raw
         image_bytes = base64.b64decode(b64_clean)
-        return Image.open(BytesIO(image_bytes))
+        return Image.open(BytesIO(image_bytes)).convert("RGB")
 
     def black_image(self, w, h):
         return torch.zeros((1, h, w, 3), dtype=torch.float32)

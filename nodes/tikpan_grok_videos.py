@@ -13,8 +13,14 @@ from PIL import Image
 
 import comfy.utils
 import comfy.model_management
-from .tikpan_happyhorse_common import video_from_path
-from .tikpan_node_options import GROK_ASPECT_OPTIONS, GROK_DURATION_OPTIONS, normalize_seed, option_value, pick
+from .tikpan_happyhorse_common import (
+    extract_task_status,
+    extract_video_url,
+    is_failure_status,
+    is_success_status,
+    video_from_path,
+)
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, GROK_ASPECT_OPTIONS, GROK_DURATION_OPTIONS, normalize_seed, option_value, pick
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -49,6 +55,7 @@ class TikpanGrokVideoNode:
                 "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "参考图1": ("IMAGE",),
                 "参考图2": ("IMAGE",),
                 "参考图3": ("IMAGE",),
@@ -81,6 +88,7 @@ class TikpanGrokVideoNode:
         print(f"[Tikpan-GrokVideo] 📦 收到参数: {list(kwargs.keys())}", flush=True)
 
         api_key = str(pick(kwargs, "API_密钥", "api_key", default="") or "").strip()
+        api_base_url = f"{normalize_api_host(kwargs.get('中转站地址', API_HOST_OPTIONS[0]))}/v1"
         prompt = str(pick(kwargs, "生成指令", "prompt", default="") or "").strip()
         model = pick(kwargs, "模型", "model", default="grok-videos") or "grok-videos"
         duration = option_value(pick(kwargs, "视频时长", "duration", default="6秒｜6s"), "6s")
@@ -140,7 +148,7 @@ class TikpanGrokVideoNode:
             print(f"[Tikpan-GrokVideo] 📡 正在提交视频生成任务...", flush=True)
 
             response = session.post(
-                f"{API_BASE_URL}/videos",
+                f"{api_base_url}/videos",
                 json=payload,
                 headers=headers,
                 timeout=(15, 60),
@@ -156,7 +164,7 @@ class TikpanGrokVideoNode:
             except Exception:
                 return ("❌ 任务创建失败：返回不是合法 JSON", "无", response.text[:500], None)
 
-            task_id = res_json.get("id") or res_json.get("task_id")
+            task_id = self.extract_task_id(res_json)
 
             if not task_id:
                 return ("❌ 任务创建失败：未获取到任务ID", "无", json.dumps(res_json, ensure_ascii=False), None)
@@ -172,7 +180,7 @@ class TikpanGrokVideoNode:
 
                 try:
                     status_response = session.get(
-                        f"{API_BASE_URL}/videos/query?id={task_id}",
+                        f"{api_base_url}/videos/query?id={task_id}",
                         headers=headers,
                         timeout=(15, 30),
                         verify=False,
@@ -188,7 +196,8 @@ class TikpanGrokVideoNode:
                         print(f"[Tikpan-GrokVideo] ⚠️ 查询返回非 JSON: {status_response.text[:300]}", flush=True)
                         continue
 
-                    state = str(status_json.get("status", "")).lower()
+                    state_raw = extract_task_status(status_json) or status_json.get("status", "")
+                    state = str(state_raw).lower()
 
                     progress = status_json.get("progress", 0)
                     if isinstance(progress, str):
@@ -201,9 +210,9 @@ class TikpanGrokVideoNode:
 
                     print(f"[Tikpan-GrokVideo] 🔄 轮询中... (第{poll_count + 1}次) | 状态: {state}", flush=True)
 
-                    if state in ["success", "succeeded", "completed", "finished"]:
+                    if is_success_status(state_raw):
                         pbar.update_absolute(100, 100)
-                        video_url = status_json.get("video_url") or status_json.get("url")
+                        video_url = extract_video_url(status_json)
                         if not video_url:
                             return ("❌ 任务完成但未获取到视频地址", "无", json.dumps(status_json, ensure_ascii=False), None)
 
@@ -229,7 +238,7 @@ class TikpanGrokVideoNode:
                         )
                         return (save_path, video_url, log_text, video_from_path(save_path))
 
-                    elif state in ["failed", "error", "cancelled"]:
+                    elif is_failure_status(state_raw):
                         error_msg = status_json.get("error", "未知错误")
                         return (f"❌ 视频生成失败: {error_msg}", "无", json.dumps(status_json, ensure_ascii=False), None)
 
@@ -243,6 +252,19 @@ class TikpanGrokVideoNode:
             tb = traceback.format_exc()
             print(f"[Tikpan-GrokVideo] ❌ 异常: {e}\n{tb}", flush=True)
             return (f"❌ 运行异常: {str(e)}", "无", tb, None)
+
+
+    def extract_task_id(self, res_json):
+        if not isinstance(res_json, dict):
+            return ""
+        for obj in (res_json, res_json.get("data"), res_json.get("result"), res_json.get("output")):
+            if isinstance(obj, dict):
+                value = obj.get("task_id") or obj.get("taskId") or obj.get("id")
+                if value:
+                    return str(value).strip()
+            elif isinstance(obj, str) and obj.strip():
+                return obj.strip()
+        return ""
 
 
 NODE_CLASS_MAPPINGS = {

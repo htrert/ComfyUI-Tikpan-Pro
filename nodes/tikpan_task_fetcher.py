@@ -27,7 +27,7 @@ from .tikpan_happyhorse_common import (
     is_success_status,
     video_from_path,
 )
-from .tikpan_node_options import pick
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, pick
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -117,6 +117,9 @@ class TikpanTaskFetcherNode:
                     {"default": 10, "min": 5, "max": 60, "step": 5},
                 ),
             },
+            "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+            },
         }
 
     RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "VIDEO")
@@ -128,6 +131,7 @@ class TikpanTaskFetcherNode:
     def fetch_and_download(self, **kwargs):
         try:
             api_key = str(pick(kwargs, "API_密钥", "api_key", default="") or "").strip()
+            self.api_base_url = normalize_api_host(pick(kwargs, "中转站地址", "api_host", default=API_HOST_OPTIONS[0]))
             task_id = str(pick(kwargs, "任务ID", "task_id", default="") or "").strip()
             file_prefix = str(pick(kwargs, "文件名前缀", "file_prefix", default="Tikpan_Task") or "Tikpan_Task").strip()
             max_wait_seconds = int(pick(kwargs, "最长等待秒数", "max_wait_seconds", default=600) or 600)
@@ -201,7 +205,8 @@ class TikpanTaskFetcherNode:
 
     def _poll(self, session, api_key, task_id, max_wait_seconds, poll_interval, pbar):
         """轮询任务状态，返回 (success, media_url_or_error, raw_response)"""
-        url = f"{BASE_URL}/alibailian/api/v1/tasks/{task_id}"
+        base_url = getattr(self, "api_base_url", BASE_URL)
+        url = f"{base_url}/alibailian/api/v1/tasks/{task_id}"
         headers = {"Authorization": f"Bearer {api_key}"}
 
         print(f"[TikpanFetcher] 🔄 开始轮询 task_id={task_id}", flush=True)

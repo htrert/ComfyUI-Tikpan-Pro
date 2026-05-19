@@ -6,6 +6,19 @@ from .nodes.tikpan_happyhorse_t2v import TikpanHappyHorseT2VNode
 from .nodes.tikpan_happyhorse_r2v import TikpanHappyHorseR2VNode
 from .nodes.tikpan_happyhorse_video_edit import TikpanHappyHorseVideoEditNode
 from .nodes.tikpan_grok_video import TikpanExclusiveVideoNode
+from .nodes.tikpan_grok_imagine_image import (
+    TikpanGrokImagineImageNode,
+    TikpanGrokImagineImageProNode,
+    TikpanGrokImagineImageEditNode,
+    TikpanGrokImagineImageProEditNode,
+)
+from .nodes.tikpan_parallel_image_engine import TikpanParallelImageEngineNode
+from .nodes.tikpan_async_nodes import (
+    TikpanAsyncImageSubmitNode,
+    TikpanAsyncImageResultNode,
+    TikpanAsyncImageJoinNode,
+    TikpanAsyncTaskListNode,
+)
 from .nodes.tikpan_gemini_image import TikpanGeminiImageMaxNode
 from .nodes.tikpan_gemini_video_analyst import TikpanGeminiVideoAnalystNode
 from .nodes.tikpan_gemini_tts import TikpanGemini31FlashTTSNode
@@ -33,6 +46,15 @@ NODE_CLASS_MAPPINGS = {
     "TikpanHappyHorseR2VNode": TikpanHappyHorseR2VNode,
     "TikpanHappyHorseVideoEditNode": TikpanHappyHorseVideoEditNode,
     "TikpanExclusiveVideoNode": TikpanExclusiveVideoNode,
+    "TikpanGrokImagineImageNode": TikpanGrokImagineImageNode,
+    "TikpanGrokImagineImageProNode": TikpanGrokImagineImageProNode,
+    "TikpanGrokImagineImageEditNode": TikpanGrokImagineImageEditNode,
+    "TikpanGrokImagineImageProEditNode": TikpanGrokImagineImageProEditNode,
+    "TikpanParallelImageEngineNode": TikpanParallelImageEngineNode,
+    "TikpanAsyncImageSubmitNode": TikpanAsyncImageSubmitNode,
+    "TikpanAsyncImageResultNode": TikpanAsyncImageResultNode,
+    "TikpanAsyncImageJoinNode": TikpanAsyncImageJoinNode,
+    "TikpanAsyncTaskListNode": TikpanAsyncTaskListNode,
     "TikpanGeminiImageMaxNode": TikpanGeminiImageMaxNode,
     "TikpanGeminiVideoAnalystNode": TikpanGeminiVideoAnalystNode,
     "TikpanGemini31FlashTTSNode": TikpanGemini31FlashTTSNode,
@@ -62,6 +84,15 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanHappyHorseR2VNode": "🐴 Tikpan：HappyHorse 1.0 R2V 参考生视频",
     "TikpanHappyHorseVideoEditNode": "🐴 Tikpan：HappyHorse 1.0 Video-Edit 视频编辑",
     "TikpanExclusiveVideoNode": "🎬 Tikpan：Grok3 直出视频生成",
+    "TikpanGrokImagineImageNode": "🎨 Tikpan：Grok Imagine Image 生图",
+    "TikpanGrokImagineImageProNode": "🎨 Tikpan：Grok Imagine Image Pro 生图",
+    "TikpanGrokImagineImageEditNode": "🎨 Tikpan：Grok Imagine Image 参考图/修图",
+    "TikpanGrokImagineImageProEditNode": "🎨 Tikpan：Grok Imagine Image Pro 参考图/修图",
+    "TikpanParallelImageEngineNode": "⚡ Tikpan：API 多模型并发生图引擎",
+    "TikpanAsyncImageSubmitNode": "Tikpan Async: Submit Image Task",
+    "TikpanAsyncImageResultNode": "Tikpan Async: Query Image Result",
+    "TikpanAsyncImageJoinNode": "Tikpan Async: Join Image Tasks",
+    "TikpanAsyncTaskListNode": "Tikpan Async: Recent Tasks",
     "TikpanGeminiImageMaxNode": "👑 Tikpan：Gemini 14图极限生图",
     "TikpanGeminiVideoAnalystNode": "👁️ Tikpan：AI音视频双轨智能解构",
     "TikpanGemini31FlashTTSNode": "🎙️ Tikpan: Gemini 3.1 Flash TTS Preview",

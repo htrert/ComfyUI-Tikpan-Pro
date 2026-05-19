@@ -36,7 +36,7 @@ from .tikpan_happyhorse_common import (
     normalize_resolution,
     video_from_path,
 )
-from .tikpan_node_options import VIDEO_DURATION_OPTIONS, WATERMARK_OPTIONS, normalize_seed, option_int, pick
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, VIDEO_DURATION_OPTIONS, WATERMARK_OPTIONS, normalize_seed, option_int, pick
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -153,6 +153,9 @@ class TikpanHappyHorseT2VNode:
                     {"default": 10, "min": 5, "max": 60, "step": 5},
                 ),
             },
+            "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+            },
         }
 
     RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "VIDEO")
@@ -170,7 +173,8 @@ class TikpanHappyHorseT2VNode:
         提交异步视频生成任务
         返回 (success: bool, task_id_or_error: str)
         """
-        url = f"{BASE_URL}/alibailian/api/v1/services/aigc/video-generation/video-synthesis"
+        base_url = getattr(self, "api_base_url", BASE_URL)
+        url = f"{base_url}/alibailian/api/v1/services/aigc/video-generation/video-synthesis"
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -244,7 +248,8 @@ class TikpanHappyHorseT2VNode:
         轮询任务状态，直至成功/失败/超时
         返回 (success: bool, video_url_or_error: str, raw_response: dict)
         """
-        url = f"{BASE_URL}/alibailian/api/v1/tasks/{task_id}"
+        base_url = getattr(self, "api_base_url", BASE_URL)
+        url = f"{base_url}/alibailian/api/v1/tasks/{task_id}"
         headers = {"Authorization": f"Bearer {api_key}"}
 
         print(f"[HappyHorse-T2V] 🔄 开始轮询（每 {poll_interval} 秒，最长 {max_wait_seconds}s）...", flush=True)
@@ -354,6 +359,7 @@ class TikpanHappyHorseT2VNode:
         try:
             # 解析参数
             api_key = str(pick(kwargs, "API_密钥", "api_key", default="") or "").strip()
+            self.api_base_url = normalize_api_host(pick(kwargs, "中转站地址", "api_host", default=API_HOST_OPTIONS[0]))
             prompt = str(pick(kwargs, "生成指令", "prompt", default="") or "").strip()
             mode = str(pick(kwargs, "执行方式", "mode", default="同步 (等待生成并下载)") or "同步 (等待生成并下载)")
             resolution = normalize_resolution(str(pick(kwargs, "清晰度", "resolution", default="1080P") or "1080P"))

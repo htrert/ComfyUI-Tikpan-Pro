@@ -42,7 +42,7 @@ from .tikpan_happyhorse_common import (
     normalize_resolution,
     video_from_path,
 )
-from .tikpan_node_options import VIDEO_DURATION_OPTIONS, WATERMARK_OPTIONS, normalize_seed, option_int, pick
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, VIDEO_DURATION_OPTIONS, WATERMARK_OPTIONS, normalize_seed, option_int, pick
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -160,6 +160,7 @@ class TikpanHappyHorseVideoEditNode:
                 ),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "视频URL": (
                     "STRING",
                     {
@@ -227,9 +228,9 @@ class TikpanHappyHorseVideoEditNode:
         upload_headers = {"Authorization": f"Bearer {api_key}"}
         files = {"file": (video_filename, video_bytes, mime_type)}
         upload_endpoints = [
-            f"{BASE_URL}/alibailian/api/v1/upload",
-            f"{BASE_URL}/v1/upload",
-            f"{BASE_URL}/upload",
+            f"{base_url}/alibailian/api/v1/upload",
+            f"{base_url}/v1/upload",
+            f"{base_url}/upload",
         ]
 
         last_error = None
@@ -258,7 +259,8 @@ class TikpanHappyHorseVideoEditNode:
                     )
                     if url:
                         if not url.startswith("http"):
-                            url = f"{BASE_URL}/{url.lstrip('/')}"
+                            base_url = getattr(self, "api_base_url", BASE_URL)
+                            url = f"{base_url}/{url.lstrip('/')}"
                         print(f"[HappyHorse-VideoEdit] ✅ 视频上传成功: {url[:80]}", flush=True)
                         if pbar:
                             pbar.update_absolute(5, 100)  # 上传完成，进度到 5%
@@ -337,9 +339,9 @@ class TikpanHappyHorseVideoEditNode:
         upload_headers = {"Authorization": f"Bearer {api_key}"}
         files = {"file": (f"ref_{index}.jpg", img_bytes, "image/jpeg")}
         upload_endpoints = [
-            f"{BASE_URL}/alibailian/api/v1/upload",
-            f"{BASE_URL}/v1/upload",
-            f"{BASE_URL}/upload",
+            f"{base_url}/alibailian/api/v1/upload",
+            f"{base_url}/v1/upload",
+            f"{base_url}/upload",
         ]
 
         last_error = None
@@ -367,7 +369,8 @@ class TikpanHappyHorseVideoEditNode:
                     )
                     if url:
                         if not url.startswith("http"):
-                            url = f"{BASE_URL}/{url.lstrip('/')}"
+                            base_url = getattr(self, "api_base_url", BASE_URL)
+                            url = f"{base_url}/{url.lstrip('/')}"
                         print(f"[HappyHorse-VideoEdit] ✅ 参考图{index}上传成功", flush=True)
                         # 更新进度
                         completed[0] += 1
@@ -445,7 +448,8 @@ class TikpanHappyHorseVideoEditNode:
     # ---------- 任务提交 ----------
 
     def submit_task(self, session, api_key, prompt, video_url, reference_urls, resolution, duration, watermark, seed):
-        url = f"{BASE_URL}/alibailian/api/v1/services/aigc/video-generation/video-synthesis"
+        base_url = getattr(self, "api_base_url", BASE_URL)
+        url = f"{base_url}/alibailian/api/v1/services/aigc/video-generation/video-synthesis"
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -500,7 +504,8 @@ class TikpanHappyHorseVideoEditNode:
     # ---------- 轮询 ----------
 
     def poll_task(self, session, api_key, task_id, max_wait_seconds, poll_interval, pbar):
-        url = f"{BASE_URL}/alibailian/api/v1/tasks/{task_id}"
+        base_url = getattr(self, "api_base_url", BASE_URL)
+        url = f"{base_url}/alibailian/api/v1/tasks/{task_id}"
         headers = {"Authorization": f"Bearer {api_key}"}
 
         print(f"[HappyHorse-VideoEdit] 🔄 开始轮询（每 {poll_interval} 秒，最长 {max_wait_seconds}s）...", flush=True)
@@ -589,6 +594,7 @@ class TikpanHappyHorseVideoEditNode:
     def generate_video(self, **kwargs):
         try:
             api_key = str(pick(kwargs, "API_密钥", "api_key", default="") or "").strip()
+            self.api_base_url = normalize_api_host(pick(kwargs, "中转站地址", "api_host", default=API_HOST_OPTIONS[0]))
             prompt = str(pick(kwargs, "编辑指令", "prompt", default="") or "").strip()
             mode = str(pick(kwargs, "执行方式", "mode", default="同步 (等待生成并下载)") or "同步 (等待生成并下载)")
             resolution = str(pick(kwargs, "清晰度", "resolution", default="1080P") or "1080P")

@@ -1,5 +1,25 @@
 # Changelog
 
+## [v1.2.0] - 2026-05-19
+
+### New Features
+
+- 新增 Grok Imagine Image / Grok Imagine Image Pro 生图节点，并补齐 Tikpan 福利入口、中文字段、生成张数、画面比例、清晰度与返回格式参数。
+- 新增 Grok Imagine Image / Pro 参考图修图节点，单独走 `/v1/images/edits`，支持最多 3 张参考图，避免把参考图误塞进纯文生图接口。
+- 新增 Tikpan Async Engine 与 Parallel Image Engine 节点，支持提交任务、查询结果、合并任务、最近任务和 API 多模型并发/容灾场景。
+
+### Improvements
+
+- GPT Image 2 相关节点与网站 catalog 对齐最多 16 张参考图，不再用“参考流”隐藏真实能力。
+- Grok Imagine 节点增强返回解析、去重、RGB 标准化、payload 预览、失败上下文日志和 `Skip_Error` 黑图兜底说明。
+- ComfyUI 节点统一收口到 Tikpan 官方中转站 `https://tikpan.com`；旧工作流里残留的其他中转站地址会自动回退到 Tikpan。
+- 更新并发引擎说明文档，删除旧供应商示例，明确当前版本只使用 Tikpan 官方接口。
+
+### Validation
+
+- 使用 Aki 自带 Python 编译检查 Grok Imagine、异步/并发引擎、GPT Image 2、Doubao、Suno、Gemini 等主要节点文件。
+- 验证 `API_HOST_OPTIONS` 只包含 `https://tikpan.com`，并确认旧上游地址会被 `normalize_api_host()` 回退到 Tikpan。
+
 ## [v1.1.10] - 2026-05-13
 
 ### Improvements

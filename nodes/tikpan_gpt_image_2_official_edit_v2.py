@@ -18,7 +18,7 @@ from .tikpan_gpt_image_recovery import (
     save_recovery_record,
     short_hash,
 )
-from .tikpan_node_options import BACKGROUND_OPTIONS, QUALITY_OPTIONS, option_value
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, BACKGROUND_OPTIONS, QUALITY_OPTIONS, option_value
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -54,10 +54,8 @@ class TikpanGptImage2OfficialEditV2:
                 "超时秒数": ("INT", {"default": 300, "min": 30, "max": 1800, "step": 10}),
             },
             "optional": {
-                "参考图1": ("IMAGE",),
-                "参考图2": ("IMAGE",),
-                "参考图3": ("IMAGE",),
-                "参考图4": ("IMAGE",),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                **{f"参考图{i}": ("IMAGE",) for i in range(1, 16)},
                 "参考流": ("IMAGE",),
                 "遮罩掩码": ("MASK",),
                 "跳过错误": ("BOOLEAN", {"default": False}),
@@ -75,6 +73,7 @@ class TikpanGptImage2OfficialEditV2:
 
         try:
             api_key = str(kwargs.get("API_密钥", "")).strip()
+            api_host = normalize_api_host(kwargs.get("中转站地址", API_HOST_OPTIONS[0]))
             if not api_key or not api_key.startswith("sk-"):
                 return (self.black_out(), "❌ API Key 格式错误")
 
@@ -97,12 +96,7 @@ class TikpanGptImage2OfficialEditV2:
             w, h = self.compute_size(main_img, res_tier, aspect)
             main_pil = self.to_pil(main_img[0])
 
-            ref_inputs = [
-                kwargs.get("参考图1"),
-                kwargs.get("参考图2"),
-                kwargs.get("参考图3"),
-                kwargs.get("参考图4"),
-            ]
+            ref_inputs = [kwargs.get(f"参考图{i}") for i in range(1, 16)]
 
             ref_pils = []
             for idx, ref in enumerate(ref_inputs, start=1):
@@ -192,7 +186,7 @@ class TikpanGptImage2OfficialEditV2:
 
                 try:
                     resp = sess.post(
-                        f"{API_HOST}/v1/images/edits",
+                        f"{api_host}/v1/images/edits",
                         headers=headers,
                         files=files,
                         data=data,
@@ -455,18 +449,18 @@ class TikpanGptImage2OfficialEditV2:
 
     def parse_images(self, resj, sess):
         out = []
-        items = resj.get("data", [])
-        if not isinstance(items, list):
-            return out
+        seen = set()
 
-        for d in items:
-            if not isinstance(d, dict):
+        for raw_type, raw_value in self.extract_image_items(resj):
+            marker = (raw_type, raw_value)
+            if marker in seen:
                 continue
-            b64 = d.get("b64_json")
-            url = d.get("url")
+            seen.add(marker)
+            b64 = raw_value if raw_type == "base64" else ""
+            url = raw_value if raw_type == "url" else ""
             if b64:
                 try:
-                    b64_clean = str(b64).split("base64,")[-1]
+                    b64_clean = "".join(str(b64).split("base64,")[-1].split())
                     out.append(Image.open(BytesIO(base64.b64decode(b64_clean))).convert("RGB"))
                 except Exception as e:
                     print(f"Base64 图片解析失败: {e}")
@@ -479,10 +473,57 @@ class TikpanGptImage2OfficialEditV2:
         return out
 
     def extract_result_urls(self, resj):
-        items = resj.get("data", [])
-        if not isinstance(items, list):
-            return []
-        return [d["url"] for d in items if isinstance(d, dict) and d.get("url")]
+        return [value for raw_type, value in self.extract_image_items(resj) if raw_type == "url"]
+
+    def extract_image_items(self, resj):
+        items = []
+        seen = set()
+
+        def add(raw_type, value):
+            if not isinstance(value, str):
+                return
+            value = value.strip()
+            if not value:
+                return
+            if value.startswith(("http://", "https://")):
+                raw_type = "url"
+            elif value.startswith("data:image"):
+                raw_type = "base64"
+            marker = (raw_type, value)
+            if marker in seen:
+                return
+            seen.add(marker)
+            items.append(marker)
+
+        def scan(obj):
+            if isinstance(obj, str):
+                if obj.startswith(("http://", "https://")):
+                    add("url", obj)
+                elif obj.startswith("data:image"):
+                    add("base64", obj)
+                return
+            if isinstance(obj, list):
+                for item in obj:
+                    scan(item)
+                return
+            if not isinstance(obj, dict):
+                return
+
+            for key in ("url", "image_url", "imageUrl"):
+                add("url", obj.get(key))
+            for key in ("b64_json", "image_base64", "base64", "image"):
+                add("base64", obj.get(key))
+            nested_image_url = obj.get("image_url")
+            if isinstance(nested_image_url, dict):
+                add("url", nested_image_url.get("url"))
+
+        if not isinstance(resj, dict):
+            return items
+
+        for key in ("data", "result", "output", "images"):
+            scan(resj.get(key))
+        scan(resj)
+        return items
 
     def black_out(self, w=1024, h=1024):
         return torch.zeros((1, h, w, 3), dtype=torch.float32)

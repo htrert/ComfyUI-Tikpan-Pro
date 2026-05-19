@@ -7,6 +7,7 @@ import numpy as np
 from io import BytesIO
 from PIL import Image, ImageOps
 import comfy.utils
+from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host
 from .tikpan_gpt_image_recovery import get_with_retry, make_idempotency_key, safe_json_for_log, save_recovery_record, short_hash
 
 # 🔐 Tikpan 官方聚合路由
@@ -27,6 +28,7 @@ class TikpanGptImage2EditNode:
                 "品质": (["标准｜standard", "高清｜hd"], {"default": "高清｜hd"}),
             },
             "optional": {
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
                 "遮罩_Mask": ("MASK",), # 告诉 AI 哪里需要动手术（可选）
                 "产品参考图": ("IMAGE",), # 如果要把某个具体产品放进去
             }
@@ -37,8 +39,9 @@ class TikpanGptImage2EditNode:
     FUNCTION = "edit"
     CATEGORY = "👑 Tikpan 官方独家节点"
 
-    def edit(self, 获取密钥请访问, API_密钥, 底图, 修改指令, 模型, 输出尺寸="沿用底图尺寸", 画面比例="沿用底图比例", 品质="高清｜hd", 遮罩_Mask=None, 产品参考图=None):
+    def edit(self, 获取密钥请访问, API_密钥, 底图, 修改指令, 模型, 输出尺寸="沿用底图尺寸", 画面比例="沿用底图比例", 品质="高清｜hd", 遮罩_Mask=None, 产品参考图=None, **kwargs):
         pbar = comfy.utils.ProgressBar(100)
+        api_host = normalize_api_host(kwargs.get("中转站地址", API_HOST_OPTIONS[0]))
         print(f"[Tikpan-Edit] 💉 视觉整形医生正在手术室就位...", flush=True)
 
         session = requests.Session()
@@ -126,7 +129,7 @@ class TikpanGptImage2EditNode:
 
         try:
             pbar.update(30)
-            url = f"{API_BASE_URL}/v1/chat/completions" # 使用统一聊天绘图路由
+            url = f"{api_host}/v1/chat/completions" # 使用统一聊天绘图路由
             try:
                 response = session.post(url, json=payload, headers=headers, timeout=300)
             except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
@@ -142,10 +145,10 @@ class TikpanGptImage2EditNode:
                     "上游可能已经接收并执行了修图请求，但本地等待响应时断开。"
                     f"请用相同参数重跑以复用幂等键。 Idempotency-Key: {idempotency_key} | recovery: {recovery_path}"
                 )
-            
+
             if response.status_code != 200:
                 return (self.black_image(width, height), f"❌ 手术失败: {response.text}")
-            
+
             res_json = response.json()
             save_recovery_record(
                 "all_edit",
@@ -158,11 +161,9 @@ class TikpanGptImage2EditNode:
             pbar.update(80)
 
             # 抓取数据
-            img_raw = ""
-            if "choices" in res_json:
-                img_raw = res_json["choices"][0]["message"].get("content", "")
-            elif "data" in res_json:
-                img_raw = res_json["data"][0].get("url") or res_json["data"][0].get("b64_json")
+            img_raw = self.extract_image_pointer(res_json)
+            if not img_raw:
+                return (self.black_image(width, height), f"No image data found in response: {json.dumps(res_json, ensure_ascii=False)[:1200]}")
 
             # 暴力清洗与解码
             save_recovery_record(
@@ -174,16 +175,10 @@ class TikpanGptImage2EditNode:
             )
 
             if img_raw.startswith("http"):
-                img_res = get_with_retry(session, img_raw, timeout=(10, 120), attempts=4)
-                final_img = Image.open(BytesIO(img_res.content)).convert("RGB")
+                final_img = self.load_result_image(session, img_raw)
             else:
-                b64_clean = re.sub(r'[^A-Za-z0-9+/=]', '', img_raw.split("base64,")[-1])
-                missing_padding = len(b64_clean) % 4
-                if missing_padding: b64_clean += '=' * (4 - missing_padding)
+                final_img = self.load_result_image(session, img_raw)
 
-                img_bytes = base64.b64decode(b64_clean)
-                final_img = Image.open(BytesIO(img_bytes)).convert("RGB")
-            
             img_np = np.array(final_img).astype(np.float32) / 255.0
             pbar.update(100)
             if img_raw.startswith("http"):
@@ -195,3 +190,88 @@ class TikpanGptImage2EditNode:
 
     def black_image(self, w, h):
         return torch.zeros((1, h, w, 3))
+
+    def extract_image_pointer(self, res_json):
+        seen = set()
+
+        def add(value):
+            if not isinstance(value, str):
+                return ""
+            value = value.strip()
+            if not value or value in seen:
+                return ""
+            seen.add(value)
+            if value.startswith(("http://", "https://", "data:image")):
+                return value
+            if len(value) > 80 and re.search(r"^[A-Za-z0-9+/=\s\r\n]+$", value):
+                return value
+            return ""
+
+        def from_item(item):
+            if isinstance(item, str):
+                return add(item)
+            if not isinstance(item, dict):
+                return ""
+            for key in ("url", "image_url", "imageUrl", "b64_json", "image_base64", "base64", "image"):
+                found = add(item.get(key))
+                if found:
+                    return found
+            nested = item.get("image_url")
+            if isinstance(nested, dict):
+                found = add(nested.get("url"))
+                if found:
+                    return found
+            content = item.get("content")
+            if isinstance(content, list):
+                for part in content:
+                    found = from_item(part)
+                    if found:
+                        return found
+            return ""
+
+        if not isinstance(res_json, dict):
+            return ""
+
+        for choice in res_json.get("choices", []) or []:
+            message = choice.get("message", {}) if isinstance(choice, dict) else {}
+            found = from_item(message)
+            if found:
+                return found
+
+        data = res_json.get("data")
+        if isinstance(data, list):
+            for item in data:
+                found = from_item(item)
+                if found:
+                    return found
+        else:
+            found = from_item(data)
+            if found:
+                return found
+
+        for key in ("result", "output", "images"):
+            value = res_json.get(key)
+            if isinstance(value, list):
+                for item in value:
+                    found = from_item(item)
+                    if found:
+                        return found
+            else:
+                found = from_item(value)
+                if found:
+                    return found
+
+        return from_item(res_json)
+
+    def load_result_image(self, session, img_raw):
+        img_raw = str(img_raw).strip()
+        if img_raw.startswith(("http://", "https://")):
+            img_res = get_with_retry(session, img_raw, timeout=(10, 120), attempts=4)
+            return Image.open(BytesIO(img_res.content)).convert("RGB")
+
+        b64_clean = re.sub(r"[^A-Za-z0-9+/=]", "", img_raw.split("base64,")[-1])
+        missing_padding = len(b64_clean) % 4
+        if missing_padding:
+            b64_clean += "=" * (4 - missing_padding)
+        img_bytes = base64.b64decode(b64_clean)
+        return Image.open(BytesIO(img_bytes)).convert("RGB")
