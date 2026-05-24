@@ -4,9 +4,9 @@
 # ComfyUI-Tikpan-Pro | 攀升AI官方插件
 
 <p align="center">
-  <img src="[https://img.shields.io/badge/Official-Tikpan.com-red?style=for-the-badge](https://img.shields.io/badge/Official-Tikpan.com-red?style=for-the-badge)" alt="Tikpan Official">
-  <img src="[https://img.shields.io/badge/ComfyUI-Registry-green?style=for-the-badge](https://img.shields.io/badge/ComfyUI-Registry-green?style=for-the-badge)" alt="Registry">
-  <img src="[https://img.shields.io/badge/Version-1.3.0-blue?style=for-the-badge](https://img.shields.io/badge/Version-1.3.0-blue?style=for-the-badge)" alt="Version">
+  <img src="https://img.shields.io/badge/Official-Tikpan.com-red?style=for-the-badge" alt="Tikpan Official">
+  <img src="https://img.shields.io/badge/ComfyUI-Registry-green?style=for-the-badge" alt="Registry">
+  <img src="https://img.shields.io/badge/Version-1.3.0-blue?style=for-the-badge" alt="Version">
 </p>
 
 **ComfyUI-Tikpan-Pro** 是由 [攀升AI (Tikpan.com)](https://tikpan.com/) 官方发布的深度集成插件。专为 **TikTok 电商矩阵运营**、**高阶内容创作**及 **AI 工作流自动化**设计，通过接入自有的高稳定性 API 渠道，为全球创作者提供顶级的模型生成能力。
@@ -17,6 +17,8 @@
 
 * [节点使用教程](docs/节点使用教程.md)：从安装、选节点、连接工作流到常见问题排查，适合实际使用者照着跑通。
 * [节点速查表](docs/节点速查表.md)：按图片、视频、音频、分析工具整理关键参数和输出，适合后续做 Web 网站表单、供应商渠道和计费映射。
+* [节点功能分类](docs/Tikpan_ComfyUI_节点功能分类.md)：对齐 ComfyUI 菜单分组，适合维护新增节点时检查放置位置。
+* [更新日志](CHANGELOG.md)：记录每个版本新增节点、修复项、文档同步和验证结果。
 
 ---
 

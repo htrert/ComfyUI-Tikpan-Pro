@@ -8,9 +8,11 @@ Tikpan: Gemini Omni 视频生成节点
 import base64
 import hashlib
 import json
+import mimetypes
 import os
 import time
 import traceback
+import wave
 from io import BytesIO
 
 import folder_paths
@@ -62,6 +64,7 @@ QUERY_ENDPOINT_TEMPLATE = "/v1/video/query?id={task_id}"
 
 MAX_REFERENCE_IMAGES = 5
 MAX_INLINE_VIDEO_BYTES = 48 * 1024 * 1024
+MAX_INLINE_AUDIO_BYTES = 24 * 1024 * 1024
 
 
 def _raw(value, default=""):
@@ -91,6 +94,40 @@ class TikpanGeminiOmniVideoNode:
         # 参考图（仅 omni-flash-components 有效）
         for i in range(1, MAX_REFERENCE_IMAGES + 1):
             optional[f"参考图{i}"] = ("IMAGE",)
+
+        optional["视频URL"] = (
+            "STRING",
+            {
+                "multiline": False,
+                "default": "",
+                "tooltip": "用于视频编辑/视频参考。优先使用公开可访问 URL；本字段会透传为 video_url/input_video 等兼容字段。",
+            },
+        )
+        optional["本地视频"] = (
+            "VIDEO",
+            {"tooltip": "用于视频编辑/视频参考。小于约 48MB 时会 inline 直传为 data:video。更大的视频请使用视频URL。"},
+        )
+        optional["参考音频URL"] = (
+            "STRING",
+            {
+                "multiline": False,
+                "default": "",
+                "tooltip": "用于音频驱动或参考音色。优先使用公开可访问 URL；会透传为 audio_url/reference_audio 等兼容字段。",
+            },
+        )
+        optional["参考音频"] = (
+            "AUDIO",
+            {"tooltip": "用于音频驱动或参考音色。会打包为 wav data URL；体积建议小于 24MB。"},
+        )
+        optional["参考音色ID"] = (
+            "STRING",
+            {
+                "multiline": False,
+                "default": "",
+                "tooltip": "如果 Tikpan/上游已返回音色 ID，可填入这里；会透传为 voice_id/reference_voice_id。",
+            },
+        )
+        optional["保留原视频声音"] = ("BOOLEAN", {"default": True})
 
         optional["高级自定义JSON"] = (
             "STRING",
@@ -190,9 +227,77 @@ class TikpanGeminiOmniVideoNode:
                 images.append(self._tensor_to_data_url(t))
         return images
 
+    def _guess_mime(self, path, fallback):
+        mime, _ = mimetypes.guess_type(str(path or ""))
+        return mime or fallback
+
+    def _video_path_from_input(self, value):
+        if value is None:
+            return ""
+        if isinstance(value, (list, tuple)) and value:
+            return self._video_path_from_input(value[0])
+        if isinstance(value, str):
+            return value
+        if isinstance(value, dict):
+            for key in ("filename", "path", "video", "file"):
+                candidate = value.get(key)
+                if isinstance(candidate, str):
+                    return candidate
+        return str(value)
+
+    def _video_to_data_url(self, local_video):
+        path = self._video_path_from_input(local_video)
+        if not path:
+            return ""
+        if not os.path.exists(path):
+            raise ValueError(f"本地视频文件不存在: {path}")
+        size = os.path.getsize(path)
+        if size > MAX_INLINE_VIDEO_BYTES:
+            raise ValueError(
+                f"本地视频 {size / 1024 / 1024:.1f}MB 超过 inline 限制，"
+                f"请上传到公开地址后填写“视频URL”。"
+            )
+        with open(path, "rb") as f:
+            data = base64.b64encode(f.read()).decode("utf-8")
+        return f"data:{self._guess_mime(path, 'video/mp4')};base64,{data}"
+
+    def _audio_to_wav_data_url(self, audio):
+        if audio is None:
+            return ""
+        waveform = audio.get("waveform") if isinstance(audio, dict) else None
+        sample_rate = audio.get("sample_rate") if isinstance(audio, dict) else None
+        if waveform is None or sample_rate is None:
+            raise ValueError("参考音频不是有效的 ComfyUI AUDIO 对象")
+        wf = waveform.detach().cpu().float()
+        if wf.dim() == 3:
+            wf = wf.squeeze(0)
+        if wf.dim() == 1:
+            wf = wf.unsqueeze(0)
+        channels, _ = wf.shape
+        wf = wf.clamp(-1.0, 1.0)
+        pcm = (wf.numpy() * 32767.0).astype(np.int16)
+        if channels == 1:
+            interleaved = pcm[0]
+        else:
+            interleaved = np.transpose(pcm, (1, 0)).reshape(-1)
+        buf = BytesIO()
+        with wave.open(buf, "wb") as wav:
+            wav.setnchannels(int(channels))
+            wav.setsampwidth(2)
+            wav.setframerate(int(sample_rate))
+            wav.writeframes(interleaved.tobytes())
+        raw = buf.getvalue()
+        if len(raw) > MAX_INLINE_AUDIO_BYTES:
+            raise ValueError(
+                f"参考音频 {len(raw) / 1024 / 1024:.1f}MB 超过 inline 限制，"
+                f"请上传到公开地址后填写“参考音频URL”。"
+            )
+        return "data:audio/wav;base64," + base64.b64encode(raw).decode("utf-8")
+
     # ─── Payload 构建 ───────────────────────────────────────────────────────────
     def _build_payload(self, model, prompt, duration, aspect_ratio, resolution,
-                       generate_audio, seed, negative_prompt, images, custom_json_str):
+                       generate_audio, seed, negative_prompt, images, video_ref,
+                       audio_ref, voice_id, keep_original_sound, custom_json_str):
         payload = {
             "model": model,
             "prompt": prompt,
@@ -204,6 +309,26 @@ class TikpanGeminiOmniVideoNode:
         }
         if negative_prompt:
             payload["negative_prompt"] = negative_prompt
+
+        if video_ref:
+            payload["video_url"] = video_ref
+            payload["input_video"] = video_ref
+            payload["reference_video"] = video_ref
+            payload["video_list"] = [{
+                "video_url": video_ref,
+                "refer_type": "base",
+                "keep_original_sound": "yes" if keep_original_sound else "no",
+            }]
+
+        if audio_ref:
+            payload["audio_url"] = audio_ref
+            payload["input_audio"] = audio_ref
+            payload["reference_audio"] = audio_ref
+
+        if voice_id:
+            payload["voice_id"] = voice_id
+            payload["reference_voice_id"] = voice_id
+            payload["element_voice_id"] = voice_id
 
         if images:
             if model in COMPONENT_MODELS:
@@ -347,6 +472,12 @@ class TikpanGeminiOmniVideoNode:
             generate_audio = bool(pick(kwargs, "生成原生音频", "generate_audio", default=True))
             seed = normalize_seed(pick(kwargs, "随机种子", "seed", default=888888), default=888888)
             negative_prompt = str(pick(kwargs, "负面提示词", "negative_prompt", default="") or "").strip()
+            video_url = str(pick(kwargs, "视频URL", "video_url", default="") or "").strip()
+            local_video = pick(kwargs, "本地视频", "local_video", default=None)
+            audio_url = str(pick(kwargs, "参考音频URL", "audio_url", "reference_audio_url", default="") or "").strip()
+            audio = pick(kwargs, "参考音频", "reference_audio", default=None)
+            voice_id = str(pick(kwargs, "参考音色ID", "voice_id", "reference_voice_id", default="") or "").strip()
+            keep_original_sound = bool(pick(kwargs, "保留原视频声音", "keep_original_sound", default=True))
             custom_json_str = str(pick(kwargs, "高级自定义JSON", "custom_json", default="") or "").strip()
             max_wait = int(pick(kwargs, "最长等待秒数", "max_wait_seconds", default=1200) or 1200)
             poll_interval = int(pick(kwargs, "查询间隔秒数", "poll_interval", default=8) or 8)
@@ -359,6 +490,14 @@ class TikpanGeminiOmniVideoNode:
                 model = "omni-flash"
 
             images = self._collect_images(kwargs)
+            video_ref = video_url if video_url.startswith(("http://", "https://", "data:video")) else ""
+            if not video_ref and local_video is not None:
+                video_ref = self._video_to_data_url(local_video)
+
+            audio_ref = audio_url if audio_url.startswith(("http://", "https://", "data:audio")) else ""
+            if not audio_ref and audio is not None:
+                audio_ref = self._audio_to_wav_data_url(audio)
+
             if images and model not in COMPONENT_MODELS:
                 print(
                     f"[Tikpan-GeminiOmni] ⚠️ 当前模型 {model} 不是 components 版本，"
@@ -370,7 +509,8 @@ class TikpanGeminiOmniVideoNode:
             pbar.update_absolute(8, 100)
             payload = self._build_payload(
                 model, prompt, duration, aspect_ratio, resolution,
-                generate_audio, seed, negative_prompt, images, custom_json_str,
+                generate_audio, seed, negative_prompt, images, video_ref,
+                audio_ref, voice_id, keep_original_sound, custom_json_str,
             )
             session = self._create_session()
             pbar.update_absolute(15, 100)
@@ -404,7 +544,8 @@ class TikpanGeminiOmniVideoNode:
             log = (
                 f"✅ Gemini Omni 视频生成成功\n"
                 f"model={model} | duration={duration}s | aspect={aspect_ratio} | resolution={resolution} | "
-                f"audio={generate_audio} | refs={len(images)} | endpoint={HARDCODED_ENDPOINT}\n"
+                f"audio={generate_audio} | refs={len(images)} | video_ref={bool(video_ref)} | "
+                f"audio_ref={bool(audio_ref)} | voice_id={bool(voice_id)} | endpoint={HARDCODED_ENDPOINT}\n"
                 f"task_id={task_id}\nvideo_url={video_url}\npath={save_path}\n\n"
                 f"{json.dumps(self._redact(final_json), ensure_ascii=False, indent=2, default=str)[:3000]}"
             )
