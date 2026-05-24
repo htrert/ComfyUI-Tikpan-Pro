@@ -36,7 +36,7 @@ class TikpanGptImage2GenNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成结果图", "📄_渲染日志")
     FUNCTION = "generate"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
 
     def generate(self, 获取密钥请访问, API_密钥, 生成指令, 模型, 分辨率档位, 画面比例, 品质, 随机种子=888888, **kwargs):
         pbar = comfy.utils.ProgressBar(100)

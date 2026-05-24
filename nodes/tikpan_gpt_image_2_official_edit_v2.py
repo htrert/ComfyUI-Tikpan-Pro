@@ -65,7 +65,7 @@ class TikpanGptImage2OfficialEditV2:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("编辑结果", "渲染日志")
     FUNCTION = "edit_image"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
 
     def edit_image(self, **kwargs):
         w, h = 1024, 1024

@@ -1,0 +1,12 @@
+.env
+data/*.db
+data/*.db-*
+data/config.export.json
+outputs/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.git/
+logs/
+recovery/

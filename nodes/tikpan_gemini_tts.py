@@ -172,7 +172,7 @@ class TikpanGemini31FlashTTSNode:
     )
     OUTPUT_NODE = True
     FUNCTION = "generate_tts"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/03 音频 Audio'
 
     def empty_audio(self):
         try:

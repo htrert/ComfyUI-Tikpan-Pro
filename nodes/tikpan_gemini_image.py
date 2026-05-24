@@ -11,6 +11,7 @@ import urllib3
 from PIL import Image
 
 import comfy.utils
+import comfy.model_management
 from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, normalize_seed
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -66,7 +67,7 @@ class TikpanGeminiImageMaxNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成结果图", "📄_渲染日志")
     FUNCTION = "execute"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
 
     def black_image(self):
         return torch.zeros((1, 512, 512, 3), dtype=torch.float32)
@@ -436,6 +437,14 @@ class TikpanGeminiImageMaxNode:
         session = requests.Session()
         session.trust_env = False
 
+        def safe_update(value):
+            try:
+                pbar.update(value)
+            except comfy.model_management.InterruptProcessingException:
+                raise
+            except Exception:
+                pass
+
         image_size_val = 分辨率 if 分辨率 in ("1K", "2K", "4K") else None
 
         # 🔑 根据调用方式构建不同的 payload 和 URL
@@ -519,7 +528,7 @@ class TikpanGeminiImageMaxNode:
         print(f"[Tikpan-ChatProbe] 📋 完整payload: {json.dumps(payload, ensure_ascii=False)[:3000]}", flush=True)
 
         try:
-            pbar.update(20)
+            safe_update(20)
 
             response = session.post(
                 url,
@@ -529,7 +538,7 @@ class TikpanGeminiImageMaxNode:
                 verify=False,
             )
 
-            pbar.update(50)
+            safe_update(50)
 
             raw_text_preview = response.text[:4000]
 
@@ -549,7 +558,7 @@ class TikpanGeminiImageMaxNode:
                     f"❌ 接口返回非 JSON:\n{raw_text_preview}",
                 )
 
-            pbar.update(75)
+            safe_update(75)
 
             # --- 提取图片 ---
             if 调用方式 == "gemini原生":
@@ -611,7 +620,7 @@ class TikpanGeminiImageMaxNode:
                 final_img, out_tensor, actual_width, actual_height, 分辨率, 画面比例
             )
 
-            pbar.update(100)
+            safe_update(100)
 
             # --- 成功返回 ---
             requested_pixel = self.calc_pixel_size(分辨率, 画面比例) if 分辨率 != "none" else "原始"
@@ -632,6 +641,11 @@ class TikpanGeminiImageMaxNode:
             return (
                 self.black_image(),
                 "❌ 请求超时\n💡 建议减少参考图数量，或稍后重试。",
+            )
+        except comfy.model_management.InterruptProcessingException:
+            return (
+                self.black_image(),
+                "⚠️ 节点已被 ComfyUI 中断：通常是你手动停止队列、切换/重新运行工作流，或其他节点触发了中断。本次流程不会继续执行；如果请求已经提交到上游，可能仍会在上游继续处理。",
             )
         except requests.exceptions.ConnectionError as e:
             return (self.black_image(), f"❌ 连接错误: {str(e)[:500]}")

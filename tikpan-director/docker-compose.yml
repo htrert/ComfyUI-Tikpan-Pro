@@ -1,0 +1,20 @@
+version: "3.8"
+services:
+  director:
+    image: python:3.11-slim
+    working_dir: /app/backend
+    command: >
+      sh -c "pip install flask flask-cors requests pillow python-dotenv gunicorn -q &&
+             python app.py"
+    ports:
+      - "7788:7788"
+    volumes:
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./data:/app/data
+    environment:
+      - TIKPAN_API_KEY=${TIKPAN_API_KEY}
+      - TIKPAN_API_HOST=${TIKPAN_API_HOST:-https://tikpan.com}
+      - PORT=7788
+      - DEBUG=false
+    restart: unless-stopped

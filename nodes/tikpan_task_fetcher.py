@@ -126,7 +126,7 @@ class TikpanTaskFetcherNode:
     RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_云端链接", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "fetch_and_download"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/06 任务与并发 Tools'
 
     def fetch_and_download(self, **kwargs):
         try:

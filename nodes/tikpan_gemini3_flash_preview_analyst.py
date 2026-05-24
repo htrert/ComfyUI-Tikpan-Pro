@@ -146,7 +146,7 @@ class TikpanGemini3FlashPreviewAnalystNode:
     RETURN_NAMES = ("分析报告", "反推提示词", "结构化JSON", "用量", "状态日志")
     OUTPUT_NODE = True
     FUNCTION = "analyze_media"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/04 文字与多模态 Text & Multimodal'
 
     def make_return(self, report="", prompt="", structured="", usage="", log=""):
         return (str(report or ""), str(prompt or ""), str(structured or ""), str(usage or ""), str(log or ""))

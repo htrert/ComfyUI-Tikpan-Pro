@@ -25,7 +25,15 @@ def apply_agent():
 
     if payment_method == "balance":
         from models import update_balance
-        success, err = update_balance(request.user_id, -AGENT_FEE_CREDITS)
+        success, err = update_balance(
+            request.user_id,
+            -AGENT_FEE_CREDITS,
+            entry_type="agent_fee",
+            reference_type="agent_apply",
+            reference_id=request.user_id,
+            idempotency_key=f"agent_fee:{request.user_id}",
+            note=f"代理申请门槛扣费 {AGENT_FEE_CREDITS} 额度",
+        )
         if not success:
             return jsonify({"error": f"余额不足。成为代理需要 {AGENT_FEE_CREDITS} 额度"}), 402
 

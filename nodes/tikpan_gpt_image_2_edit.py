@@ -37,7 +37,7 @@ class TikpanGptImage2EditNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_重绘结果图", "📄_渲染日志")
     FUNCTION = "edit"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
 
     def edit(self, 获取密钥请访问, API_密钥, 底图, 修改指令, 模型, 输出尺寸="沿用底图尺寸", 画面比例="沿用底图比例", 品质="高清｜hd", 遮罩_Mask=None, 产品参考图=None, **kwargs):
         pbar = comfy.utils.ProgressBar(100)

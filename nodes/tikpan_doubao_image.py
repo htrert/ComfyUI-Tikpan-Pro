@@ -159,7 +159,7 @@ class TikpanDoubaoImageNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成图像Batch", "📄_渲染日志")
     FUNCTION = "generate_image"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
 
     def looks_like_base64(self, s):
         if not s:

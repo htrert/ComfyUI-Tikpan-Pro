@@ -1,5 +1,6 @@
 const canvas = document.getElementById("canvas");
 const world = document.getElementById("world");
+const stage = document.querySelector(".stage");
 const zoomLabel = document.getElementById("zoomLabel");
 const connectionLabel = document.getElementById("connectionLabel");
 const statusText = document.getElementById("statusText");
@@ -19,6 +20,11 @@ const factoryBriefInput = document.getElementById("factoryBriefInput");
 const factorySummary = document.getElementById("factorySummary");
 const buildFactoryButton = document.getElementById("buildFactoryButton");
 const zoomRange = document.getElementById("zoomRange");
+const miniMapButton = document.getElementById("miniMapButton");
+const gridButton = document.getElementById("gridButton");
+const miniMap = document.getElementById("miniMap");
+const miniMapBody = document.getElementById("miniMapBody");
+const miniMapCount = document.getElementById("miniMapCount");
 const userSummary = document.getElementById("userSummary");
 const loginButton = document.getElementById("loginButton");
 const logoutButton = document.getElementById("logoutButton");
@@ -73,6 +79,8 @@ const state = {
   theme: localStorage.getItem("canvasTheme") || "system",
   assets: [],
   factoryWorkflows: [],
+  showGrid: localStorage.getItem("canvasGridHidden") !== "true",
+  showMiniMap: localStorage.getItem("canvasMiniMapOpen") === "true",
 };
 
 let drag = null;
@@ -162,6 +170,7 @@ function renderCamera() {
   world.style.transform = `translate(${state.camera.x}px, ${state.camera.y}px) scale(${state.camera.scale})`;
   zoomLabel.textContent = `${Math.round(state.camera.scale * 100)}%`;
   if (zoomRange) zoomRange.value = String(Math.round(state.camera.scale * 100));
+  renderMiniMap();
 }
 
 function screenToWorld(clientX, clientY) {
@@ -190,6 +199,107 @@ function selectNode(id) {
 
 function updateEmptyHint() {
   if (canvasEmptyHint) canvasEmptyHint.hidden = state.nodes.length > 0;
+}
+
+function applyCanvasChrome() {
+  if (stage) stage.classList.toggle("grid-hidden", !state.showGrid);
+  if (gridButton) gridButton.classList.toggle("active", state.showGrid);
+  if (miniMap) miniMap.classList.toggle("open", state.showMiniMap);
+  if (miniMapButton) miniMapButton.classList.toggle("active", state.showMiniMap);
+  renderMiniMap();
+}
+
+function nodeBounds(nodes = state.nodes) {
+  if (!nodes.length) return null;
+  return nodes.reduce((box, node) => ({
+    minX: Math.min(box.minX, node.x),
+    minY: Math.min(box.minY, node.y),
+    maxX: Math.max(box.maxX, node.x + node.width),
+    maxY: Math.max(box.maxY, node.y + node.height),
+  }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+}
+
+function renderMiniMap() {
+  if (!miniMapBody || !state.showMiniMap) return;
+  miniMapBody.innerHTML = "";
+  if (miniMapCount) miniMapCount.textContent = `${state.nodes.length} 节点`;
+  const bounds = nodeBounds();
+  if (!bounds) return;
+
+  const pad = 90;
+  const mapRect = miniMapBody.getBoundingClientRect();
+  const worldWidth = Math.max(bounds.maxX - bounds.minX + pad * 2, 1);
+  const worldHeight = Math.max(bounds.maxY - bounds.minY + pad * 2, 1);
+  const scale = Math.min(mapRect.width / worldWidth, mapRect.height / worldHeight);
+  const originX = bounds.minX - pad;
+  const originY = bounds.minY - pad;
+  const offsetX = (mapRect.width - worldWidth * scale) / 2;
+  const offsetY = (mapRect.height - worldHeight * scale) / 2;
+
+  for (const node of state.nodes) {
+    const item = document.createElement("div");
+    item.className = `mini-node ${node.type || "prompt"}`;
+    item.style.left = `${offsetX + (node.x - originX) * scale}px`;
+    item.style.top = `${offsetY + (node.y - originY) * scale}px`;
+    item.style.width = `${Math.max(4, node.width * scale)}px`;
+    item.style.height = `${Math.max(4, node.height * scale)}px`;
+    miniMapBody.appendChild(item);
+  }
+
+  const canvasRect = canvas.getBoundingClientRect();
+  const view = document.createElement("div");
+  view.className = "mini-viewport";
+  view.style.left = `${offsetX + ((-state.camera.x / state.camera.scale) - originX) * scale}px`;
+  view.style.top = `${offsetY + ((-state.camera.y / state.camera.scale) - originY) * scale}px`;
+  view.style.width = `${Math.max(8, (canvasRect.width / state.camera.scale) * scale)}px`;
+  view.style.height = `${Math.max(8, (canvasRect.height / state.camera.scale) * scale)}px`;
+  miniMapBody.appendChild(view);
+}
+
+function clearCanvasLinks() {
+  world.querySelectorAll(".canvas-link").forEach((link) => link.remove());
+}
+
+function drawLinkBetween(fromNode, toNode) {
+  if (!fromNode || !toNode) return;
+  const startX = fromNode.x + fromNode.width;
+  const startY = fromNode.y + fromNode.height / 2;
+  const endX = toNode.x;
+  const endY = toNode.y + toNode.height / 2;
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const length = Math.hypot(dx, dy);
+  if (length < 12) return;
+  const link = document.createElement("div");
+  link.className = "canvas-link";
+  link.style.left = `${startX}px`;
+  link.style.top = `${startY}px`;
+  link.style.width = `${length}px`;
+  link.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+  world.insertBefore(link, world.firstChild);
+}
+
+function renderCanvasLinks() {
+  clearCanvasLinks();
+  const factoryNodes = state.nodes.filter((node) => node.factory?.templateId);
+  if (!factoryNodes.length) return;
+  const byLane = new Map();
+  for (const node of factoryNodes) {
+    const lane = node.factory?.lane || "workflow";
+    if (!byLane.has(lane)) byLane.set(lane, []);
+    byLane.get(lane).push(node);
+  }
+  for (const nodes of byLane.values()) {
+    nodes.sort((a, b) => a.y - b.y).forEach((node, index, arr) => {
+      if (arr[index + 1]) drawLinkBetween(node, arr[index + 1]);
+    });
+  }
+  const ordered = [...factoryNodes].sort((a, b) => (a.x - b.x) || (a.y - b.y));
+  ordered.forEach((node, index) => {
+    if (ordered[index + 1] && ordered[index + 1].factory?.lane !== node.factory?.lane) {
+      drawLinkBetween(node, ordered[index + 1]);
+    }
+  });
 }
 
 function createNodeElement(node) {
@@ -292,6 +402,8 @@ function addNode(node) {
   selectNode(node.id);
   persistLocal();
   updateEmptyHint();
+  renderCanvasLinks();
+  renderMiniMap();
   return node;
 }
 
@@ -344,6 +456,7 @@ function addMediaAt(point, src, kind, title) {
 function redraw() {
   world.innerHTML = "";
   for (const node of state.nodes) createNodeElement(node);
+  renderCanvasLinks();
   renderCamera();
   updateEmptyHint();
 }
@@ -1046,6 +1159,8 @@ canvas.addEventListener("pointermove", (event) => {
     const element = world.querySelector(`[data-id="${node.id}"]`);
     element.style.left = `${node.x}px`;
     element.style.top = `${node.y}px`;
+    renderCanvasLinks();
+    renderMiniMap();
   }
 });
 
@@ -1082,6 +1197,10 @@ window.addEventListener("keydown", (event) => {
     redraw();
     persistLocal();
   }
+});
+
+window.addEventListener("resize", () => {
+  renderMiniMap();
 });
 
 promptInput.addEventListener("input", syncPromptPanelFromSelection);
@@ -1135,6 +1254,22 @@ document.getElementById("clearButton").addEventListener("click", () => {
   persistLocal();
   updateReferenceHint();
 });
+if (gridButton) {
+  gridButton.addEventListener("click", () => {
+    state.showGrid = !state.showGrid;
+    localStorage.setItem("canvasGridHidden", String(!state.showGrid));
+    applyCanvasChrome();
+    setStatus(state.showGrid ? "已显示画布网格。" : "已隐藏画布网格。");
+  });
+}
+if (miniMapButton) {
+  miniMapButton.addEventListener("click", () => {
+    state.showMiniMap = !state.showMiniMap;
+    localStorage.setItem("canvasMiniMapOpen", String(state.showMiniMap));
+    applyCanvasChrome();
+    setStatus(state.showMiniMap ? "已打开小地图。" : "已关闭小地图。");
+  });
+}
 
 launcherCloseButton.addEventListener("click", hideLauncher);
 launcherSearch.addEventListener("input", () => renderLauncherList(launcherSearch.value));
@@ -1245,6 +1380,7 @@ authSubmitButton.addEventListener("click", async () => {
 });
 
 applyTheme(state.theme);
+applyCanvasChrome();
 setProjectName(projectTitleInput.value || projectNameInput.value, { persist: false });
 renderCamera();
 restoreLocal();

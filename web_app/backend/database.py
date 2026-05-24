@@ -38,6 +38,8 @@ def init_db():
             description TEXT DEFAULT '',
             api_type TEXT NOT NULL DEFAULT 'gemini_native',
             endpoint TEXT DEFAULT '',
+            usage_json TEXT DEFAULT '[]',
+            node_class TEXT DEFAULT '',
             is_active INTEGER DEFAULT 1,
             sort_order INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -59,6 +61,10 @@ def init_db():
             sort_order INTEGER DEFAULT 0,
             is_group INTEGER DEFAULT 0,
             group_config_json TEXT DEFAULT '{}',
+            hint TEXT DEFAULT '',
+            min TEXT DEFAULT '',
+            max TEXT DEFAULT '',
+            step TEXT DEFAULT '',
             FOREIGN KEY (model_id) REFERENCES models(id),
             UNIQUE(model_id, field_key)
         );
@@ -69,8 +75,20 @@ def init_db():
             password_hash TEXT NOT NULL
         );
     """)
+    _ensure_column(conn, "model_fields", "hint", "TEXT DEFAULT ''")
+    _ensure_column(conn, "model_fields", "min", "TEXT DEFAULT ''")
+    _ensure_column(conn, "model_fields", "max", "TEXT DEFAULT ''")
+    _ensure_column(conn, "model_fields", "step", "TEXT DEFAULT ''")
+    _ensure_column(conn, "models", "usage_json", "TEXT DEFAULT '[]'")
+    _ensure_column(conn, "models", "node_class", "TEXT DEFAULT ''")
     conn.commit()
     conn.close()
+
+
+def _ensure_column(conn, table, column, definition):
+    columns = [row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+    if column not in columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 # ==================== Categories ====================
@@ -131,11 +149,11 @@ def get_model(model_id):
     return dict(row) if row else None
 
 
-def add_model(model_id, category_key, name, provider="", description="", api_type="gemini_native", endpoint="", sort_order=0):
+def add_model(model_id, category_key, name, provider="", description="", api_type="gemini_native", endpoint="", sort_order=0, usage_json="[]", node_class=""):
     conn = get_db()
     conn.execute(
-        "INSERT OR REPLACE INTO models (id, category_key, name, provider, description, api_type, endpoint, sort_order) VALUES (?,?,?,?,?,?,?,?)",
-        (model_id, category_key, name, provider, description, api_type, endpoint, sort_order))
+        "INSERT OR REPLACE INTO models (id, category_key, name, provider, description, api_type, endpoint, sort_order, usage_json, node_class) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (model_id, category_key, name, provider, description, api_type, endpoint, sort_order, usage_json, node_class))
     conn.commit()
     conn.close()
 
@@ -168,11 +186,11 @@ def get_fields(model_id):
 
 def add_field(model_id, field_key, field_type="textarea", label="", placeholder="", default_value="",
               required=0, options_json="[]", max_count=0, rows=4, sort_order=0,
-              is_group=0, group_config_json="{}"):
+              is_group=0, group_config_json="{}", hint="", min_value="", max_value="", step=""):
     conn = get_db()
     conn.execute(
-        "INSERT OR IGNORE INTO model_fields (model_id, field_key, field_type, label, placeholder, default_value, required, options_json, max_count, rows, sort_order, is_group, group_config_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        (model_id, field_key, field_type, label, placeholder, default_value, required, options_json, max_count, rows, sort_order, is_group, group_config_json))
+        "INSERT OR IGNORE INTO model_fields (model_id, field_key, field_type, label, placeholder, default_value, required, options_json, max_count, rows, sort_order, is_group, group_config_json, hint, min, max, step) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (model_id, field_key, field_type, label, placeholder, default_value, required, options_json, max_count, rows, sort_order, is_group, group_config_json, hint, min_value, max_value, step))
     conn.commit()
     conn.close()
 
@@ -218,6 +236,13 @@ def get_full_model_tree():
                     "required": bool(f["required"]),
                     "rows": f["rows"],
                 }
+                hint_value = f["hint"] if "hint" in f.keys() else ""
+                if hint_value:
+                    entry["hint"] = hint_value
+                for numeric_key in ("min", "max", "step"):
+                    value = f[numeric_key] if numeric_key in f.keys() else ""
+                    if value not in (None, ""):
+                        entry[numeric_key] = value
                 if f["field_type"] == "select" or f["field_type"] == "file_image":
                     try:
                         entry["options"] = json.loads(f["options_json"]) if f["options_json"] else []
@@ -242,6 +267,8 @@ def get_full_model_tree():
                 "description": m["description"],
                 "api_type": m["api_type"],
                 "endpoint": m["endpoint"],
+                "usage": json.loads(m["usage_json"] if "usage_json" in m.keys() and m["usage_json"] else "[]"),
+                "node_class": m["node_class"] if "node_class" in m.keys() else "",
                 "pricing": {
                     "1K": calculate_model_credits(m["id"], {"resolution": "1K"})["credits"],
                     "2K": calculate_model_credits(m["id"], {"resolution": "2K"})["credits"],

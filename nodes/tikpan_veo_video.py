@@ -69,7 +69,7 @@ class TikpanVeoVideoNode:
     RETURN_NAMES = ("📁_本地保存路径", "🏷️_任务ID", "🔗_视频云端直链", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "execute"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/02 视频 Video'
 
     def execute(self, 获取密钥请访问, API_密钥, Veo专属提示词, 模型选择, 比例, 随机种子=888888, **kwargs):
         comfy.model_management.throw_exception_if_processing_interrupted()

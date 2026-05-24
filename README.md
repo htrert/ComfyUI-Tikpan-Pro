@@ -6,7 +6,7 @@
 <p align="center">
   <img src="[https://img.shields.io/badge/Official-Tikpan.com-red?style=for-the-badge](https://img.shields.io/badge/Official-Tikpan.com-red?style=for-the-badge)" alt="Tikpan Official">
   <img src="[https://img.shields.io/badge/ComfyUI-Registry-green?style=for-the-badge](https://img.shields.io/badge/ComfyUI-Registry-green?style=for-the-badge)" alt="Registry">
-  <img src="[https://img.shields.io/badge/Version-1.2.0-blue?style=for-the-badge](https://img.shields.io/badge/Version-1.2.0-blue?style=for-the-badge)" alt="Version">
+  <img src="[https://img.shields.io/badge/Version-1.3.0-blue?style=for-the-badge](https://img.shields.io/badge/Version-1.3.0-blue?style=for-the-badge)" alt="Version">
 </p>
 
 **ComfyUI-Tikpan-Pro** 是由 [攀升AI (Tikpan.com)](https://tikpan.com/) 官方发布的深度集成插件。专为 **TikTok 电商矩阵运营**、**高阶内容创作**及 **AI 工作流自动化**设计，通过接入自有的高稳定性 API 渠道，为全球创作者提供顶级的模型生成能力。
@@ -24,12 +24,47 @@
 
 本插件通过云端 API 模式，让您的本地 ComfyUI 具备生产顶级素材的能力：
 
-* **GPT-Image-2 (Official)**：深度支持高阶多图编辑、风格迁移与 1:1 复刻级图像生成。
-* **Google Veo / Sora**：接入最前沿的视频生成模型，为 TikTok 账号提供高保真原生素材。
-* **Gemini 3.1 Flash TTS Preview**：Google Gemini 文字转语音预览模型，适合低延迟、可控语音生成。
-* **speech-2.8-hd / speech-2.8-turbo**：高清与极速语音合成，适合短视频旁白、广告口播、多语言配音和商业音频工作流。
-* **Grok-3 / GPT-4o**：集成实时联网的大语言模型，助力精准选品分析与爆款营销文案生成。
-* **UGC Native Optimization**：算法层优化，输出具有真实社会化媒体感的 720P/1080P 素材，显著提升 TikTok/Instagram 等平台的账号权重与推流表现。
+**图片生成**
+
+* **GPT-Image-2 Official**：官方生图与修图，支持多参考图、遮罩区域重绘、高分辨率。
+* **GPT-Image-2-all（生图/修图）**：最多 14 张参考图的多模态图像生成与修图节点。
+* **Gemini 14图极限生图**：Gemini 图像模型，最多 14 张参考图融合。
+* **Grok Imagine Image / Pro**：Grok 图像生成，支持文生图与最多 3 张参考图修图。
+* **Nano Banana Pro**：Gemini 图像链路，支持多参考图、温度和 token 控制。
+* **Qwen-Image-2.0**：通义千问图像模型，文生图/图生图/多参考图。
+* **Wan 2.7 Image Pro**：支持 4K 分辨率和 thinking 深度推理模式。
+* **豆包图像生成 Seedream**：Doubao 5.0 图像，支持联网搜索增强和多图生成。
+
+**视频生成**
+
+* **HappyHorse 1.0 系列**：文生视频、图生视频、多参考图生视频、视频编辑，支持同步/异步模式。
+* **Grok-Videos**：Grok 视频生成，支持最多 4 张参考图。
+* **Veo 3.1**：Google Veo 3.1 多模型，lite/fast/pro/components，支持首尾帧和 components 垫图。
+* **Kling Motion Control**：Kling v2.6/v3.0 动作控制，把角色图像+动作参考视频合成新视频。
+* **Vidu3 参考生视频**：最多 7 张参考图，通过 `@1`/`@2` 保持角色一致性生视频。
+* **Vidu3 Turbo**：快速文生/图生/首尾帧视频，底层模型 `viduq3-turbo`。
+* **Gemini Omni Flash**：多模态视频生成，支持文生/图生/多参考/编辑/音频驱动五种模式。
+
+**音频生成**
+
+* **Suno 音乐生成**：歌曲/纯音乐/续写/歌手风格，支持 V5/Fenix/V4/Auk 等模型。
+* **speech-2.8-hd / speech-2.8-turbo**：MiniMax 高清/极速语音合成，支持 100+ 音色。
+* **豆包语音合成 2.0**：Doubao TTS，覆盖中文口播、角色音色和多语种。
+* **Gemini 3.1 Flash TTS Preview**：Google Gemini TTS，30 个预置音色，低延迟。
+
+**多模态推理与分析**
+
+* **GPT-5.4 Mini 推理**：Responses API，支持图片/视频抽帧/文件分析、联网搜索和 reasoning_effort。
+* **Gemini 3 Flash Preview 分析**：图片/视频理解，支持视频 URL 和抽帧分析，输出报告/提示词/JSON。
+* **Gemini 3.5 Flash 推理**：长文档/复杂推理，支持 thinking 深度推理（8192 token）和本地文件 inline。
+* **Grok 多图剧本重构**：把视频分析报告重构成 Grok 视频专属提示词。
+* **AI 音视频双轨解析**：音视频双轨同时分析，输出专业镜头拆解报告。
+
+**工具节点**
+
+* **异步任务查询与下载**：已提交任务按 task_id 继续轮询下载。
+* **API 多模型并发生图引擎**：failover 容灾/race 抢速/parallel 全量三种策略。
+* **异步图片任务组**（Submit / Result / Join / List）：后台并行提交多个任务，统一收图。
 
 ---
 

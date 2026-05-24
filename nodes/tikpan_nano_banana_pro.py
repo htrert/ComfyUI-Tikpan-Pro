@@ -89,7 +89,7 @@ class TikpanNanoBananaProNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成结果图", "📄_渲染日志")
     FUNCTION = "execute"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
 
     def parse_aspect_ratio(self, ratio_str):
         return str(ratio_str).split(" | ")[0].strip()

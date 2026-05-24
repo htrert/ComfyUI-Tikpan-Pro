@@ -91,6 +91,7 @@ COMPAT_COLUMNS = {
     "generation_logs": {
         "status": "TEXT DEFAULT 'success'",
         "image_url": "TEXT DEFAULT ''",
+        "idempotency_key": "TEXT DEFAULT ''",
         "error_message": "TEXT DEFAULT ''",
         "request_id": "TEXT DEFAULT ''",
         "raw_response": "TEXT DEFAULT ''",

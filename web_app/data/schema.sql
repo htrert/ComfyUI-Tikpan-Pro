@@ -81,12 +81,30 @@ CREATE TABLE IF NOT EXISTS generation_logs (
     prompt TEXT DEFAULT '',
     status TEXT DEFAULT 'success',
     image_url TEXT DEFAULT '',
+    idempotency_key TEXT DEFAULT '',
     error_message TEXT DEFAULT '',
     request_id TEXT DEFAULT '',
     raw_response TEXT DEFAULT '',
     refunded_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT '',
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS balance_ledger (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    entry_type TEXT NOT NULL,
+    delta INTEGER NOT NULL,
+    balance_before INTEGER NOT NULL,
+    balance_after INTEGER NOT NULL,
+    reference_type TEXT DEFAULT '',
+    reference_id TEXT DEFAULT '',
+    idempotency_key TEXT DEFAULT '',
+    status TEXT DEFAULT 'posted',
+    note TEXT DEFAULT '',
+    metadata_json TEXT DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
@@ -158,5 +176,8 @@ CREATE TABLE IF NOT EXISTS system_settings (
 CREATE INDEX IF NOT EXISTS idx_models_category ON models(category_key, sort_order);
 CREATE INDEX IF NOT EXISTS idx_model_fields_model ON model_fields(model_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_generation_logs_user_created ON generation_logs(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_generation_logs_idempotency ON generation_logs(user_id, idempotency_key);
+CREATE INDEX IF NOT EXISTS idx_balance_ledger_user_created ON balance_ledger(user_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_balance_ledger_idempotency ON balance_ledger(idempotency_key) WHERE idempotency_key <> '';
 CREATE INDEX IF NOT EXISTS idx_model_routes_model ON model_provider_routes(model_id, priority);
 CREATE INDEX IF NOT EXISTS idx_provider_channels_active ON provider_channels(is_active, priority);

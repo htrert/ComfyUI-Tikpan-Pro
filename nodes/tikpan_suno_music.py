@@ -96,7 +96,7 @@ class TikpanSunoMusicNode:
     )
     OUTPUT_NODE = True
     FUNCTION = "generate_music"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/03 音频 Audio'
 
     def safe_json_text(self, obj, max_len=800):
         try:

@@ -61,7 +61,7 @@ class TikpanGeminiVideoAnalystNode:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("📄_专业分镜与脚本报告",)
     FUNCTION = "analyze_video"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/05 提示词与分析 Prompt & Analysis'
 
     def analyze_video(
         self,

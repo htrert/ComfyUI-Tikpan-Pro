@@ -67,7 +67,7 @@ class TikpanAsyncImageSubmitNode:
     RETURN_TYPES = ("STRING", "STRING", "STRING")
     RETURN_NAMES = ("Task_ID", "Stage_Log", "Task_JSON")
     FUNCTION = "submit"
-    CATEGORY = "👑 Tikpan 官方独家节点/异步任务池 Async Engine"
+    CATEGORY = '👑 Tikpan 官方独家节点/06 任务与并发 Tools/异步任务池 Async Engine'
 
     def submit(self, **kwargs):
         api_key = str(pick(kwargs, "API_Key", "api_key", default="") or "").strip()

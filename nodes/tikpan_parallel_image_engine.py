@@ -88,7 +88,7 @@ class TikpanParallelImageEngineNode:
     RETURN_TYPES = ("IMAGE", "STRING", "STRING")
     RETURN_NAMES = ("Images", "Stage_Log", "Result_JSON")
     FUNCTION = "run"
-    CATEGORY = "👑 Tikpan 官方独家节点/并发引擎 Parallel Engine"
+    CATEGORY = '👑 Tikpan 官方独家节点/06 任务与并发 Tools/并发引擎 Parallel Engine'
 
     def run(self, **kwargs):
         start_time = time.time()

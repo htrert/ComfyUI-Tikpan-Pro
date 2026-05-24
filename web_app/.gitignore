@@ -1,5 +1,6 @@
 build/
 outputs/
+.venv/
 data/*
 !data/schema.sql
 !data/seed.example.json

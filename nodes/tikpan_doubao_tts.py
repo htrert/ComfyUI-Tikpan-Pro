@@ -155,7 +155,7 @@ class TikpanDoubaoTTS20Node:
     RETURN_NAMES = ("📁_音频路径", "🔗_音频链接", "🎙️_voice_type", "💰_计费字符数", "📋_状态日志", "🎧_音频流")
     OUTPUT_NODE = True
     FUNCTION = "generate_tts"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/03 音频 Audio'
 
     DEFAULT_OPTIONAL_VALUES = {
         "自定义voice_type": "",

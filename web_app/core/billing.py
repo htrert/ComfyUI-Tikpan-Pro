@@ -4,7 +4,7 @@
 from models import calculate_model_credits, get_model_price, update_balance, get_user
 
 
-def deduct_credits(user_id, model_id, resolution="2K", params=None):
+def deduct_credits(user_id, model_id, resolution="2K", params=None, reference_id="", idempotency_key=""):
     """
     扣费流程：检查余额 → 扣费 → 记录日志
     返回 (success, credits_used, error_msg)
@@ -21,7 +21,16 @@ def deduct_credits(user_id, model_id, resolution="2K", params=None):
     if user["balance"] < credits:
         return False, credits, f"余额不足（需要 {credits} 额度，当前 {user['balance']} 额度）"
 
-    success, error = update_balance(user_id, -credits)
+    success, error = update_balance(
+        user_id,
+        -credits,
+        entry_type="generation_debit",
+        reference_type="generation",
+        reference_id=reference_id,
+        idempotency_key=idempotency_key,
+        note=f"{model_id} 生成任务扣费：{quote.get('detail', credits)}",
+        metadata={"model_id": model_id, "quote": quote},
+    )
     if not success:
         return False, credits, error
 

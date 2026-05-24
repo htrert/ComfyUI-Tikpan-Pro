@@ -3,20 +3,61 @@ Generation API: charge user balance, call upstream provider, and keep an
 auditable job record for every attempt.
 """
 import traceback
+import uuid
 
 from flask import Blueprint, jsonify, request
 
 from backend.database import get_model
 from backend.handlers import API_DISPATCH
+from backend.handlers import normalize_image_size, option_value
+from backend.storage import get_image_url, is_oss_enabled
 from config import generate_image_token
 from core.auth import login_required
 from core.billing import deduct_credits, quote_credits
-from models import get_user, log_generation, select_model_route, update_balance, update_generation_log
+from models import (
+    get_generation_by_idempotency,
+    get_user,
+    log_generation,
+    select_model_route,
+    update_balance,
+    update_generation_log,
+)
 
 bp = Blueprint("api_generate", __name__, url_prefix="/api")
 
 MAX_PROMPT_CHARS = 8000
-MAX_REFERENCE_IMAGES = 14
+MAX_REFERENCE_IMAGES = 16
+
+PROGRESS_STAGES = [
+    {"key": "user", "label": "用户", "detail": "登录鉴权与账户识别"},
+    {"key": "server", "label": "服务器", "detail": "参数校验与任务建档"},
+    {"key": "billing", "label": "计费", "detail": "余额预扣与幂等保护"},
+    {"key": "upstream", "label": "上游", "detail": "模型网关请求与生成等待"},
+    {"key": "oss", "label": "OSS", "detail": "结果保存到本地或对象存储"},
+    {"key": "cdn", "label": "CDN", "detail": "生成可访问结果链接"},
+]
+
+
+def _progress_payload(active="server", failed="", message=""):
+    return {
+        "active": active,
+        "failed": failed,
+        "message": message,
+        "stages": PROGRESS_STAGES,
+    }
+
+
+def _error_response(error, status=500, stage="server", job_id=None, raw_response=""):
+    payload = {
+        "error": str(error),
+        "stage": stage,
+        "progress": _progress_payload(stage, stage, str(error)),
+    }
+    if job_id:
+        payload["job_id"] = job_id
+    if raw_response:
+        payload["raw_response"] = raw_response[:1200]
+    return jsonify(payload), status
 
 
 def _validate_generation_input(data, files):
@@ -46,17 +87,56 @@ def generate():
     files = request.files
     model_id, reference_images, validation_error = _validate_generation_input(data, files)
     if validation_error:
-        return jsonify({"error": validation_error}), 400
+        return _error_response(validation_error, 400, "server")
     prompt = data.get("prompt", "")
     resolution = data.get("resolution", "2K")
 
     config = get_model(model_id)
     if not config:
-        return jsonify({"error": f"未知模型: {model_id}"}), 400
+        return _error_response(f"未知模型: {model_id}", 400, "server")
 
-    success, credits, error = deduct_credits(request.user_id, model_id, resolution, data)
+    idempotency_key = (
+        request.headers.get("Idempotency-Key")
+        or data.get("idempotency_key")
+        or f"web:{request.user_id}:{model_id}:{uuid.uuid4().hex}"
+    )
+    existing_job = get_generation_by_idempotency(request.user_id, idempotency_key)
+    if existing_job:
+        if existing_job.get("status") == "success":
+            return jsonify({
+                "success": True,
+                "replayed": True,
+                "job_id": existing_job["id"],
+                "image_url": existing_job.get("image_url", ""),
+                "credits_used": existing_job.get("credits_used", 0),
+                "stage": "cdn",
+                "progress": _progress_payload("cdn", message="已复用上次成功结果"),
+                "message": "检测到重复请求，已返回上一次成功结果，未重复扣费。",
+            })
+        if existing_job.get("status") == "pending":
+            return jsonify({
+                "error": "该请求正在处理中，请稍后查看结果，未重复扣费。",
+                "job_id": existing_job["id"],
+                "stage": "server",
+                "progress": _progress_payload("server", message="该请求正在处理中，请稍后查看结果"),
+            }), 409
+        return jsonify({
+            "error": "该幂等请求此前已失败并处理退款。如需重新生成，请重新提交一次新请求。",
+            "job_id": existing_job["id"],
+            "status": existing_job.get("status"),
+            "stage": "server",
+            "progress": _progress_payload("server", "server", "此前请求已失败并退款"),
+        }), 409
+
+    success, credits, error = deduct_credits(
+        request.user_id,
+        model_id,
+        resolution,
+        data,
+        idempotency_key=f"debit:{idempotency_key}",
+    )
     if not success:
-        return jsonify({"error": error}), 402
+        return _error_response(error, 402, "billing")
 
     job_id = log_generation(
         request.user_id,
@@ -64,6 +144,7 @@ def generate():
         credits,
         prompt,
         status="pending",
+        idempotency_key=idempotency_key,
     )
 
     try:
@@ -80,16 +161,21 @@ def generate():
                 request.user_id,
                 credits,
                 f"未知 API 类型: {api_type}",
+                stage="server",
             )
 
         result, error = _call_handler(api_type, handler, model_id, data, reference_images)
         if error:
-            return _refund_and_fail(job_id, request.user_id, credits, str(error))
+            return _refund_and_fail(job_id, request.user_id, credits, str(error), stage="upstream")
 
         result = result or {}
         if result.get("filename"):
-            result["token"] = generate_image_token(result["filename"])
-            result["secure_url"] = f"/outputs/{result['filename']}?token={result['token']}"
+            cdn_url = get_image_url(result["filename"]) if is_oss_enabled() else ""
+            if cdn_url:
+                result["secure_url"] = cdn_url
+            else:
+                result["token"] = generate_image_token(result["filename"])
+                result["secure_url"] = f"/outputs/{result['filename']}?token={result['token']}"
 
         image_url = (
             result.get("secure_url")
@@ -111,9 +197,16 @@ def generate():
 
         result["credits_used"] = credits
         result["job_id"] = job_id
+        result["progress"] = _progress_payload("cdn", message="结果已生成并完成访问链接")
 
         user = get_user(request.user_id)
-        return jsonify({"success": True, "result": result, "balance": user["balance"]})
+        return jsonify({
+            "success": True,
+            "result": result,
+            "balance": user["balance"],
+            "stage": "cdn",
+            "progress": result["progress"],
+        })
 
     except Exception as exc:
         tb = traceback.format_exc()
@@ -124,6 +217,7 @@ def generate():
             credits,
             f"服务器异常: {str(exc)[:500]}",
             raw_response=tb[:4000],
+            stage="server",
         )
 
 
@@ -136,7 +230,7 @@ def request_preview():
         return jsonify({"error": validation_error}), 400
     config = get_model(model_id)
     if not config:
-        return jsonify({"error": f"未知模型: {model_id}"}), 400
+        return _error_response(f"未知模型: {model_id}", 400, "server")
 
     preview = {
         "version": "2026-05-11",
@@ -153,6 +247,7 @@ def request_preview():
             if key not in ("api_key",)
         },
         "reference_images": [f.filename for f in reference_images],
+        "progress_stages": PROGRESS_STAGES,
         "execution": {
             "mode": "upstream",
             "billing": "preview_only_no_charge",
@@ -163,6 +258,7 @@ def request_preview():
 
 
 def _call_handler(api_type, handler, model_id, data, reference_images):
+    api_key = str(data.get("api_key") or "").strip() or None
     if api_type == "gemini_native":
         return handler(
             model_id,
@@ -171,31 +267,40 @@ def _call_handler(api_type, handler, model_id, data, reference_images):
             data.get("aspect_ratio", "1:1"),
             reference_images,
             int(data.get("seed", 0)),
-            None,
+            api_key,
         )
     if api_type == "doubao":
+        data["size"] = normalize_image_size(data)
         return handler(
             data.get("prompt", ""),
             data.get("model_variant", "doubao-seedream-5-0"),
             data.get("size", "1024x1024"),
             reference_images,
             int(data.get("n", 1)),
-            None,
+            api_key,
         )
     if api_type == "suno":
         extra = {k.replace("suno_", ""): v for k, v in data.items() if k.startswith("suno_")}
+        for key in ("title", "tags", "custom_tags", "negative_tags", "make_instrumental", "generation_type", "continue_clip_id", "continue_at", "persona_id", "send_advanced", "vocal_gender", "auto_generate_lyrics", "style_weight", "weirdness", "reference_audio_id"):
+            if key in data and key not in extra:
+                extra[key] = data.get(key)
         return handler(
             data.get("mode", "灵感模式"),
             data.get("prompt", ""),
             data.get("model_version", "chirp-v5"),
             extra,
-            None,
+            api_key,
         )
     if api_type == "grok_video":
+        grok_model = data.get("model", "grok-video-3")
+        duration = "10s" if str(grok_model).endswith("10s") else "6s"
         return handler(
             data.get("prompt", ""),
-            data.get("duration", "5s"),
+            option_value(data.get("duration"), duration),
             None,
+            data,
+            reference_images,
+            api_key,
         )
     if api_type == "openai_responses":
         return handler(
@@ -203,20 +308,31 @@ def _call_handler(api_type, handler, model_id, data, reference_images):
             data.get("system_prompt", ""),
             reference_images,
             data,
-            None,
+            api_key,
         )
     if api_type == "gemini_analysis":
         return handler(
             data.get("prompt", "") or data.get("analysis_requirement", ""),
             reference_images,
             data,
-            None,
+            api_key,
         )
+    if api_type == "tikpan_proxy":
+        return handler(model_id, data, reference_images, api_key)
     return None, f"未实现的 API 类型: {api_type}"
 
 
-def _refund_and_fail(job_id, user_id, credits, error, raw_response=""):
-    update_balance(user_id, credits)
+def _refund_and_fail(job_id, user_id, credits, error, raw_response="", stage="upstream"):
+    update_balance(
+        user_id,
+        credits,
+        entry_type="generation_refund",
+        reference_type="generation",
+        reference_id=job_id,
+        idempotency_key=f"refund:generation:{job_id}",
+        note=f"生成失败自动退回 {credits} 额度",
+        metadata={"error": str(error)[:500]},
+    )
     update_generation_log(
         job_id,
         status="refunded",
@@ -224,4 +340,9 @@ def _refund_and_fail(job_id, user_id, credits, error, raw_response=""):
         raw_response=raw_response,
         refunded_at="now",
     )
-    return jsonify({"error": error, "job_id": job_id}), 500
+    return jsonify({
+        "error": error,
+        "job_id": job_id,
+        "stage": stage,
+        "progress": _progress_payload(stage, stage, str(error)),
+    }), 500

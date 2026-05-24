@@ -45,7 +45,7 @@ class TikpanGrokPromptOptimizerNode:
     RETURN_TYPES = ("STRING", "STRING")
     RETURN_NAMES = ("🎯_Grok3专属提示词", "🧠_GPT重构思考日志")
     FUNCTION = "optimize_prompt"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/05 提示词与分析 Prompt & Analysis'
 
     def optimize_prompt(self, 获取密钥地址, Tikpan_API密钥, 文本处理模型, Gemini原片拆解报告, 核心产品与植入场景, 氛围与运镜微调, **kwargs):
         comfy.model_management.throw_exception_if_processing_interrupted()

@@ -281,6 +281,96 @@ textarea{min-height:80px;resize:vertical}
   border-top:1px solid var(--border);
 }
 
+/* Config Builder */
+.toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;margin-bottom:12px;flex-wrap:wrap;
+}
+
+.toolbar-left,.toolbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+.field-list{display:flex;flex-direction:column;gap:8px}
+.sort-list{display:flex;flex-direction:column;gap:8px}
+
+.sort-row{
+  display:grid;
+  grid-template-columns:34px minmax(170px,1fr) minmax(120px,.75fr) minmax(100px,.6fr) 220px;
+  gap:10px;align-items:center;
+  padding:10px 12px;border:1px solid var(--border);
+  border-radius:var(--radius-sm);background:var(--bg2);
+  transition:border-color .15s,background .15s;
+}
+.sort-row:hover{border-color:var(--accent);background:var(--accent-light)}
+.sort-row.dragging{opacity:.55;border-style:dashed}
+
+.field-row{
+  display:grid;
+  grid-template-columns:34px minmax(150px,1fr) 110px minmax(160px,1.1fr) 84px 210px;
+  gap:10px;align-items:center;
+  padding:10px 12px;border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:var(--bg2);
+  transition:border-color .15s,background .15s,box-shadow .15s;
+}
+
+.field-row:hover{border-color:var(--accent);background:var(--accent-light)}
+.field-row.dragging{opacity:.55;border-style:dashed}
+.drag-handle{
+  width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--border);border-radius:var(--radius-sm);
+  color:var(--text3);cursor:grab;background:var(--bg3);
+}
+.drag-handle:active{cursor:grabbing}
+
+.field-meta{min-width:0}
+.field-meta strong{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.field-meta code{display:inline-block;margin-top:3px}
+.field-actions{display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+.muted{color:var(--text3);font-size:12px}
+
+.config-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1.45fr) minmax(280px,.75fr);
+  gap:16px;align-items:start;
+}
+
+.preset-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.preset-btn{
+  padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  background:var(--bg2);color:var(--text);font-size:12px;font-weight:600;
+  cursor:pointer;text-align:left;transition:all .15s;
+}
+.preset-btn span{display:block;font-size:11px;color:var(--text3);font-weight:500;margin-top:2px}
+.preset-btn:hover{border-color:var(--accent);background:var(--accent-light);color:var(--accent)}
+
+.option-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.option-row{display:grid;grid-template-columns:28px 1fr 70px;gap:8px;align-items:center}
+.option-row.dragging{opacity:.55}
+.option-row input{height:34px}
+
+.preview-panel{
+  position:sticky;top:16px;
+  border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--bg2);padding:16px;
+}
+.preview-title{font-size:12px;font-weight:700;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:12px}
+.preview-control{border:1px dashed var(--border2);border-radius:var(--radius-sm);padding:12px;background:var(--bg)}
+.preview-control label{font-size:13px}
+.preview-upload{
+  min-height:88px;border:1px dashed var(--border2);border-radius:var(--radius-sm);
+  display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:12px;background:var(--bg3);
+}
+.preview-log{font-size:12px;color:var(--text3);line-height:1.7;margin-top:12px}
+
+@media (max-width: 1100px){
+  .config-layout{grid-template-columns:1fr}
+  .preview-panel{position:static}
+  .field-row{grid-template-columns:34px minmax(140px,1fr) 100px minmax(120px,1fr)}
+  .field-row .field-actions{grid-column:1 / -1;justify-content:flex-start}
+  .sort-row{grid-template-columns:34px minmax(140px,1fr) minmax(100px,1fr)}
+  .sort-row .field-actions{grid-column:1 / -1;justify-content:flex-start}
+}
+
 /* Badge */
 .badge{
   display:inline-block;padding:1px 6px;
@@ -332,6 +422,9 @@ textarea{min-height:80px;resize:vertical}
     <button class="side-item" onclick="showTab('pricing', this)">
       <span class="icon">💰</span> 计价规则
     </button>
+    <button class="side-item" onclick="showTab('ledger', this)">
+      <span class="icon">📒</span> 余额流水
+    </button>
     <button class="side-item" onclick="showTab('settings', this)">
       <span class="icon">⚙️</span> 系统设置
     </button>
@@ -350,7 +443,11 @@ let models = [];
 let channels = [];
 let pricingRules = [];
 let routes = [];
+let ledgerEntries = [];
 let selectedModelId = null;
+let fieldOptions = [];
+let draggedFieldId = null;
+let draggedOptionIndex = null;
 
 async function api(url, method='GET', body=null) {
   const opts = {method, headers:{}};
@@ -358,6 +455,29 @@ async function api(url, method='GET', body=null) {
   const resp = await fetch(url, opts);
   if (!resp.ok) throw await resp.json();
   return resp.json();
+}
+
+function esc(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function jsArg(value) {
+  return esc(JSON.stringify(String(value ?? '')));
+}
+
+function parseJsonSafe(value, fallback) {
+  if (!value) return fallback;
+  try { return JSON.parse(value); } catch { return fallback; }
+}
+
+function asNumber(value, fallback=0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 async function logout() {
@@ -373,6 +493,7 @@ function showTab(tab, btn) {
   else if (tab==='fields') renderFields();
   else if (tab==='channels') renderChannels();
   else if (tab==='pricing') renderPricing();
+  else if (tab==='ledger') renderLedger();
   else if (tab==='settings') renderSettings();
   else if (tab==='about') renderAbout();
 }
@@ -387,25 +508,30 @@ async function renderCategories() {
     `<div class="card">
       <div class="card-header">
         <div class="card-title"><span class="icon">📂</span> 全部分类 (${categories.length})</div>
-        <button class="btn btn-primary btn-sm" onclick="showAddCat()">+ 新增分类</button>
+        <div class="toolbar-right">
+          <button class="btn btn-edit btn-sm" onclick="saveSortOrder('category')">保存排序</button>
+          <button class="btn btn-primary btn-sm" onclick="showAddCat()">+ 新增分类</button>
+        </div>
       </div>`,
   ];
   if (categories.length===0) h.push('<div class="empty"><div class="empty-icon">📂</div>暂无分类</div>');
   else {
-    h.push('<table><tr><th>排序</th><th>标识</th><th>名称</th><th>图标</th><th>操作</th></tr>');
+    h.push('<div class="sort-list" id="category-sort-list">');
     for (const c of categories) {
-      h.push(`<tr>
-        <td>${c.sort_order||'—'}</td>
-        <td><code>${c.key}</code></td>
-        <td>${c.name}</td>
-        <td>${c.icon||'📦'}</td>
-        <td>
+      h.push(`<div class="sort-row" draggable="true" data-id="${c.id}" data-kind="category" ondragstart="sortDragStart(event)" ondragover="sortDragOver(event)" ondrop="sortDrop(event)" ondragend="sortDragEnd(event)">
+        <span class="drag-handle" title="拖拽排序">↕</span>
+        <div class="field-meta"><strong>${esc(c.name)}</strong><code>${esc(c.key)}</code></div>
+        <div class="muted">图标：${esc(c.icon || '📦')}</div>
+        <div class="muted">排序：${c.sort_order||'—'}</div>
+        <div class="field-actions">
+          <button class="btn btn-sm btn-edit" onclick="moveSortRow('category', ${c.id}, -1)">上移</button>
+          <button class="btn btn-sm btn-edit" onclick="moveSortRow('category', ${c.id}, 1)">下移</button>
           <button class="btn btn-sm btn-edit" onclick="editCat(${c.id})">编辑</button>
           <button class="btn btn-sm btn-danger" onclick="delCat(${c.id})">删除</button>
-        </td>
-      </tr>`);
+        </div>
+      </div>`);
     }
-    h.push('</table>');
+    h.push('</div><div class="muted" id="category-order-status" style="margin-top:10px">拖动分类可调整前台侧边栏顺序。</div>');
   }
   h.push('</div>');
   document.getElementById('main-content').innerHTML = h.join('');
@@ -413,6 +539,61 @@ async function renderCategories() {
 
 function showAddCat() { showCatForm(null); }
 function editCat(id) { showCatForm(categories.find(c=>c.id===id)); }
+
+function sortDragStart(e) {
+  e.currentTarget.classList.add('dragging');
+}
+
+function sortDragOver(e) {
+  e.preventDefault();
+  const list = e.currentTarget.parentElement;
+  const dragging = list?.querySelector('.sort-row.dragging');
+  if (!list || !dragging) return;
+  const afterElement = getSortAfterElement(list, e.clientY);
+  if (afterElement == null) list.appendChild(dragging);
+  else list.insertBefore(dragging, afterElement);
+}
+
+function sortDrop(e) {
+  e.preventDefault();
+  const kind = e.currentTarget.dataset.kind;
+  saveSortOrder(kind, false);
+}
+
+function sortDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+}
+
+function getSortAfterElement(container, y) {
+  const rows = [...container.querySelectorAll('.sort-row:not(.dragging)')];
+  return rows.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) return { offset, element: child };
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+async function moveSortRow(kind, id, direction) {
+  const list = document.getElementById(`${kind}-sort-list`);
+  const row = list?.querySelector(`.sort-row[data-id="${CSS.escape(String(id))}"]`);
+  if (!row) return;
+  if (direction < 0 && row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling);
+  if (direction > 0 && row.nextElementSibling) row.parentNode.insertBefore(row.nextElementSibling, row);
+  await saveSortOrder(kind, false);
+}
+
+async function saveSortOrder(kind, showToast=true) {
+  const list = document.getElementById(`${kind}-sort-list`);
+  if (!list) return;
+  const ids = Array.from(list.querySelectorAll('.sort-row')).map(row => row.dataset.id);
+  const endpoint = kind === 'category' ? '/admin/api/categories/reorder' : '/admin/api/models/reorder';
+  const status = document.getElementById(`${kind}-order-status`);
+  if (status) status.textContent = '正在保存排序...';
+  await api(endpoint, 'POST', { ids });
+  if (status) status.textContent = `排序已保存 · ${new Date().toLocaleTimeString()}`;
+  if (showToast) alert('排序已保存');
+}
 
 function showCatForm(cat) {
   const isEdit = !!cat;
@@ -463,29 +644,32 @@ async function renderModels() {
     `<div class="card">
       <div class="card-header">
         <div class="card-title"><span class="icon">🧬</span> 全部模型 (${models.length})</div>
-        <button class="btn btn-primary btn-sm" onclick="showAddModel()">+ 新增模型</button>
+        <div class="toolbar-right">
+          <button class="btn btn-edit btn-sm" onclick="saveSortOrder('model')">保存排序</button>
+          <button class="btn btn-primary btn-sm" onclick="showAddModel()">+ 新增模型</button>
+        </div>
       </div>`,
   ];
   if (models.length===0) h.push('<div class="empty"><div class="empty-icon">🧬</div>暂无模型</div>');
   else {
-    h.push('<table><tr><th>排序</th><th>模型ID</th><th>名称</th><th>分类</th><th>API类型</th><th>状态</th><th>操作</th></tr>');
+    h.push('<div class="sort-list" id="model-sort-list">');
     for (const m of models) {
       const cat = categories.find(c=>c.key===m.category_key);
-      h.push(`<tr>
-        <td>${m.sort_order||'—'}</td>
-        <td><code>${m.id}</code></td>
-        <td>${m.name}</td>
-        <td>${cat?cat.name:m.category_key}</td>
-        <td><span class="tag tag-blue">${m.api_type}</span></td>
-        <td><span class="tag ${m.is_active?'tag-green':'tag-red'}">${m.is_active?'上线':'下线'}</span></td>
-        <td>
-          <button class="btn btn-sm btn-edit" onclick="editModel('${m.id}')">编辑</button>
-          <button class="btn btn-sm btn-edit" onclick="manageFields('${m.id}')">字段</button>
-          <button class="btn btn-sm btn-danger" onclick="delModel('${m.id}')">删除</button>
-        </td>
-      </tr>`);
+      h.push(`<div class="sort-row" draggable="true" data-id="${esc(m.id)}" data-kind="model" ondragstart="sortDragStart(event)" ondragover="sortDragOver(event)" ondrop="sortDrop(event)" ondragend="sortDragEnd(event)">
+        <span class="drag-handle" title="拖拽排序">↕</span>
+        <div class="field-meta"><strong>${esc(m.name)}</strong><code>${esc(m.id)}</code></div>
+        <div class="muted">${esc(cat?cat.name:m.category_key)}</div>
+        <div><span class="tag tag-blue">${esc(m.api_type)}</span> <span class="tag ${m.is_active?'tag-green':'tag-red'}">${m.is_active?'上线':'下线'}</span></div>
+        <div class="field-actions">
+          <button class="btn btn-sm btn-edit" onclick="moveSortRow('model', ${jsArg(m.id)}, -1)">上移</button>
+          <button class="btn btn-sm btn-edit" onclick="moveSortRow('model', ${jsArg(m.id)}, 1)">下移</button>
+          <button class="btn btn-sm btn-edit" onclick="editModel(${jsArg(m.id)})">编辑</button>
+          <button class="btn btn-sm btn-edit" onclick="manageFields(${jsArg(m.id)})">字段</button>
+          <button class="btn btn-sm btn-danger" onclick="delModel(${jsArg(m.id)})">删除</button>
+        </div>
+      </div>`);
     }
-    h.push('</table>');
+    h.push('</div><div class="muted" id="model-order-status" style="margin-top:10px">拖动模型可调整前台模型展示顺序。</div>');
   }
   h.push('</div>');
   document.getElementById('main-content').innerHTML = h.join('');
@@ -567,41 +751,50 @@ async function delModel(id) {
 async function renderFields() {
   categories = await api('/admin/api/categories');
   models = await api('/admin/api/models');
+  const selectedModel = models.find(m => m.id === selectedModelId);
   let h = [
     `<div class="page-title">📋 字段管理</div>`,
-    `<div class="page-desc">字段是模型表单中的输入控件，控制用户能看到哪些参数</div>`,
-    `<div class="notice">💡 选择一个模型来管理它的字段。每个字段对应一个表单控件。</div>`,
+    `<div class="page-desc">用可视化方式配置模型参数、前台表单控件和展示顺序</div>`,
+    `<div class="notice">💡 字段会直接决定用户在前台看到的参数。优先使用参数模板和下拉选项，减少用户手填 API 参数的成本。</div>`,
     `<div class="card">
       <div class="form-row" style="grid-template-columns:1fr">
-        <div><label>选择模型</label><select onchange="loadFields(this.value)"><option value="">-- 请选择 --</option>`;
-  for (const m of models) h.push(`<option value="${m.id}" ${m.id===selectedModelId?'selected':''}>${m.name} (${m.id})</option>`);
+        <div><label>选择模型</label><select onchange="loadFields(this.value)"><option value="">-- 请选择 --</option>`
+  ];
+  for (const m of models) h.push(`<option value="${esc(m.id)}" ${m.id===selectedModelId?'selected':''}>${esc(m.name)} (${esc(m.id)})</option>`);
   h.push('</select></div></div></div>');
 
   if (selectedModelId) {
     const fields = await api(`/admin/api/models/${selectedModelId}/fields`);
     h.push(`<div class="card">
       <div class="card-header">
-        <div class="card-title"><span class="icon">📋</span> ${selectedModelId} 的字段 (${fields.length})</div>
-        <button class="btn btn-primary btn-sm" onclick="showAddField()">+ 新增字段</button>
+        <div>
+          <div class="card-title"><span class="icon">📋</span> ${esc(selectedModel?.name || selectedModelId)} 的字段 (${fields.length})</div>
+          <div class="muted" style="margin-top:5px"><code>${esc(selectedModelId)}</code> · 拖动字段左侧手柄即可调整前台显示顺序</div>
+        </div>
+        <div class="toolbar-right">
+          <button class="btn btn-edit btn-sm" onclick="saveFieldOrder()">保存排序</button>
+          <button class="btn btn-primary btn-sm" onclick="showAddField()">+ 新增字段</button>
+        </div>
       </div>`);
     if (fields.length===0) h.push('<div class="empty"><div class="empty-icon">📋</div>暂无字段</div>');
     else {
-      h.push('<table><tr><th>排序</th><th>Key</th><th>类型</th><th>标签</th><th>必填</th><th>默认值</th><th>操作</th></tr>');
+      h.push('<div class="field-list" id="field-list">');
       for (const f of fields) {
-        h.push(`<tr>
-          <td>${f.sort_order||'—'}</td>
-          <td><code>${f.field_key}</code></td>
-          <td><span class="tag tag-blue">${f.field_type}</span></td>
-          <td>${f.label}</td>
-          <td><span class="tag ${f.required?'tag-green':'tag-gray'}">${f.required?'是':'否'}</span></td>
-          <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis">${f.default_value||'—'}</td>
-          <td>
+        h.push(`<div class="field-row" draggable="true" data-id="${f.id}" ondragstart="fieldDragStart(event)" ondragover="fieldDragOver(event)" ondrop="fieldDrop(event)" ondragend="fieldDragEnd(event)">
+          <span class="drag-handle" title="拖拽排序">↕</span>
+          <div class="field-meta"><strong>${esc(f.label || f.field_key)}</strong><code>${esc(f.field_key)}</code></div>
+          <div><span class="tag tag-blue">${esc(f.field_type)}</span></div>
+          <div class="muted">${esc(f.placeholder || f.default_value || '无占位/默认值')}</div>
+          <div><span class="tag ${f.required?'tag-green':'tag-gray'}">${f.required?'必填':'选填'}</span></div>
+          <div class="field-actions">
+            <button class="btn btn-sm btn-edit" onclick="moveField(${f.id}, -1)">上移</button>
+            <button class="btn btn-sm btn-edit" onclick="moveField(${f.id}, 1)">下移</button>
             <button class="btn btn-sm btn-edit" onclick="editField(${f.id})">编辑</button>
             <button class="btn btn-sm btn-danger" onclick="delField(${f.id})">删除</button>
-          </td>
-        </tr>`);
+          </div>
+        </div>`);
       }
-      h.push('</table>');
+      h.push('</div><div class="muted" id="field-order-status" style="margin-top:10px">排序调整后会自动保存，也可以点击右上角手动保存。</div>');
     }
     h.push('</div>');
   }
@@ -619,65 +812,377 @@ async function editField(id) {
   showFieldForm(fields.find(f=>f.id===id));
 }
 
+const FIELD_PRESETS = {
+  prompt: {
+    title: '提示词', desc: '大段文本输入',
+    field_key: 'prompt', field_type: 'textarea', label: '提示词',
+    placeholder: '描述你想生成或分析的内容', default_value: '', rows: 5, required: 1, options: []
+  },
+  negative_prompt: {
+    title: '反向提示词', desc: '不希望出现的内容',
+    field_key: 'negative_prompt', field_type: 'textarea', label: '反向提示词',
+    placeholder: '例如：低清晰度、变形、文字错误', default_value: '', rows: 3, required: 0, options: []
+  },
+  aspect_ratio: {
+    title: '画面比例', desc: '常用尺寸下拉',
+    field_key: 'aspect_ratio', field_type: 'select', label: '画面比例',
+    placeholder: '', default_value: '16:9', rows: 4, required: 1,
+    options: ['1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '21:9']
+  },
+  resolution: {
+    title: '清晰度', desc: '计费常用档位',
+    field_key: 'resolution', field_type: 'select', label: '清晰度',
+    placeholder: '', default_value: '2K', rows: 4, required: 1,
+    options: ['1K', '2K', '4K']
+  },
+  image_upload: {
+    title: '参考图片', desc: '单/多图上传',
+    field_key: 'image', field_type: 'file_image', label: '参考图片',
+    placeholder: '', default_value: '', rows: 4, required: 0, max_count: 1, options: []
+  },
+  image_group: {
+    title: '多张参考图', desc: '垫图/组件图',
+    field_key: 'images', field_type: 'file_image', label: '参考图组',
+    placeholder: '', default_value: '', rows: 4, required: 0, max_count: 3, options: []
+  },
+  duration: {
+    title: '视频时长', desc: '秒数下拉',
+    field_key: 'duration', field_type: 'select', label: '视频时长',
+    placeholder: '', default_value: '8', rows: 4, required: 1,
+    options: ['5', '8', '10']
+  },
+  output_format: {
+    title: '输出格式', desc: 'URL/文件/Base64',
+    field_key: 'output_format', field_type: 'select', label: '输出格式',
+    placeholder: '', default_value: 'url', rows: 4, required: 0,
+    options: ['url', 'file', 'base64']
+  },
+  seed: {
+    title: '随机种子', desc: '复现结果用',
+    field_key: 'seed', field_type: 'number', label: '随机种子',
+    placeholder: '-1 表示随机', default_value: '-1', rows: 4, required: 0, options: []
+  }
+};
+
+const PROVIDER_TYPES = [
+  ['tikpan', 'Tikpan 中转站'],
+  ['openai', 'OpenAI 兼容'],
+  ['google', 'Google Gemini'],
+  ['doubao', '火山/豆包'],
+  ['suno', 'Suno 音乐'],
+  ['custom', '自定义供应商']
+];
+
+const BASE_URL_PRESETS = {
+  tikpan: 'https://tikpan.com',
+  openai: 'https://api.openai.com',
+  google: 'https://generativelanguage.googleapis.com',
+  doubao: 'https://ark.cn-beijing.volces.com',
+  suno: 'https://tikpan.com',
+  custom: ''
+};
+
+const ENDPOINT_PRESETS = [
+  ['/v1/chat/completions', 'OpenAI 聊天'],
+  ['/v1/responses', 'OpenAI Responses'],
+  ['/v1/images/generations', 'OpenAI 生图'],
+  ['/v1/images/edits', 'OpenAI 修图'],
+  ['/v1/videos', 'OpenAI 视频'],
+  ['/v1beta/models/{model}:generateContent', 'Gemini 内容生成'],
+  ['/v1/audio/speech', '语音合成']
+];
+
+function normalizeOptions(raw) {
+  const arr = Array.isArray(raw) ? raw : [];
+  return arr.map(item => {
+    if (typeof item === 'string') return item;
+    if (item && typeof item === 'object') return item.label || item.value || '';
+    return String(item ?? '');
+  }).filter(Boolean);
+}
+
 function showFieldForm(field) {
   const isEdit = !!field;
-  const extra = field?.field_type==='select' ? JSON.parse(field?.options_json||'[]') : [];
+  fieldOptions = normalizeOptions(parseJsonSafe(field?.options_json, []));
+  const groupConfig = parseJsonSafe(field?.group_config_json, {});
+  const presetButtons = Object.entries(FIELD_PRESETS).map(([key, preset]) =>
+    `<button class="preset-btn" type="button" onclick="applyFieldPreset('${key}')">${esc(preset.title)}<span>${esc(preset.desc)}</span></button>`
+  ).join('');
   document.getElementById('main-content').innerHTML = `
     <div class="page-title">${isEdit?'✏️ 编辑':'➕ 新增'}字段</div>
-    <div class="card">
-      <div class="form-row">
-        <div><label>字段 Key</label><input id="f-key" value="${field?.field_key||''}" ${isEdit?'readonly':''} placeholder="如：prompt"></div>
-        <div><label>标签</label><input id="f-label" value="${field?.label||''}" placeholder="如：📝 提示词"></div>
-      </div>
-      <div class="form-row">
-        <div>
-          <label>类型</label>
-          <select id="f-type" onchange="toggleFieldOpts()">
-            <option value="textarea" ${field?.field_type==='textarea'?'selected':''}>多行文本</option>
-            <option value="text" ${field?.field_type==='text'?'selected':''}>单行文本</option>
-            <option value="select" ${field?.field_type==='select'?'selected':''}>下拉选择</option>
-            <option value="number" ${field?.field_type==='number'?'selected':''}>数字</option>
-            <option value="checkbox" ${field?.field_type==='checkbox'?'selected':''}>复选框</option>
-            <option value="file_image" ${field?.field_type==='file_image'?'selected':''}>上传图片</option>
-            <option value="select_group" ${field?.field_type==='select_group'?'selected':''}>分组选择器</option>
-          </select>
+    <div class="config-layout">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><span class="icon">🧩</span> 可视化字段配置</div>
+            <div class="muted" style="margin-top:5px">先套用常用参数模板，再微调 Key、标签和选项。</div>
+          </div>
         </div>
-        <div><label>排序</label><input id="f-sort" type="number" value="${field?.sort_order||0}"></div>
-      </div>
-      <div class="form-row">
-        <div><label>占位文本</label><input id="f-placeholder" value="${field?.placeholder||''}"></div>
-        <div><label>默认值</label><input id="f-default" value="${field?.default_value||''}"></div>
-      </div>
-      <div class="form-row">
-        <div><label>必填</label><select id="f-required"><option value="1" ${field?.required?'selected':''}>是</option><option value="0" ${!field?.required?'selected':''}>否</option></select></div>
-        <div><label>行数 (多行文本)</label><input id="f-rows" type="number" value="${field?.rows||4}"></div>
-      </div>
-      <div id="f-select-opts" style="${(field?.field_type==='select'||field?.field_type==='file_image')?'':'display:none'}">
-        <label>选项（每行一个）</label>
-        <textarea id="f-options" rows="4" placeholder="每行一个选项">${extra.join('\n')}</textarea>
-      </div>
-      <div id="f-file-opts" style="${field?.field_type==='file_image'?'':'display:none'}">
-        <div class="form-row" style="grid-template-columns:1fr">
-          <div><label>最大文件数</label><input id="f-maxcount" type="number" value="${field?.max_count||14}"></div>
+        <div class="preset-grid">${presetButtons}</div>
+
+        <div class="form-row">
+          <div><label>字段 Key</label><input id="f-key" value="${esc(field?.field_key||'')}" ${isEdit?'readonly':''} placeholder="如：prompt"></div>
+          <div><label>前台标签</label><input id="f-label" value="${esc(field?.label||'')}" placeholder="如：提示词"></div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label>控件类型</label>
+            <select id="f-type" onchange="toggleFieldOpts()">
+              <option value="textarea" ${field?.field_type==='textarea'?'selected':''}>多行文本</option>
+              <option value="text" ${field?.field_type==='text'?'selected':''}>单行文本</option>
+              <option value="select" ${field?.field_type==='select'?'selected':''}>下拉选择</option>
+              <option value="number" ${field?.field_type==='number'?'selected':''}>数字输入</option>
+              <option value="checkbox" ${field?.field_type==='checkbox'?'selected':''}>开关/复选</option>
+              <option value="file_image" ${field?.field_type==='file_image'?'selected':''}>图片上传</option>
+              <option value="select_group" ${field?.field_type==='select_group'?'selected':''}>分组选择器</option>
+            </select>
+          </div>
+          <div><label>排序值</label><input id="f-sort" type="number" value="${field?.sort_order||0}"></div>
+        </div>
+        <div class="form-row">
+          <div><label>占位提示</label><input id="f-placeholder" value="${esc(field?.placeholder||'')}" placeholder="给用户看的输入提示"></div>
+          <div><label>默认值</label><input id="f-default" value="${esc(field?.default_value||'')}"></div>
+        </div>
+        <div class="form-row">
+          <div><label>是否必填</label><select id="f-required"><option value="1" ${field?.required?'selected':''}>必填</option><option value="0" ${!field?.required?'selected':''}>选填</option></select></div>
+          <div><label>文本行数</label><input id="f-rows" type="number" min="1" max="20" value="${field?.rows||4}"></div>
+        </div>
+
+        <div id="f-select-opts">
+          <div class="toolbar">
+            <label style="margin:0">下拉选项</label>
+            <button class="btn btn-edit btn-sm" type="button" onclick="addOption()">+ 添加选项</button>
+          </div>
+          <div class="option-list" id="option-list"></div>
+          <div class="muted" style="margin-top:8px">这些值会显示在用户前台下拉框里，拖动可调整顺序。</div>
+        </div>
+
+        <div id="f-group-opts">
+          <label>分组选项高级 JSON</label>
+          <textarea id="f-group-config" rows="7" placeholder='{"选项名":{"desc":"说明","fields_extra":[]}}'>${esc(JSON.stringify(groupConfig, null, 2))}</textarea>
+          <div class="muted" style="margin-top:6px">适合 Suno 这类“选择模式后再出现附加参数”的模型；不需要附加字段时可留空为 {}。</div>
+        </div>
+
+        <div id="f-file-opts">
+          <div class="form-row" style="grid-template-columns:1fr">
+            <div><label>最大图片数</label><input id="f-maxcount" type="number" min="1" max="20" value="${field?.max_count||1}"></div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-edit" onclick="renderFields()">取消</button>
+          <button class="btn btn-primary" onclick="saveField('${isEdit?field.id:''}')">💾 保存字段</button>
         </div>
       </div>
-      <div class="actions">
-        <button class="btn btn-edit" onclick="renderFields()">取消</button>
-        <button class="btn btn-primary" onclick="saveField('${isEdit?field.id:''}')">💾 保存</button>
+
+      <div class="preview-panel">
+        <div class="preview-title">前台效果预览</div>
+        <div id="field-preview"></div>
+        <div class="preview-log" id="field-preview-meta"></div>
       </div>
     </div>`;
+  bindFieldFormPreview();
+  renderOptionEditor();
+  toggleFieldOpts();
 }
 
 function toggleFieldOpts() {
   const t = document.getElementById('f-type').value;
-  document.getElementById('f-select-opts').style.display = t==='select'||t==='file_image'?'':'none';
+  document.getElementById('f-select-opts').style.display = (t==='select'||t==='select_group')?'':'none';
+  document.getElementById('f-group-opts').style.display = t==='select_group'?'':'none';
   document.getElementById('f-file-opts').style.display = t==='file_image'?'':'none';
+  updateFieldPreview();
+}
+
+function bindFieldFormPreview() {
+  document.querySelectorAll('#main-content input, #main-content select, #main-content textarea').forEach(el => {
+    el.addEventListener('input', updateFieldPreview);
+    el.addEventListener('change', updateFieldPreview);
+  });
+}
+
+function applyFieldPreset(key) {
+  const preset = FIELD_PRESETS[key];
+  if (!preset) return;
+  const set = (id, value) => { const el = document.getElementById(id); if (el && !el.readOnly) el.value = value ?? ''; };
+  set('f-key', preset.field_key);
+  set('f-label', preset.label);
+  set('f-placeholder', preset.placeholder);
+  set('f-default', preset.default_value);
+  set('f-rows', preset.rows || 4);
+  document.getElementById('f-type').value = preset.field_type;
+  document.getElementById('f-required').value = String(preset.required || 0);
+  fieldOptions = [...(preset.options || [])];
+  const maxEl = document.getElementById('f-maxcount');
+  if (maxEl) maxEl.value = preset.max_count || 1;
+  renderOptionEditor();
+  toggleFieldOpts();
+}
+
+function renderOptionEditor() {
+  const list = document.getElementById('option-list');
+  if (!list) return;
+  if (!fieldOptions.length) {
+    list.innerHTML = '<div class="empty" style="padding:18px">暂无选项，点击“添加选项”开始配置</div>';
+    updateFieldPreview();
+    return;
+  }
+  list.innerHTML = fieldOptions.map((value, index) => `
+    <div class="option-row" draggable="true" data-index="${index}" ondragstart="optionDragStart(event)" ondragover="optionDragOver(event)" ondrop="optionDrop(event)" ondragend="optionDragEnd(event)">
+      <span class="drag-handle" title="拖拽排序">↕</span>
+      <input class="option-input" value="${esc(value)}" placeholder="选项值" oninput="syncOption(${index}, this.value)">
+      <div class="field-actions">
+        <button class="btn btn-sm btn-edit" type="button" onclick="moveOption(${index}, -1)">↑</button>
+        <button class="btn btn-sm btn-danger" type="button" onclick="removeOption(${index})">删</button>
+      </div>
+    </div>
+  `).join('');
+  updateFieldPreview();
+}
+
+function addOption(value='') {
+  fieldOptions.push(value || `选项${fieldOptions.length + 1}`);
+  renderOptionEditor();
+}
+
+function syncOption(index, value) {
+  fieldOptions[index] = value;
+  updateFieldPreview();
+}
+
+function removeOption(index) {
+  fieldOptions.splice(index, 1);
+  renderOptionEditor();
+}
+
+function moveOption(index, direction) {
+  const target = index + direction;
+  if (target < 0 || target >= fieldOptions.length) return;
+  [fieldOptions[index], fieldOptions[target]] = [fieldOptions[target], fieldOptions[index]];
+  renderOptionEditor();
+}
+
+function optionDragStart(e) {
+  draggedOptionIndex = Number(e.currentTarget.dataset.index);
+  e.currentTarget.classList.add('dragging');
+}
+
+function optionDragOver(e) {
+  e.preventDefault();
+}
+
+function optionDrop(e) {
+  e.preventDefault();
+  const target = Number(e.currentTarget.dataset.index);
+  if (!Number.isInteger(draggedOptionIndex) || draggedOptionIndex === target) return;
+  const [item] = fieldOptions.splice(draggedOptionIndex, 1);
+  fieldOptions.splice(target, 0, item);
+  draggedOptionIndex = null;
+  renderOptionEditor();
+}
+
+function optionDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  draggedOptionIndex = null;
+}
+
+function collectFieldOptions() {
+  const inputs = document.querySelectorAll('#option-list .option-input');
+  return Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
+}
+
+function updateFieldPreview() {
+  const box = document.getElementById('field-preview');
+  const meta = document.getElementById('field-preview-meta');
+  if (!box || !meta) return;
+  const type = document.getElementById('f-type')?.value || 'text';
+  const label = document.getElementById('f-label')?.value || '字段标签';
+  const placeholder = document.getElementById('f-placeholder')?.value || '';
+  const defaultValue = document.getElementById('f-default')?.value || '';
+  const required = document.getElementById('f-required')?.value === '1';
+  const rows = asNumber(document.getElementById('f-rows')?.value, 4);
+  const options = collectFieldOptions();
+  let control = '';
+  if (type === 'textarea') {
+    control = `<textarea rows="${rows}" placeholder="${esc(placeholder)}">${esc(defaultValue)}</textarea>`;
+  } else if (type === 'select' || type === 'select_group') {
+    const opts = (options.length ? options : ['选项 A', '选项 B']).map(o => `<option>${esc(o)}</option>`).join('');
+    control = `<select>${opts}</select>${type === 'select_group' ? '<div class="muted" style="margin-top:8px">选择后可展开附加参数</div>' : ''}`;
+  } else if (type === 'number') {
+    control = `<input type="number" placeholder="${esc(placeholder)}" value="${esc(defaultValue)}">`;
+  } else if (type === 'checkbox') {
+    control = `<label class="checkbox-label"><input type="checkbox" ${defaultValue ? 'checked' : ''}> ${esc(label)}</label>`;
+    box.innerHTML = `<div class="preview-control">${control}</div>`;
+    meta.textContent = `类型：${type} · Key：${document.getElementById('f-key')?.value || '未填写'}`;
+    return;
+  } else if (type === 'file_image') {
+    const maxCount = asNumber(document.getElementById('f-maxcount')?.value, 1);
+    control = `<div class="preview-upload">点击上传图片 · 最多 ${maxCount} 张</div>`;
+  } else {
+    control = `<input type="text" placeholder="${esc(placeholder)}" value="${esc(defaultValue)}">`;
+  }
+  box.innerHTML = `<div class="preview-control"><label>${esc(label)}${required ? '<span style="color:var(--red)"> *</span>' : ''}</label>${control}</div>`;
+  meta.textContent = `类型：${type} · Key：${document.getElementById('f-key')?.value || '未填写'} · 选项数：${options.length}`;
+}
+
+function fieldDragStart(e) {
+  draggedFieldId = e.currentTarget.dataset.id;
+  e.currentTarget.classList.add('dragging');
+}
+
+function getDragAfterElement(container, y) {
+  const rows = [...container.querySelectorAll('.field-row:not(.dragging)')];
+  return rows.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) return { offset, element: child };
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function fieldDragOver(e) {
+  e.preventDefault();
+  const list = document.getElementById('field-list');
+  const dragging = list?.querySelector('.field-row.dragging');
+  if (!list || !dragging) return;
+  const afterElement = getDragAfterElement(list, e.clientY);
+  if (afterElement == null) list.appendChild(dragging);
+  else list.insertBefore(dragging, afterElement);
+}
+
+function fieldDrop(e) {
+  e.preventDefault();
+  saveFieldOrder(false);
+}
+
+function fieldDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  draggedFieldId = null;
+}
+
+async function moveField(id, direction) {
+  const row = document.querySelector(`.field-row[data-id="${id}"]`);
+  if (!row) return;
+  if (direction < 0 && row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling);
+  if (direction > 0 && row.nextElementSibling) row.parentNode.insertBefore(row.nextElementSibling, row);
+  await saveFieldOrder(false);
+}
+
+async function saveFieldOrder(showToast=true) {
+  const rows = document.querySelectorAll('#field-list .field-row');
+  const ids = Array.from(rows).map(row => row.dataset.id);
+  if (!ids.length || !selectedModelId) return;
+  const status = document.getElementById('field-order-status');
+  if (status) status.textContent = '正在保存排序...';
+  await api(`/admin/api/models/${selectedModelId}/fields/reorder`, 'POST', { ids });
+  if (status) status.textContent = `排序已保存 · ${new Date().toLocaleTimeString()}`;
+  if (showToast) alert('字段排序已保存');
 }
 
 async function saveField(id) {
+  const fieldType = document.getElementById('f-type').value;
   const data = {
     field_key: document.getElementById('f-key').value,
-    field_type: document.getElementById('f-type').value,
+    field_type: fieldType,
     label: document.getElementById('f-label').value,
     placeholder: document.getElementById('f-placeholder').value,
     default_value: document.getElementById('f-default').value,
@@ -686,9 +1191,23 @@ async function saveField(id) {
     sort_order: parseInt(document.getElementById('f-sort').value),
     options: [],
     max_count: 0,
+    is_group: fieldType === 'select_group' ? 1 : 0,
+    group_config: {},
   };
-  if (data.field_type==='select') data.options = document.getElementById('f-options').value.split('\n').filter(s=>s.trim());
-  if (data.field_type==='file_image') { data.max_count = parseInt(document.getElementById('f-maxcount').value); data.multiple = true; }
+  if (fieldType === 'select' || fieldType === 'select_group') data.options = collectFieldOptions();
+  if (fieldType === 'select_group') {
+    const raw = document.getElementById('f-group-config').value.trim();
+    try {
+      data.group_config = raw ? JSON.parse(raw) : {};
+    } catch (err) {
+      alert('分组选项 JSON 格式不正确，请检查逗号、引号和括号。');
+      return;
+    }
+  }
+  if (fieldType==='file_image') {
+    data.max_count = parseInt(document.getElementById('f-maxcount').value || '1');
+    data.multiple = data.max_count > 1;
+  }
   if (id) await api(`/admin/api/fields/${id}`, 'PUT', data);
   else await api(`/admin/api/models/${selectedModelId}/fields`, 'POST', data);
   renderFields();
@@ -752,32 +1271,74 @@ async function renderChannels() {
 
 function showChannelForm(key='') {
   const c = channels.find(x => x.key === key) || {};
+  const typeOptions = PROVIDER_TYPES.map(([value, label]) =>
+    `<option value="${value}" ${(c.provider_type || 'tikpan') === value ? 'selected' : ''}>${label}</option>`
+  ).join('');
   document.getElementById('main-content').innerHTML = `
     <div class="page-title">${key ? '✏️ 编辑' : '➕ 新增'}供应商渠道</div>
-    <div class="card">
-      <div class="form-row">
-        <div><label>渠道 Key</label><input id="ch-key" value="${c.key || ''}" ${key ? 'readonly' : ''} placeholder="如：openai-main"></div>
-        <div><label>渠道名称</label><input id="ch-name" value="${c.name || ''}" placeholder="如：OpenAI 主渠道"></div>
+    <div class="config-layout">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><span class="icon">🔌</span> 渠道配置</div>
+            <div class="muted" style="margin-top:5px">供应商类型和 Base URL 用下拉预设，减少填错接口域名。</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div><label>渠道 Key</label><input id="ch-key" value="${esc(c.key || '')}" ${key ? 'readonly' : ''} placeholder="如：tikpan-main"></div>
+          <div><label>渠道名称</label><input id="ch-name" value="${esc(c.name || '')}" placeholder="如：Tikpan 主渠道"></div>
+        </div>
+        <div class="form-row">
+          <div><label>供应商类型</label><select id="ch-type" onchange="applyProviderPreset()">${typeOptions}</select></div>
+          <div><label>Base URL</label><input id="ch-base" value="${esc(c.base_url || '')}" placeholder="https://tikpan.com"></div>
+        </div>
+        <div><label>API Key</label><input id="ch-api-key" type="password" value="${esc(c.api_key || '')}" placeholder="留空表示暂不配置"></div>
+        <div class="form-row-3">
+          <div><label>优先级</label><input id="ch-priority" type="number" value="${c.priority ?? 100}"></div>
+          <div><label>权重</label><input id="ch-weight" type="number" value="${c.weight ?? 1}"></div>
+          <div><label>超时秒数</label><input id="ch-timeout" type="number" value="${c.timeout_seconds ?? 120}"></div>
+        </div>
+        <div class="form-row">
+          <div><label>状态</label><select id="ch-active"><option value="1" ${c.is_active !== 0 ? 'selected' : ''}>启用</option><option value="0" ${c.is_active === 0 ? 'selected' : ''}>停用</option></select></div>
+          <div><label>备注</label><input id="ch-notes" value="${esc(c.notes || '')}" placeholder="成本、限额、账号说明"></div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-edit" onclick="renderChannels()">取消</button>
+          <button class="btn btn-primary" onclick="saveChannel()">💾 保存渠道</button>
+        </div>
       </div>
-      <div class="form-row">
-        <div><label>供应商类型</label><input id="ch-type" value="${c.provider_type || ''}" placeholder="openai / doubao / tikpan / custom"></div>
-        <div><label>Base URL</label><input id="ch-base" value="${c.base_url || ''}" placeholder="https://api.example.com"></div>
-      </div>
-      <div><label>API Key</label><input id="ch-api-key" type="password" value="${c.api_key || ''}" placeholder="留空表示暂不配置"></div>
-      <div class="form-row-3">
-        <div><label>优先级</label><input id="ch-priority" type="number" value="${c.priority ?? 100}"></div>
-        <div><label>权重</label><input id="ch-weight" type="number" value="${c.weight ?? 1}"></div>
-        <div><label>超时秒数</label><input id="ch-timeout" type="number" value="${c.timeout_seconds ?? 120}"></div>
-      </div>
-      <div class="form-row">
-        <div><label>状态</label><select id="ch-active"><option value="1" ${c.is_active !== 0 ? 'selected' : ''}>启用</option><option value="0" ${c.is_active === 0 ? 'selected' : ''}>停用</option></select></div>
-        <div><label>备注</label><input id="ch-notes" value="${c.notes || ''}" placeholder="成本、限额、账号说明"></div>
-      </div>
-      <div class="actions">
-        <button class="btn btn-edit" onclick="renderChannels()">取消</button>
-        <button class="btn btn-primary" onclick="saveChannel()">💾 保存渠道</button>
+      <div class="preview-panel">
+        <div class="preview-title">渠道检查</div>
+        <div class="preview-log" id="channel-preview"></div>
       </div>
     </div>`;
+  bindChannelPreview();
+  updateChannelPreview();
+}
+
+function applyProviderPreset() {
+  const type = document.getElementById('ch-type').value;
+  const base = document.getElementById('ch-base');
+  if (base && !base.value.trim()) base.value = BASE_URL_PRESETS[type] || '';
+  updateChannelPreview();
+}
+
+function bindChannelPreview() {
+  document.querySelectorAll('#main-content input, #main-content select').forEach(el => {
+    el.addEventListener('input', updateChannelPreview);
+    el.addEventListener('change', updateChannelPreview);
+  });
+}
+
+function updateChannelPreview() {
+  const box = document.getElementById('channel-preview');
+  if (!box) return;
+  const type = document.getElementById('ch-type')?.value || 'custom';
+  const base = document.getElementById('ch-base')?.value || '未填写';
+  const priority = document.getElementById('ch-priority')?.value || '100';
+  const weight = document.getElementById('ch-weight')?.value || '1';
+  const timeout = document.getElementById('ch-timeout')?.value || '120';
+  box.innerHTML = `类型：${esc(type)}<br>Base URL：<code>${esc(base)}</code><br>调度：优先级 ${esc(priority)} · 权重 ${esc(weight)} · 超时 ${esc(timeout)} 秒<br>${type === 'tikpan' ? '建议：Tikpan 中转站统一绑定 https://tikpan.com。' : '建议：上线前用小额模型测试鉴权、超时和扣费。'}`;
 }
 
 async function saveChannel() {
@@ -799,33 +1360,75 @@ async function saveChannel() {
 
 function showRouteForm(modelId='', channelKey='') {
   const r = routes.find(x => x.model_id === modelId && x.channel_key === channelKey) || {};
-  const modelOpts = models.map(m => `<option value="${m.id}" ${r.model_id === m.id ? 'selected' : ''}>${m.name} (${m.id})</option>`).join('');
-  const channelOpts = channels.map(c => `<option value="${c.key}" ${r.channel_key === c.key ? 'selected' : ''}>${c.name} (${c.key})</option>`).join('');
+  const modelOpts = models.map(m => `<option value="${esc(m.id)}" ${r.model_id === m.id ? 'selected' : ''}>${esc(m.name)} (${esc(m.id)})</option>`).join('');
+  const channelOpts = channels.map(c => `<option value="${esc(c.key)}" ${r.channel_key === c.key ? 'selected' : ''}>${esc(c.name)} (${esc(c.key)})</option>`).join('');
+  const endpointOpts = ENDPOINT_PRESETS.map(([value, label]) =>
+    `<option value="${esc(value)}" ${r.endpoint === value ? 'selected' : ''}>${esc(label)} · ${esc(value)}</option>`
+  ).join('');
   document.getElementById('main-content').innerHTML = `
     <div class="page-title">${modelId ? '✏️ 编辑' : '➕ 新增'}模型路由</div>
-    <div class="card">
-      <div class="form-row">
-        <div><label>模型</label><select id="rt-model">${modelOpts}</select></div>
-        <div><label>渠道</label><select id="rt-channel">${channelOpts}</select></div>
+    <div class="config-layout">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><span class="icon">🧭</span> 路由配置</div>
+            <div class="muted" style="margin-top:5px">把前台模型映射到具体供应商、上游模型名和接口端点。</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div><label>模型</label><select id="rt-model">${modelOpts}</select></div>
+          <div><label>渠道</label><select id="rt-channel">${channelOpts}</select></div>
+        </div>
+        <div class="form-row">
+          <div><label>上游模型 ID</label><input id="rt-upstream" value="${esc(r.upstream_model || '')}" placeholder="供应商真实模型名"></div>
+          <div><label>端点预设</label><select id="rt-endpoint-preset" onchange="applyEndpointPreset()"><option value="">手动填写</option>${endpointOpts}</select></div>
+        </div>
+        <div><label>端点</label><input id="rt-endpoint" value="${esc(r.endpoint || '')}" placeholder="/v1/images/generations"></div>
+        <div class="form-row-3">
+          <div><label>优先级</label><input id="rt-priority" type="number" value="${r.priority ?? 100}"></div>
+          <div><label>权重</label><input id="rt-weight" type="number" value="${r.weight ?? 1}"></div>
+          <div><label>成本/单位</label><input id="rt-cost" type="number" step="0.0001" value="${r.cost_per_unit ?? 0}"></div>
+        </div>
+        <div class="form-row">
+          <div><label>状态</label><select id="rt-active"><option value="1" ${r.is_active !== 0 ? 'selected' : ''}>启用</option><option value="0" ${r.is_active === 0 ? 'selected' : ''}>停用</option></select></div>
+          <div><label>备注</label><input id="rt-notes" value="${esc(r.notes || '')}"></div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-edit" onclick="renderChannels()">取消</button>
+          <button class="btn btn-primary" onclick="saveRoute()">💾 保存路由</button>
+        </div>
       </div>
-      <div class="form-row">
-        <div><label>上游模型 ID</label><input id="rt-upstream" value="${r.upstream_model || ''}" placeholder="供应商真实模型名"></div>
-        <div><label>端点</label><input id="rt-endpoint" value="${r.endpoint || ''}" placeholder="/v1/images/generations"></div>
-      </div>
-      <div class="form-row-3">
-        <div><label>优先级</label><input id="rt-priority" type="number" value="${r.priority ?? 100}"></div>
-        <div><label>权重</label><input id="rt-weight" type="number" value="${r.weight ?? 1}"></div>
-        <div><label>成本/单位</label><input id="rt-cost" type="number" step="0.0001" value="${r.cost_per_unit ?? 0}"></div>
-      </div>
-      <div class="form-row">
-        <div><label>状态</label><select id="rt-active"><option value="1" ${r.is_active !== 0 ? 'selected' : ''}>启用</option><option value="0" ${r.is_active === 0 ? 'selected' : ''}>停用</option></select></div>
-        <div><label>备注</label><input id="rt-notes" value="${r.notes || ''}"></div>
-      </div>
-      <div class="actions">
-        <button class="btn btn-edit" onclick="renderChannels()">取消</button>
-        <button class="btn btn-primary" onclick="saveRoute()">💾 保存路由</button>
+      <div class="preview-panel">
+        <div class="preview-title">路由预览</div>
+        <div class="preview-log" id="route-preview"></div>
       </div>
     </div>`;
+  bindRoutePreview();
+  updateRoutePreview();
+}
+
+function applyEndpointPreset() {
+  const preset = document.getElementById('rt-endpoint-preset').value;
+  if (preset) document.getElementById('rt-endpoint').value = preset;
+  updateRoutePreview();
+}
+
+function bindRoutePreview() {
+  document.querySelectorAll('#main-content input, #main-content select').forEach(el => {
+    el.addEventListener('input', updateRoutePreview);
+    el.addEventListener('change', updateRoutePreview);
+  });
+}
+
+function updateRoutePreview() {
+  const box = document.getElementById('route-preview');
+  if (!box) return;
+  const model = document.getElementById('rt-model')?.value || '未选择';
+  const channel = document.getElementById('rt-channel')?.value || '未选择';
+  const upstream = document.getElementById('rt-upstream')?.value || '未填写';
+  const endpoint = document.getElementById('rt-endpoint')?.value || '未填写';
+  const cost = document.getElementById('rt-cost')?.value || '0';
+  box.innerHTML = `前台模型：<code>${esc(model)}</code><br>供应商渠道：<code>${esc(channel)}</code><br>上游模型：<code>${esc(upstream)}</code><br>请求端点：<code>${esc(endpoint)}</code><br>成本基准：${esc(cost)} / 单位`;
 }
 
 async function saveRoute() {
@@ -937,6 +1540,42 @@ async function savePricing() {
   renderPricing();
 }
 
+// ===== Balance Ledger =====
+async function renderLedger() {
+  ledgerEntries = await api('/admin/api/ledger?limit=100');
+  const h = [
+    `<div class="page-title">📒 余额流水</div>`,
+    `<div class="page-desc">用于追踪充值、生成扣费、失败退款、代理费用和人工调整。余额字段只是快照，流水才是财务依据。</div>`,
+    `<div class="notice">💡 商业化运营时，客服处理“为什么扣费/为什么退款”应优先查看这里；同一个幂等键只会入账一次。</div>`,
+    `<div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">📒</span> 最近流水 (${ledgerEntries.length})</div>
+        <button class="btn btn-edit btn-sm" onclick="renderLedger()">刷新</button>
+      </div>`
+  ];
+  if (!ledgerEntries.length) {
+    h.push('<div class="empty"><div class="empty-icon">📒</div>暂无余额流水</div>');
+  } else {
+    h.push('<table><tr><th>时间</th><th>用户</th><th>类型</th><th>变动</th><th>余额</th><th>关联</th><th>幂等键</th><th>备注</th></tr>');
+    for (const row of ledgerEntries) {
+      const delta = Number(row.delta || 0);
+      h.push(`<tr>
+        <td>${esc(row.created_at || '')}</td>
+        <td>#${row.user_id}</td>
+        <td><span class="tag tag-blue">${esc(row.entry_type || '')}</span></td>
+        <td><strong style="color:${delta >= 0 ? 'var(--green)' : 'var(--red)'}">${delta >= 0 ? '+' : ''}${delta}</strong></td>
+        <td>${row.balance_before} → ${row.balance_after}</td>
+        <td>${esc(row.reference_type || '—')} ${row.reference_id ? '#' + esc(row.reference_id) : ''}</td>
+        <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis"><code>${esc(row.idempotency_key || '—')}</code></td>
+        <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis">${esc(row.note || '')}</td>
+      </tr>`);
+    }
+    h.push('</table>');
+  }
+  h.push('</div>');
+  document.getElementById('main-content').innerHTML = h.join('');
+}
+
 // ===== Settings =====
 async function renderSettings() {
   const settings = await api('/admin/api/settings');
@@ -965,9 +1604,22 @@ async function renderSettings() {
 
     <div class="card">
       <div class="card-header"><div class="card-title"><span class="icon">🔑</span> OAuth 第三方登录</div></div>
+      <div class="notice">把下面的回调地址复制到 Google / GitHub OAuth 应用后台。未开启或未填写密钥时，前台按钮会显示为“未配置”。</div>
+      <div class="form-row">
+        <div><label>公开访问域名 / 回调域名</label><input id="oa_redirect_base" value="${s('oauth_redirect_base')||location.origin}" placeholder="https://你的域名"></div>
+        <div><label>注册方式</label><select id="oa_email_enabled"><option value="true" selected>允许邮箱注册</option></select></div>
+      </div>
+      <div class="form-row">
+        <div><label>Google 登录</label><select id="oa_google_enabled"><option value="false" ${s('oauth_google_enabled')!=='true'?'selected':''}>关闭</option><option value="true" ${s('oauth_google_enabled')==='true'?'selected':''}>开启</option></select></div>
+        <div><label>Google 回调地址</label><input value="${(s('oauth_redirect_base')||location.origin).replace(/\/$/,'')}/api/oauth/google/callback" readonly></div>
+      </div>
       <div class="form-row">
         <div><label>Google Client ID</label><input id="oa_google_id" value="${s('oauth_google_client_id')}"></div>
         <div><label>Google Client Secret</label><input type="password" id="oa_google_secret" value="${s('oauth_google_secret')}"></div>
+      </div>
+      <div class="form-row">
+        <div><label>GitHub 登录</label><select id="oa_github_enabled"><option value="false" ${s('oauth_github_enabled')!=='true'?'selected':''}>关闭</option><option value="true" ${s('oauth_github_enabled')==='true'?'selected':''}>开启</option></select></div>
+        <div><label>GitHub 回调地址</label><input value="${(s('oauth_redirect_base')||location.origin).replace(/\/$/,'')}/api/oauth/github/callback" readonly></div>
       </div>
       <div class="form-row">
         <div><label>GitHub Client ID</label><input id="oa_github_id" value="${s('oauth_github_client_id')}"></div>
@@ -1004,8 +1656,11 @@ async function saveSettings() {
     smtp_sender: document.getElementById('stp_sender').value,
     smtp_password: document.getElementById('stp_password').value,
     smtp_use_ssl: document.getElementById('stp_ssl').value,
+    oauth_redirect_base: document.getElementById('oa_redirect_base').value,
+    oauth_google_enabled: document.getElementById('oa_google_enabled').value,
     oauth_google_client_id: document.getElementById('oa_google_id').value,
     oauth_google_secret: document.getElementById('oa_google_secret').value,
+    oauth_github_enabled: document.getElementById('oa_github_enabled').value,
     oauth_github_client_id: document.getElementById('oa_github_id').value,
     oauth_github_secret: document.getElementById('oa_github_secret').value,
     recharge_10: document.getElementById('r_10').value,
@@ -1032,10 +1687,18 @@ function renderAbout() {
         <strong>前台</strong>：从数据库动态加载模型配置，自动渲染表单<br>
         <strong>管理后台</strong>：随时新增/编辑/删除模型、字段、分类<br>
         <strong>API 层</strong>：对接 tikpan.com 中转站，支持 Gemini / 豆包 / Suno / Grok<br><br>
-        🔐 后台密码：<code>admin123</code><br>
+        🔐 生产环境请在 <code>.env</code> 中设置强后台密码，并定期更换。<br>
+        <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="syncTikpanNodes()">同步本地 Tikpan 节点到网站</button><br><br>
         ⚙️ <a href="/admin/api/seed" style="color:var(--red)" onclick="return confirm('确定重置所有数据为默认值？')">重置数据为默认值</a>
       </p>
     </div>`;
+}
+
+async function syncTikpanNodes() {
+  if (!confirm('会把 catalog 中的 Tikpan 节点同步为网站模型，并刷新这些模型的字段。继续吗？')) return;
+  const result = await api('/admin/api/sync-tikpan-nodes', 'POST', {});
+  alert(`同步完成：${result.summary.models} 个模型，${result.summary.fields} 个字段。`);
+  renderModels();
 }
 
 // Init

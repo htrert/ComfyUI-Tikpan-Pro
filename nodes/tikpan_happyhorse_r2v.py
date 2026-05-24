@@ -180,7 +180,7 @@ class TikpanHappyHorseR2VNode:
     RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_视频云端链接", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/02 视频 Video'
 
     # ------------------------------------------------------------------
     # 图片处理

@@ -2,12 +2,14 @@
 🔐 管理后台 - 模型/字段/分类管理
 """
 import json
+import hmac
 from flask import Blueprint, request, jsonify, session, render_template
 from backend.database import (get_categories, add_category, update_category, delete_category,
                       get_models, get_model, add_model, update_model, delete_model,
                       get_fields, add_field, update_field, delete_field,
                       get_full_model_tree, seed_default_data)
 from models import (
+    get_ledger_entries,
     get_model_routes,
     get_pricing,
     get_provider_channels,
@@ -19,6 +21,28 @@ from models import (
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 from config import ADMIN_PASSWORD
+from core.security import client_ip, rate_limit
+
+
+@admin_bp.before_request
+def require_admin_session():
+    if request.endpoint in ("admin.admin_login", "admin.admin_logout", "admin.admin_page"):
+        return None
+    if request.path.startswith("/admin/api/") and not session.get("admin_logged_in"):
+        return jsonify({"error": "请先登录管理后台"}), 401
+    return None
+
+
+def _parse_order_ids(raw_ids):
+    if not isinstance(raw_ids, list):
+        return None
+    parsed = []
+    for raw_id in raw_ids:
+        try:
+            parsed.append(int(raw_id))
+        except (TypeError, ValueError):
+            return None
+    return parsed
 
 
 # ==================== 页面路由 ====================
@@ -34,8 +58,14 @@ def admin_page():
 
 @admin_bp.route("/login", methods=["POST"])
 def admin_login():
-    data = request.json
-    if data.get("password") == ADMIN_PASSWORD:
+    ip = client_ip()
+    ok, retry_after = rate_limit(f"admin-login:{ip}", limit=8, window_seconds=300)
+    if not ok:
+        return jsonify({"error": f"尝试过于频繁，请 {retry_after} 秒后再试"}), 429
+
+    data = request.json or {}
+    password = str(data.get("password", ""))
+    if hmac.compare_digest(password, ADMIN_PASSWORD):
         session["admin_logged_in"] = True
         session.permanent = True
         return jsonify({"success": True})
@@ -60,6 +90,20 @@ def api_add_category():
     data = request.json
     add_category(data["key"], data["name"], data.get("icon", "📦"), int(data.get("sort_order", 0)))
     return jsonify({"success": True})
+
+
+@admin_bp.route("/api/categories/reorder", methods=["POST"])
+def api_reorder_categories():
+    ids = _parse_order_ids((request.json or {}).get("ids", []))
+    if ids is None:
+        return jsonify({"error": "ids must be a list of integers"}), 400
+    known = {c["id"] for c in get_categories()}
+    updated = 0
+    for index, cat_id in enumerate(ids, start=1):
+        if cat_id in known:
+            update_category(cat_id, sort_order=index)
+            updated += 1
+    return jsonify({"success": True, "updated": updated})
 
 
 @admin_bp.route("/api/categories/<int:cat_id>", methods=["PUT"])
@@ -103,6 +147,21 @@ def api_add_model():
     return jsonify({"success": True})
 
 
+@admin_bp.route("/api/models/reorder", methods=["POST"])
+def api_reorder_models():
+    model_ids = (request.json or {}).get("ids", [])
+    if not isinstance(model_ids, list):
+        return jsonify({"error": "ids must be a list"}), 400
+    known = {m["id"] for m in get_models(active_only=False)}
+    updated = 0
+    for index, model_id in enumerate(model_ids, start=1):
+        model_id = str(model_id)
+        if model_id in known:
+            update_model(model_id, sort_order=index)
+            updated += 1
+    return jsonify({"success": True, "updated": updated})
+
+
 @admin_bp.route("/api/models/<model_id>", methods=["PUT"])
 def api_update_model(model_id):
     data = request.json
@@ -142,6 +201,20 @@ def api_add_field(model_id):
               int(data.get("is_group", 0)),
               json.dumps(data.get("group_config", {}), ensure_ascii=False))
     return jsonify({"success": True})
+
+
+@admin_bp.route("/api/models/<model_id>/fields/reorder", methods=["POST"])
+def api_reorder_fields(model_id):
+    field_ids = _parse_order_ids((request.json or {}).get("ids", []))
+    if field_ids is None:
+        return jsonify({"error": "ids must be a list of integers"}), 400
+    known = {f["id"] for f in get_fields(model_id)}
+    updated = 0
+    for index, field_id in enumerate(field_ids, start=1):
+        if field_id in known:
+            update_field(field_id, sort_order=index)
+            updated += 1
+    return jsonify({"success": True, "updated": updated})
 
 
 @admin_bp.route("/api/fields/<int:field_id>", methods=["PUT"])
@@ -185,6 +258,14 @@ def api_tree():
     return jsonify(get_full_model_tree())
 
 
+@admin_bp.route("/api/sync-tikpan-nodes", methods=["POST"])
+def api_sync_tikpan_nodes():
+    from scripts.sync_tikpan_nodes import sync_catalog
+
+    summary = sync_catalog(dry_run=False)
+    return jsonify({"success": True, "summary": summary})
+
+
 # ==================== 商业化运营 API：供应商 / 路由 / 计价 ====================
 
 @admin_bp.route("/api/provider-channels", methods=["GET"])
@@ -211,6 +292,18 @@ def api_save_pricing():
     if not ok:
         return jsonify({"error": error}), 400
     return jsonify({"success": True})
+
+
+@admin_bp.route("/api/ledger", methods=["GET"])
+def api_ledger():
+    user_id = request.args.get("user_id")
+    limit = request.args.get("limit", 100)
+    try:
+        parsed_user_id = int(user_id) if user_id else None
+        parsed_limit = min(max(int(limit), 1), 500)
+    except (TypeError, ValueError):
+        return jsonify({"error": "user_id 和 limit 必须是数字"}), 400
+    return jsonify(get_ledger_entries(parsed_user_id, parsed_limit))
 
 
 @admin_bp.route("/api/model-routes", methods=["GET"])

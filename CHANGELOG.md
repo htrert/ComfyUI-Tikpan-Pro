@@ -1,5 +1,32 @@
 # Changelog
 
+## [v1.3.0] - 2026-05-23
+
+### New Features
+
+- 新增 Kling Motion Control 动作控制节点 (`TikpanKlingMotionControlNode`)：支持 Kling v2.6 / v3.0 的 std（720P）和 pro（1080P）模式，传入角色图像和动作参考视频（URL 或本地路径），将参考视频的动作精准迁移到角色图像上生成视频。
+- 新增 Vidu3 参考生视频节点 (`TikpanVidu3ReferenceVideoNode`)：最多传 7 张参考图，通过 `@1`、`@2` 等占位符在提示词里引用对应主体，保持人物/产品一致性生成视频；支持音画同步、音频类型、错峰生成。
+- 新增 Vidu3 Turbo 文生/图生/首尾帧节点 (`TikpanVidu3TurboVideoNode`)：底层模型固定 `viduq3-turbo`，支持纯文字生视频、图生视频（首帧控制）、首尾帧同时控制三种模式；支持运动幅度、音画同步和错峰生成。
+- 新增 Gemini Omni Flash 视频生成节点 (`TikpanGeminiOmniVideoNode`)：多模态视频生成，支持文生/图生/多参考/视频编辑/音频驱动五种模式；模型包含 `omni-flash`、`omni-flash-components`、`gemini-omni-flash` 等；端点支持 Tikpan 中转站（`/v1/video/create`、`/v1/videos`）和 Gemini 原生预览。
+- 新增 Gemini 3.5 Flash 推理节点 (`TikpanGemini35FlashNode`)：长文档/复杂推理场景，支持 thinking 深度推理（auto/关闭/轻量/中等/深度）、最多 6 张图片 inline、本地文件 inline（PDF/TXT/代码等，建议 < 18MB）、Gemini 原生和 OpenAI 兼容两种调用方式；recovery 目录 `recovery/gemini_3_5_flash`。
+- 新增 Qwen-Image-2.0 生图/编辑节点 (`TikpanQwenImage20Node`)：支持文生图、图生图/编辑、多参考图三种模式，最多 4 张参考图；清晰度 `auto/1k/2k`；画质策略 `auto/speed/balanced/quality`。
+- 新增 Wan 2.7 Image Pro 生图/编辑节点 (`TikpanWan27ImageProNode`)：支持 4K 清晰度（清晰度选项 `auto/1k/2k/4k`）；支持 thinking 模式（`auto/false/true`）；最多 4 张参考图。
+
+### Bug Fixes
+
+- 修复 `tikpan_gemini_omni_video.py` 中 `ENDPOINT_OPTIONS` 列表存在重复项的问题：原第 0 项和第 2 项均为 `"Tikpan 视频创建｜/v1/video/create"`，导致下拉菜单出现两个完全相同的选项，且 Gemini 原生预览选项的实际下拉索引错位。已删除重复项，从 5 项精简为 4 项。
+
+### Documentation
+
+- 节点速查表 (`docs/节点速查表.md`) 补充上述所有新节点的关键输入/输出行，并新增"工具节点"表，覆盖并发引擎和异步任务组共 5 个工具节点。
+- 节点使用教程 (`docs/节点使用教程.md`) 补充第 5.8–5.11 节（Grok Imagine Image 生图/修图、Qwen/Wan 图像）、第 6.9–6.12 节（Kling Motion Control、Vidu3 参考、Vidu3 Turbo、Gemini Omni Flash）、第 8.3 节（Gemini 3.5 Flash 推理），以及新增第 9 章（工具节点：并发引擎 + 异步任务组）；章节编号随之顺延。
+- 修正使用教程中 `GPT-5 Mini` → `GPT-5.4 Mini` 名称不一致问题，并在"应该用哪个节点"决策表中补充新节点入口。
+
+### Validation
+
+- 检查所有 40 个注册节点在根 `__init__.py` 的 `NODE_CLASS_MAPPINGS` 和 `NODE_DISPLAY_NAME_MAPPINGS` 中均有正确条目。
+- 确认 `ENDPOINT_OPTIONS` 修复后无重复项，下拉索引逻辑正常。
+
 ## [v1.2.0] - 2026-05-19
 
 ### New Features
@@ -10,7 +37,7 @@
 
 ### Improvements
 
-- GPT Image 2 相关节点与网站 catalog 对齐最多 16 张参考图，不再用“参考流”隐藏真实能力。
+- GPT Image 2 相关节点与网站 catalog 对齐最多 16 张参考图，不再用”参考流”隐藏真实能力。
 - Grok Imagine 节点增强返回解析、去重、RGB 标准化、payload 预览、失败上下文日志和 `Skip_Error` 黑图兜底说明。
 - ComfyUI 节点统一收口到 Tikpan 官方中转站 `https://tikpan.com`；旧工作流里残留的其他中转站地址会自动回退到 Tikpan。
 - 更新并发引擎说明文档，删除旧供应商示例，明确当前版本只使用 Tikpan 官方接口。

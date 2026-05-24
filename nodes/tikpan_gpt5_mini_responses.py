@@ -166,7 +166,7 @@ class TikpanGPT5MiniResponsesNode:
     RETURN_NAMES = ("回答文本", "优化提示词", "结构化JSON", "用量", "状态日志")
     OUTPUT_NODE = True
     FUNCTION = "run_responses"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/04 文字与多模态 Text & Multimodal'
 
     def make_return(self, answer="", prompt="", structured="", usage="", log=""):
         return (str(answer or ""), str(prompt or ""), str(structured or ""), str(usage or ""), str(log or ""))

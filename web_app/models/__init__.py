@@ -5,6 +5,8 @@ import sqlite3
 import json
 import os
 import hashlib
+import hmac
+import secrets
 from datetime import datetime
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "tikpan.db")
@@ -57,6 +59,24 @@ def init_db():
             prompt TEXT DEFAULT '',
             status TEXT DEFAULT 'success',
             image_url TEXT DEFAULT '',
+            idempotency_key TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS balance_ledger (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            entry_type TEXT NOT NULL,
+            delta INTEGER NOT NULL,
+            balance_before INTEGER NOT NULL,
+            balance_after INTEGER NOT NULL,
+            reference_type TEXT DEFAULT '',
+            reference_id TEXT DEFAULT '',
+            idempotency_key TEXT DEFAULT '',
+            status TEXT DEFAULT 'posted',
+            note TEXT DEFAULT '',
+            metadata_json TEXT DEFAULT '{}',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
@@ -128,6 +148,12 @@ def init_db():
     """)
     _ensure_generation_log_columns(conn)
     _ensure_pricing_columns(conn)
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_balance_ledger_idempotency "
+        "ON balance_ledger(idempotency_key) WHERE idempotency_key <> ''"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_balance_ledger_user_created ON balance_ledger(user_id, created_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_generation_logs_idempotency ON generation_logs(user_id, idempotency_key)")
     conn.commit()
     conn.close()
 
@@ -144,6 +170,7 @@ def _ensure_generation_log_columns(conn):
         "raw_response": "TEXT DEFAULT ''",
         "refunded_at": "TIMESTAMP",
         "updated_at": "TIMESTAMP DEFAULT ''",
+        "idempotency_key": "TEXT DEFAULT ''",
     }
     for name, ddl in columns.items():
         if name not in existing:
@@ -169,22 +196,116 @@ def _ensure_pricing_columns(conn):
 
 
 def seed_pricing():
-    """初始化模型定价"""
-    pricing = [
-        ("gemini-3-pro-image-preview", "Gemini 3 Pro", 6, 10, 18),
-        ("gemini-3.1-flash-image-preview", "Gemini 3.1 Flash", 4, 6, 12),
-        ("doubao-seedream-5-0-260128", "豆包图像 5.0", 3, 5, 10),
-        ("suno-music", "Suno 音乐", 10, 10, 10),
-        ("grok-video", "Grok 视频", 12, 12, 12),
-    ]
+    """初始化模型定价 — 覆盖所有攀升AI节点支持的模型
+
+    billing_mode 说明:
+      resolution  - 按分辨率阶梯计费（图片生成）
+      per_call    - 按次数计费（音乐/视频/固定TTS）
+      per_char    - 按字符数计费（TTS）
+      per_token   - 按 token 计费（LLM 分析）
+    """
     conn = get_db()
-    for pid, name, p1, p2, p4 in pricing:
+
+    # ─── 图片生成模型（resolution 计费）──────────────────────────────────
+    image_models = [
+        # (model_id, display_name, credits_1k, credits_2k, credits_4k)
+        ("gpt-image-2-official",             "GPT-Image-2 官方",          8,  14, 28),
+        ("gpt-image-2-gen",                  "GPT-Image-2-all 生图",       6,  10, 20),
+        ("gpt-image-2-edit",                 "GPT-Image-2-all 修图",       6,  10, 20),
+        ("gemini-image-max",                 "Gemini 14图极限生图",         6,  10, 18),
+        ("gemini-3-pro-image-preview",       "Gemini 3 Pro 图像",          6,  10, 18),
+        ("gemini-3.1-flash-image-preview",   "Gemini 3.1 Flash 图像",      4,   6, 12),
+        ("nano-banana-pro",                  "Nano Banana Pro",            5,   8, 16),
+        ("doubao-seedream-5-0-260128",       "豆包图像 Seedream",           3,   5, 10),
+        ("grok-imagine-image",               "Grok Imagine Image",         4,   7, 14),
+        ("grok-imagine-image-pro",           "Grok Imagine Image Pro",    10,  16, 32),
+        ("qwen-image-2.0",                   "Qwen-Image-2.0",             4,   7, 14),
+        ("wan-2.7-image-pro",                "Wan 2.7 Image Pro",          5,   8, 20),
+    ]
+    for row in image_models:
         conn.execute(
-            "INSERT OR IGNORE INTO models_pricing (model_id, model_name, credits_1k, credits_2k, credits_4k) VALUES (?,?,?,?,?)",
-            (pid, name, p1, p2, p4)
+            "INSERT OR IGNORE INTO models_pricing "
+            "(model_id, model_name, credits_1k, credits_2k, credits_4k, billing_mode) "
+            "VALUES (?,?,?,?,?,'resolution')",
+            row
         )
+
+    # ─── 视频生成模型（per_call 计费，credits_1k 字段存储每次费用）────────
+    video_models = [
+        # (model_id, display_name, credits_per_call)
+        ("happyhorse-t2v",           "HappyHorse 文生视频",    30),
+        ("happyhorse-i2v",           "HappyHorse 图生视频",    30),
+        ("happyhorse-r2v",           "HappyHorse 参考生视频",  35),
+        ("happyhorse-edit",          "HappyHorse 视频编辑",    35),
+        ("grok-videos",              "Grok-Videos",           40),
+        ("veo-3.1-lite",             "Veo 3.1 Lite",          30),
+        ("veo-3.1-fast-4k",          "Veo 3.1 Fast 4K",       50),
+        ("veo-3.1-pro",              "Veo 3.1 Pro",           80),
+        ("veo-3.1-components",       "Veo 3.1 Components",    50),
+        ("kling-motion-control",     "Kling 动作控制",         50),
+        ("vidu3-reference",          "Vidu3 参考生视频",       40),
+        ("vidu3-turbo",              "Vidu3 Turbo",           35),
+        ("gemini-omni-flash",        "Gemini Omni Flash",     30),
+        ("gemini-omni-components",   "Gemini Omni Components",35),
+    ]
+    for model_id, name, cpc in video_models:
+        conn.execute(
+            "INSERT OR IGNORE INTO models_pricing "
+            "(model_id, model_name, credits_1k, billing_mode, unit_name, unit_credits, min_credits) "
+            "VALUES (?,?,?,'per_call','次',?,?)",
+            (model_id, name, cpc, cpc, cpc)
+        )
+
+    # ─── 音乐生成（per_call）────────────────────────────────────────────
+    music_models = [
+        ("suno-v5",      "Suno V5 音乐",   15),
+        ("suno-v4",      "Suno V4 音乐",   12),
+        ("suno-fenix",   "Suno Fenix 音乐",18),
+    ]
+    for model_id, name, cpc in music_models:
+        conn.execute(
+            "INSERT OR IGNORE INTO models_pricing "
+            "(model_id, model_name, credits_1k, billing_mode, unit_name, unit_credits, min_credits) "
+            "VALUES (?,?,?,'per_call','首',?,?)",
+            (model_id, name, cpc, cpc, cpc)
+        )
+
+    # ─── TTS 语音合成（per_char 计费，unit_credits = 每千字符费用）────────
+    tts_models = [
+        # (model_id, name, credits_per_1k_chars, min_credits)
+        ("minimax-speech-2.8-hd",    "speech-2.8-hd 高清",   6, 2),
+        ("minimax-speech-2.8-turbo", "speech-2.8-turbo 极速", 4, 1),
+        ("doubao-tts-2.0",           "豆包语音合成 2.0",       3, 1),
+        ("gemini-3.1-flash-tts",     "Gemini 3.1 Flash TTS",  5, 2),
+    ]
+    for model_id, name, per_1k, min_c in tts_models:
+        conn.execute(
+            "INSERT OR IGNORE INTO models_pricing "
+            "(model_id, model_name, billing_mode, unit_name, unit_field, unit_credits, min_credits) "
+            "VALUES (?,?,'per_char','千字符','char_count',?,?)",
+            (model_id, name, per_1k, min_c)
+        )
+
+    # ─── 多模态分析（per_token 计费）───────────────────────────────────
+    analysis_models = [
+        # (model_id, name, credits_per_1k_tokens, min_credits)
+        ("gpt-5-mini-responses",           "GPT-5.4 Mini 推理",         2, 1),
+        ("gemini-3-flash-preview-analyst", "Gemini 3 Flash 分析",        2, 1),
+        ("gemini-3.5-flash",               "Gemini 3.5 Flash 推理",      3, 1),
+        ("grok-prompt-optimizer",          "Grok 剧本重构",               4, 2),
+        ("gemini-video-analyst",           "AI 音视频双轨解析",            5, 2),
+    ]
+    for model_id, name, per_1k, min_c in analysis_models:
+        conn.execute(
+            "INSERT OR IGNORE INTO models_pricing "
+            "(model_id, model_name, billing_mode, unit_name, unit_field, unit_credits, min_credits) "
+            "VALUES (?,?,'per_token','千Token','token_count',?,?)",
+            (model_id, name, per_1k, min_c)
+        )
+
     conn.commit()
     conn.close()
+
 
 
 def seed_provider_channels():
@@ -210,8 +331,39 @@ def seed_provider_channels():
 
 # ==================== 用户操作 ====================
 
+PASSWORD_HASH_ITERATIONS = 260_000
+
+
 def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        str(password).encode("utf-8"),
+        salt.encode("utf-8"),
+        PASSWORD_HASH_ITERATIONS,
+    ).hex()
+    return f"pbkdf2_sha256${PASSWORD_HASH_ITERATIONS}${salt}${digest}"
+
+
+def _legacy_sha256(password):
+    return hashlib.sha256(str(password).encode()).hexdigest()
+
+
+def verify_password_hash(stored_hash, password):
+    stored_hash = str(stored_hash or "")
+    if stored_hash.startswith("pbkdf2_sha256$"):
+        try:
+            _, iterations, salt, digest = stored_hash.split("$", 3)
+            expected = hashlib.pbkdf2_hmac(
+                "sha256",
+                str(password).encode("utf-8"),
+                salt.encode("utf-8"),
+                int(iterations),
+            ).hex()
+            return hmac.compare_digest(expected, digest), False
+        except Exception:
+            return False, False
+    return hmac.compare_digest(stored_hash, _legacy_sha256(password)), True
 
 
 def create_user(username, password, nickname=""):
@@ -233,10 +385,15 @@ def create_user(username, password, nickname=""):
 def verify_user(username, password):
     conn = get_db()
     user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+    if not user:
+        conn.close()
+        return None
+    matched, needs_upgrade = verify_password_hash(user["password_hash"], password)
+    if matched and needs_upgrade:
+        conn.execute("UPDATE users SET password_hash=? WHERE id=?", (hash_password(password), user["id"]))
+        conn.commit()
     conn.close()
-    if user and user["password_hash"] == hash_password(password):
-        return dict(user)
-    return None
+    return dict(user) if matched else None
 
 
 def get_user(user_id):
@@ -246,21 +403,71 @@ def get_user(user_id):
     return dict(user) if user else None
 
 
-def update_balance(user_id, delta):
-    """增加/扣除余额（delta 为正数增加，负数扣除）"""
+def update_balance(
+    user_id,
+    delta,
+    entry_type="adjustment",
+    reference_type="",
+    reference_id="",
+    idempotency_key="",
+    note="",
+    metadata=None,
+):
+    """增加/扣除余额，并写入不可变流水账本。"""
     conn = get_db()
-    user = conn.execute("SELECT balance FROM users WHERE id=?", (user_id,)).fetchone()
-    if not user:
+    try:
+        if idempotency_key:
+            existing = conn.execute(
+                "SELECT id FROM balance_ledger WHERE idempotency_key=?",
+                (idempotency_key,),
+            ).fetchone()
+            if existing:
+                return True, None
+
+        conn.execute("BEGIN IMMEDIATE")
+        user = conn.execute("SELECT balance FROM users WHERE id=?", (user_id,)).fetchone()
+        if not user:
+            conn.rollback()
+            return False, "用户不存在"
+
+        balance_before = int(user["balance"] or 0)
+        delta = int(delta)
+        balance_after = balance_before + delta
+        if balance_after < 0:
+            conn.rollback()
+            return False, "余额不足"
+
+        conn.execute("UPDATE users SET balance=? WHERE id=?", (balance_after, user_id))
+        conn.execute(
+            """
+            INSERT INTO balance_ledger
+                (user_id, entry_type, delta, balance_before, balance_after,
+                 reference_type, reference_id, idempotency_key, note, metadata_json)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                user_id,
+                entry_type,
+                delta,
+                balance_before,
+                balance_after,
+                reference_type,
+                str(reference_id or ""),
+                idempotency_key or "",
+                note or "",
+                json.dumps(metadata or {}, ensure_ascii=False, default=str),
+            ),
+        )
+        conn.commit()
+        return True, None
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return True, None
+    except Exception as exc:
+        conn.rollback()
+        return False, str(exc)
+    finally:
         conn.close()
-        return False, "用户不存在"
-    new_balance = user["balance"] + delta
-    if new_balance < 0:
-        conn.close()
-        return False, "余额不足"
-    conn.execute("UPDATE users SET balance=? WHERE id=?", (new_balance, user_id))
-    conn.commit()
-    conn.close()
-    return True, None
 
 
 # ==================== 订单 ====================
@@ -281,11 +488,29 @@ def complete_order(order_id):
     """完成订单，增加用户余额"""
     conn = get_db()
     order = conn.execute("SELECT * FROM orders WHERE id=?", (order_id,)).fetchone()
+    if order and order["status"] == "completed":
+        conn.close()
+        return True
     if not order or order["status"] != "pending":
         conn.close()
         return False
+    conn.close()
+
+    ok, _ = update_balance(
+        order["user_id"],
+        order["credits"],
+        entry_type="recharge",
+        reference_type="order",
+        reference_id=order_id,
+        idempotency_key=f"order:{order_id}:complete",
+        note=f"充值订单完成，获得 {order['credits']} 额度",
+        metadata={"amount": order["amount"], "payment_method": order["payment_method"]},
+    )
+    if not ok:
+        return False
+
+    conn = get_db()
     conn.execute("UPDATE orders SET status='completed' WHERE id=?", (order_id,))
-    conn.execute("UPDATE users SET balance=balance+? WHERE id=?", (order["credits"], order["user_id"]))
     conn.commit()
     conn.close()
     return True
@@ -303,15 +528,17 @@ def log_generation(
     error_message="",
     request_id="",
     raw_response="",
+    idempotency_key="",
 ):
     conn = get_db()
     cur = conn.execute(
         """
         INSERT INTO generation_logs
-            (user_id, model, credits_used, prompt, image_url, status, error_message, request_id, raw_response, updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+            (user_id, model, credits_used, prompt, image_url, status, error_message,
+             request_id, raw_response, idempotency_key, updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
         """,
-        (user_id, model, credits_used, prompt, image_url, status, error_message, request_id, raw_response)
+        (user_id, model, credits_used, prompt, image_url, status, error_message, request_id, raw_response, idempotency_key)
     )
     log_id = cur.lastrowid
     conn.commit()
@@ -327,6 +554,7 @@ def update_generation_log(log_id, **kwargs):
         "request_id",
         "raw_response",
         "refunded_at",
+        "idempotency_key",
     }
     updates = {k: v for k, v in kwargs.items() if k in allowed}
     if not updates:
@@ -428,6 +656,32 @@ def calculate_model_credits(model_id, params=None):
 def get_all_pricing():
     conn = get_db()
     rows = conn.execute("SELECT * FROM models_pricing WHERE is_active=1").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_generation_by_idempotency(user_id, idempotency_key):
+    if not idempotency_key:
+        return None
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM generation_logs WHERE user_id=? AND idempotency_key=? ORDER BY id DESC LIMIT 1",
+        (user_id, idempotency_key),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_ledger_entries(user_id=None, limit=100):
+    conn = get_db()
+    sql = "SELECT * FROM balance_ledger"
+    args = []
+    if user_id:
+        sql += " WHERE user_id=?"
+        args.append(user_id)
+    sql += " ORDER BY created_at DESC, id DESC LIMIT ?"
+    args.append(int(limit))
+    rows = conn.execute(sql, args).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -695,8 +949,11 @@ def get_smtp_config():
 def get_oauth_config():
     settings = get_all_settings()
     return {
+        "google_enabled": settings.get("oauth_google_enabled", "false") == "true",
         "google_client_id": settings.get("oauth_google_client_id", ""),
         "google_secret": settings.get("oauth_google_secret", ""),
+        "github_enabled": settings.get("oauth_github_enabled", "false") == "true",
         "github_client_id": settings.get("oauth_github_client_id", ""),
         "github_secret": settings.get("oauth_github_secret", ""),
+        "redirect_base": settings.get("oauth_redirect_base", ""),
     }

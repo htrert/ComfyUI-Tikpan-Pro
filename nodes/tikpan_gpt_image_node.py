@@ -33,7 +33,7 @@ class TikpanGptImage2Node:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成图像", "📄_完整日志")
     FUNCTION = "generate_image"
-    CATEGORY = "👑 Tikpan 官方独家节点"
+    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
 
     def generate_image(self, 获取密钥请访问, API_密钥, 提示词, 模型, 尺寸, 品质, 风格, 随机种子, **kwargs):
         # 1. 进度条初始化

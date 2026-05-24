@@ -49,6 +49,236 @@ def decode_base64_to_image(b64_data):
     return Image.open(BytesIO(base64.b64decode(cleaned))).convert("RGB")
 
 
+def split_label_value(value):
+    text = str(value or "").strip()
+    return [part.strip() for part in text.split("｜") if part.strip()]
+
+
+def option_value(value, default=""):
+    parts = split_label_value(value)
+    if not parts:
+        return str(default or "").strip()
+    last = parts[-1].strip()
+    return last if last else str(default or "").strip()
+
+
+def bool_value(value):
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on", "开启"}
+
+
+def normalize_suno_tags(value, custom_value=""):
+    custom = str(custom_value or "").strip()
+    if custom:
+        return custom
+    parts = split_label_value(value)
+    if not parts:
+        return ""
+    if parts[-1].lower() == "custom":
+        return ""
+    return parts[-1]
+
+
+def normalize_tts_voice(model_id, value, data):
+    text = str(value or "").strip()
+    parts = split_label_value(text)
+    if not parts:
+        return text
+    if parts[0].startswith("自定义"):
+        if model_id == "gemini-3.1-flash-tts-preview":
+            return str(data.get("custom_voice_name") or "").strip()
+        if model_id == "doubao-tts-2.0":
+            return str(data.get("custom_voice_type") or "").strip()
+        return str(data.get("custom_voice_id") or "").strip()
+    if model_id == "gemini-3.1-flash-tts-preview":
+        return parts[0]
+    return parts[-1]
+
+
+def normalize_tts_style(value, custom_value=""):
+    custom = str(custom_value or "").strip()
+    if custom:
+        return custom
+    parts = split_label_value(value)
+    if not parts:
+        return ""
+    if parts[-1].lower() == "custom":
+        return ""
+    return parts[-1]
+
+
+def normalize_image_size(data):
+    raw_size = data.get("size")
+    if raw_size:
+        return option_value(raw_size, raw_size)
+    resolution = str(option_value(data.get("resolution"), data.get("resolution") or "1024")).strip()
+    ratio = option_value(data.get("aspect_ratio"), data.get("aspect_ratio") or "1:1")
+    ratio = str(ratio).split("|", 1)[0].strip().split(" ", 1)[0].strip()
+    if resolution in {"Auto", "none", "沿用底图尺寸", "沿用底图比例"}:
+        return resolution
+    base_map = {
+        "512": 512,
+        "1K": 1024,
+        "1K (1024)": 1024,
+        "2K": 2048,
+        "2K (2048)": 2048,
+        "3K": 3072,
+        "4K": 4096,
+        "4K (官方极限 3840)": 3840,
+        "720P": 1280,
+        "1080P": 1920,
+    }
+    if "x" in resolution:
+        return resolution
+    base = base_map.get(resolution, 1024)
+    try:
+        w_ratio, h_ratio = [float(part) for part in ratio.split(":", 1)]
+    except Exception:
+        return "1024x1024"
+    if w_ratio >= h_ratio:
+        width = base
+        height = int(base * h_ratio / w_ratio)
+    else:
+        height = base
+        width = int(base * w_ratio / h_ratio)
+    width = max((width // 8) * 8, 8)
+    height = max((height // 8) * 8, 8)
+    return f"{width}x{height}"
+
+
+def build_minimax_speech_payload(model_id, data):
+    voice_id = normalize_tts_voice(model_id, data.get("voice", ""), data)
+    audio_format = str(data.get("audio_format") or "mp3").strip()
+    return {
+        "model": model_id,
+        "text": str(data.get("text") or data.get("prompt") or "").strip(),
+        "language_boost": str(data.get("language_boost") or "auto").strip(),
+        "voice_setting": {
+            "voice_id": voice_id,
+            "speed": float(data.get("speed") or 1.0),
+            "vol": float(data.get("volume") or 1.0),
+            "pitch": int(float(data.get("pitch") or 0)),
+        },
+        "audio_setting": {
+            "sample_rate": int(data.get("sample_rate") or 32000),
+            "bitrate": int(data.get("bitrate") or 128000),
+            "format": audio_format,
+            "channel": int(data.get("channel") or 1),
+        },
+        "stream": False,
+        "output_format": str(data.get("output_format") or "hex").strip(),
+    }
+
+
+def build_doubao_tts_payload(model_id, data):
+    voice_type = normalize_tts_voice(model_id, data.get("voice", ""), data)
+    return {
+        "user": {"uid": str(data.get("user_id") or "tikpan_web_user")},
+        "req_params": {
+            "text": str(data.get("text") or data.get("prompt") or "").strip(),
+            "speaker": voice_type,
+            "audio_params": {
+                "format": str(data.get("audio_format") or "mp3").strip(),
+                "sample_rate": int(data.get("sample_rate") or 24000),
+                "speech_rate": int(round((float(data.get("speed") or 1.0) - 1.0) * 100)),
+                "loudness_rate": int(round((float(data.get("volume") or 1.0) - 1.0) * 100)),
+                "pitch_rate": int(round((float(data.get("pitch") or 1.0) - 1.0) * 100)),
+            },
+            "request_id": f"web-doubao-{uuid.uuid4().hex}",
+        },
+    }
+
+
+def build_gemini_tts_payload(model_id, data):
+    voice_name = normalize_tts_voice(model_id, data.get("voice", ""), data)
+    style = normalize_tts_style(data.get("style", ""), data.get("custom_style", ""))
+    text = str(data.get("text") or data.get("prompt") or "").strip()
+    language_code = str(data.get("language_code") or "").strip()
+    if language_code == "自动":
+        language_code = ""
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": f"{style}: {text}" if style else text}],
+            }
+        ],
+        "generationConfig": {
+            "responseModalities": ["AUDIO"],
+            "speechConfig": {
+                "voiceConfig": {
+                    "prebuiltVoiceConfig": {"voiceName": voice_name}
+                }
+            },
+        },
+    }
+    if language_code:
+        payload["generationConfig"]["speechConfig"]["languageCode"] = language_code
+    return payload
+
+
+def build_catalog_payload(model_id, data, upstream_model):
+    if model_id in {"speech-2.8-hd", "speech-2.8-turbo"}:
+        return build_minimax_speech_payload(model_id, data)
+    if model_id == "doubao-tts-2.0":
+        return build_doubao_tts_payload(model_id, data)
+    if model_id == "gemini-3.1-flash-tts-preview":
+        return build_gemini_tts_payload(model_id, data)
+    payload = {
+        "model": upstream_model,
+        "prompt": data.get("prompt") or data.get("text") or data.get("user_question") or "",
+    }
+    if model_id in {"gpt-image-2", "gpt-image-2-all", "gpt-image-2-all-simple", "gpt-image-2-all-edit", "gpt-image-2-edit"}:
+        payload["size"] = normalize_image_size(data)
+    return payload
+
+
+# ==================== Suno 音乐生成 ====================
+
+def build_suno_payload(model_id, data):
+    """构建 Suno 音乐生成请求体
+    支持: 普通生成 / 续写 / 歌手风格 / 纯音乐
+    model_id -> Suno 内部 mv 参数 映射
+    """
+    MV_MAP = {
+        "suno-v5":    "chirp-v5",
+        "suno-v4":    "chirp-v4",
+        "suno-fenix": "chirp-fenix",
+        "suno-auk":   "chirp-auk",
+        "suno-v3.5":  "chirp-v3-5",
+        "suno-v3":    "chirp-v3-0",
+    }
+    mv = MV_MAP.get(model_id, "chirp-v5")
+    title = str(data.get("title", "") or "").strip()
+    prompt = str(data.get("prompt", "") or data.get("lyrics", "")).strip()
+    style = normalize_suno_tags(data.get("style", ""), data.get("custom_style", ""))
+    negative_style = normalize_suno_tags(data.get("negative_style", ""), "")
+    instrumental = bool_value(data.get("instrumental", False))
+
+    payload = {
+        "mv": mv,
+        "title": title,
+        "prompt": prompt,
+        "tags": style,
+        "make_instrumental": instrumental,
+    }
+    if negative_style:
+        payload["negative_tags"] = negative_style
+    # 续写模式
+    continue_at = data.get("continue_at")
+    continue_clip_id = str(data.get("continue_clip_id", "") or "").strip()
+    if continue_clip_id:
+        payload["continue_clip_id"] = continue_clip_id
+        if continue_at is not None:
+            payload["continue_at"] = float(continue_at)
+    # 歌手风格
+    persona_id = str(data.get("persona_id", "") or "").strip()
+    if persona_id:
+        payload["persona_id"] = persona_id
+    return payload
+
+
 # ==================== API 调用 ====================
 
 def call_gemini_native(model_id, prompt, resolution, aspect_ratio, reference_images, seed, api_key=None):
@@ -60,6 +290,9 @@ def call_gemini_native(model_id, prompt, resolution, aspect_ratio, reference_ima
         parts.append({"inlineData": {"mimeType": "image/jpeg", "data": b64}})
 
     gen_config = {"responseModalities": ["TEXT", "IMAGE"], "imageConfig": {"aspectRatio": aspect_ratio}}
+    resolution = option_value(resolution, resolution)
+    aspect_ratio = option_value(aspect_ratio, aspect_ratio)
+    gen_config["imageConfig"]["aspectRatio"] = aspect_ratio
     if resolution and resolution != "none" and resolution in ("1K", "2K", "4K"):
         gen_config["imageConfig"]["imageSize"] = resolution
     if seed and seed > 0:
@@ -94,7 +327,7 @@ def call_gemini_native(model_id, prompt, resolution, aspect_ratio, reference_ima
 
 def call_doubao(prompt, model_variant, size, reference_images, n, api_key=None):
     key = api_key or API_KEY
-    payload = {"model": model_variant, "prompt": prompt, "size": size, "n": int(n)}
+    payload = {"model": model_variant, "prompt": prompt, "size": option_value(size, size), "n": int(n)}
     if reference_images:
         urls = []
         for f in reference_images:
@@ -131,14 +364,17 @@ def call_doubao(prompt, model_variant, size, reference_images, n, api_key=None):
 
 def call_suno(mode, prompt, model_version, extra_params, api_key=None):
     key = api_key or API_KEY
+    model_version = option_value(model_version, model_version or "chirp-fenix")
     payload = {"model": model_version}
     if mode == "灵感模式":
         payload["gpt_description_prompt"] = prompt
-        payload["make_instrumental"] = extra_params.get("make_instrumental", "false") == "true"
+        payload["make_instrumental"] = bool_value(extra_params.get("make_instrumental"))
     elif mode == "自定义模式":
         payload["prompt"] = prompt
         payload["title"] = extra_params.get("title", "Untitled")
-        payload["tags"] = extra_params.get("tags", "")
+        payload["tags"] = normalize_suno_tags(extra_params.get("tags", ""), extra_params.get("custom_tags", ""))
+        if extra_params.get("negative_tags"):
+            payload["negative_tags"] = extra_params.get("negative_tags", "")
         payload["generation_type"] = extra_params.get("generation_type", "lyrics")
     elif mode == "续写模式":
         payload["continue_clip_id"] = extra_params.get("continue_clip_id", "")
@@ -147,6 +383,20 @@ def call_suno(mode, prompt, model_version, extra_params, api_key=None):
     elif mode == "歌手风格":
         payload["prompt"] = prompt
         payload["persona_id"] = extra_params.get("persona_id", "")
+        if extra_params.get("reference_audio_id"):
+            payload["reference_audio_id"] = extra_params.get("reference_audio_id", "")
+
+    if bool_value(extra_params.get("send_advanced")):
+        vocal_gender = option_value(extra_params.get("vocal_gender"), "")
+        if vocal_gender:
+            payload["vocal_gender"] = vocal_gender
+        payload["auto_generate_lyrics"] = bool_value(extra_params.get("auto_generate_lyrics"))
+        for key_name in ("style_weight", "weirdness"):
+            if extra_params.get(key_name) not in (None, ""):
+                try:
+                    payload[key_name] = float(extra_params.get(key_name))
+                except Exception:
+                    pass
 
     url = f"{API_BASE_URL}/v1/suno/submit/music"
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
@@ -179,9 +429,22 @@ def call_suno(mode, prompt, model_version, extra_params, api_key=None):
     return None, "生成超时"
 
 
-def call_grok_video(prompt, duration, api_key=None):
+def call_grok_video(prompt, duration, api_key=None, extra_params=None, reference_images=None):
     key = api_key or API_KEY
-    payload = {"model": "grok-video", "prompt": prompt, "duration": duration}
+    extra_params = extra_params or {}
+    payload = {
+        "model": extra_params.get("model") or "grok-video",
+        "prompt": prompt,
+        "duration": option_value(duration, duration),
+        "aspect_ratio": option_value(extra_params.get("aspect_ratio"), extra_params.get("ratio") or "9:16"),
+        "resolution": option_value(extra_params.get("resolution"), "720P"),
+    }
+    image_urls = []
+    for img_file in (reference_images or [])[:7]:
+        img = Image.open(img_file).convert("RGB")
+        image_urls.append(f"data:image/jpeg;base64,{image_to_base64(img, quality=88)}")
+    if image_urls:
+        payload["image_urls"] = image_urls
     url = f"{API_BASE_URL}/v1/video/grok"
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     resp = requests.post(url, json=payload, headers=headers, timeout=(30, 120), verify=False)
@@ -379,5 +642,148 @@ def call_gemini_analysis(prompt, reference_images=None, extra_params=None, api_k
     }, None
 
 
+def _extract_first_url(obj):
+    if isinstance(obj, dict):
+        for key in ("secure_url", "url", "image_url", "video_url", "audio_url", "output_url"):
+            value = obj.get(key)
+            if isinstance(value, str) and value.startswith(("http://", "https://")):
+                return value
+        for value in obj.values():
+            found = _extract_first_url(value)
+            if found:
+                return found
+    elif isinstance(obj, list):
+        for item in obj:
+            found = _extract_first_url(item)
+            if found:
+                return found
+    return ""
+
+
+def _extract_first_b64(obj):
+    if isinstance(obj, dict):
+        for key in ("b64_json", "image_b64", "base64", "data"):
+            value = obj.get(key)
+            if isinstance(value, str) and len(value) > 200:
+                return clean_base64(value)
+        for value in obj.values():
+            found = _extract_first_b64(value)
+            if found:
+                return found
+    elif isinstance(obj, list):
+        for item in obj:
+            found = _extract_first_b64(item)
+            if found:
+                return found
+    return ""
+
+def reference_image_limit(model_id):
+    if model_id in {"gpt-image-2", "gpt-image-2-all", "gpt-image-2-all-edit", "gpt-image-2-edit"}:
+        return 16
+    if model_id in {"grok-imagine-image-edit", "grok-imagine-image-pro-edit", "grok-imagine-image", "grok-imagine-image-pro"}:
+        return 3
+    return 14
+
+def is_grok_image_edit(model_id, endpoint):
+    return (
+        str(endpoint).rstrip("/") == "/v1/images/edits"
+        and model_id in {"grok-imagine-image-edit", "grok-imagine-image-pro-edit", "grok-imagine-image", "grok-imagine-image-pro"}
+    )
+
+def call_tikpan_proxy(model_id, data, reference_images=None, api_key=None):
+    """Generic Tikpan JSON proxy for catalog-backed models.
+
+    Specific handlers remain preferred for mature models. This fallback lets new
+    catalog entries be previewed and tested before a dedicated handler exists.
+    """
+    key = api_key or API_KEY
+    reference_images = reference_images or []
+    endpoint = data.get("_route_endpoint") or data.get("endpoint") or "/v1/responses"
+    upstream_model = data.get("_upstream_model") or data.get("model") or model_id
+    normalized_voice = normalize_tts_voice(model_id, data.get("voice", ""), data)
+    normalized_style = normalize_tts_style(data.get("style", ""), data.get("custom_style", ""))
+    payload = build_catalog_payload(model_id, data, upstream_model)
+    structured_tts_payload = model_id in {"speech-2.8-hd", "speech-2.8-turbo", "doubao-tts-2.0", "gemini-3.1-flash-tts-preview"}
+    for key_name, value in data.items():
+        if key_name.startswith("_") or key_name in {"api_key", "idempotency_key"}:
+            continue
+        if structured_tts_payload:
+            continue
+        if key_name == "voice":
+            value = normalized_voice or value
+        elif key_name == "style":
+            value = normalized_style
+        elif key_name in {"quality", "moderation", "background", "output_format", "response_format", "duration", "aspect_ratio", "watermark"}:
+            value = option_value(value, value)
+        elif key_name in {"custom_voice_id", "custom_voice_name", "custom_voice_type", "custom_style"}:
+            continue
+        payload[key_name] = value
+
+    image_payloads = []
+    for img_file in reference_images[:reference_image_limit(model_id)]:
+        img = Image.open(img_file).convert("RGB")
+        image_payloads.append(f"data:image/jpeg;base64,{image_to_base64(img, quality=88)}")
+    if image_payloads:
+        if is_grok_image_edit(model_id, endpoint):
+            grok_images = [{"type": "image_url", "url": image_url} for image_url in image_payloads[:3]]
+            if len(grok_images) == 1:
+                payload["image"] = grok_images[0]
+            else:
+                payload["images"] = grok_images
+        else:
+            payload["image_urls"] = image_payloads
+
+    headers = {
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Idempotency-Key": f"web-tikpan-proxy-{uuid.uuid4().hex}",
+    }
+    url = f"{API_BASE_URL}{endpoint if str(endpoint).startswith('/') else '/' + str(endpoint)}"
+    resp = requests.post(url, json=payload, headers=headers, timeout=(20, 420), verify=True)
+    if resp.status_code >= 400:
+        return None, f"API 错误 ({resp.status_code}): {resp.text[:1000]}"
+    try:
+        res_json = resp.json()
+    except Exception:
+        text = resp.text.strip()
+        if text.startswith(("http://", "https://")):
+            return {"url": text, "raw_preview": text[:1000]}, None
+        return {"text": text[:4000], "raw_preview": text[:1000]}, None
+
+    b64 = _extract_first_b64(res_json)
+    if b64:
+        try:
+            img = decode_base64_to_image(b64)
+            filepath, filename = save_image(img)
+            return {
+                "image_b64": b64,
+                "width": img.width,
+                "height": img.height,
+                "filename": filename,
+                "filepath": filepath,
+                "raw_preview": _safe_json_preview(res_json, 2000),
+            }, None
+        except Exception:
+            pass
+
+    first_url = _extract_first_url(res_json)
+    result = {
+        "request_id": res_json.get("id", "") if isinstance(res_json, dict) else "",
+        "raw_preview": _safe_json_preview(res_json, 2000),
+    }
+    if first_url:
+        if any(part in first_url.lower() for part in (".mp4", ".mov", ".webm", "video")):
+            result["video_url"] = first_url
+        elif any(part in first_url.lower() for part in (".mp3", ".wav", ".flac", "audio")):
+            result["audio_url"] = first_url
+        else:
+            result["image_url"] = first_url
+    else:
+        result["text"] = _extract_response_text(res_json) or _safe_json_preview(res_json, 2000)
+    return result, None
+
+
 API_DISPATCH["openai_responses"] = call_openai_responses
 API_DISPATCH["gemini_analysis"] = call_gemini_analysis
+API_DISPATCH["tikpan_proxy"] = call_tikpan_proxy
