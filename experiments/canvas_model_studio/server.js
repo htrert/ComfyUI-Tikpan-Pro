@@ -7,13 +7,75 @@ const crypto = require("node:crypto");
 const root = __dirname;
 const publicDir = path.join(root, "public");
 const dataDir = path.join(root, "data");
+const logsDir = path.join(root, "logs");
 const projectsDir = path.join(dataDir, "projects");
 const assetsDir = path.join(dataDir, "assets");
 const profilesFile = path.join(dataDir, "model-profiles.json");
 const platformConfigFile = path.join(dataDir, "platform-config.json");
 
-for (const dir of [dataDir, projectsDir, assetsDir]) {
+for (const dir of [dataDir, projectsDir, assetsDir, logsDir]) {
   fs.mkdirSync(dir, { recursive: true });
+}
+
+// ─── 结构化日志 ────────────────────────────────────────────────────────────
+function logLine(level, reqId, message, extra = {}) {
+  const ts = new Date().toISOString();
+  const extraStr = Object.entries(extra)
+    .filter(([, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `${k}=${typeof v === "string" ? JSON.stringify(v) : v}`)
+    .join(" ");
+  const line = `[${ts}] [${level.padEnd(5)}] ${reqId ? `req=${reqId} ` : ""}${message}${extraStr ? " " + extraStr : ""}\n`;
+  process.stdout.write(line);
+  try {
+    const date = ts.slice(0, 10);
+    fs.appendFileSync(path.join(logsDir, `canvas-${date}.log`), line);
+  } catch { /* 日志写失败不影响主流程 */ }
+}
+
+const log = {
+  info:  (msg, extra = {}, reqId = "") => logLine("INFO",  reqId, msg, extra),
+  warn:  (msg, extra = {}, reqId = "") => logLine("WARN",  reqId, msg, extra),
+  error: (msg, extra = {}, reqId = "") => logLine("ERROR", reqId, msg, extra),
+  gen:   (msg, extra = {}, reqId = "") => logLine("GEN",   reqId, msg, extra),
+  req:   (method, pathname, status, ms, reqId = "") =>
+    logLine("REQ", reqId, `${method} ${pathname}`, { status, ms }),
+};
+
+// ─── Profile 内存缓存 ──────────────────────────────────────────────────────
+let _profilesCache = null;
+let _profilesCacheTime = 0;
+const PROFILES_CACHE_TTL = 10_000; // 10s
+
+function invalidateProfilesCache() {
+  _profilesCache = null;
+  _profilesCacheTime = 0;
+}
+
+// ─── 本地软件配置（data/local-config.json）────────────────────────────────
+// 优先级：环境变量 > local-config.json > 空
+const localConfigFile = path.join(dataDir, "local-config.json");
+
+function readLocalConfig() {
+  try {
+    if (fs.existsSync(localConfigFile)) {
+      return JSON.parse(fs.readFileSync(localConfigFile, "utf8"));
+    }
+  } catch { /* 读取失败不影响启动 */ }
+  return {};
+}
+
+function writeLocalConfig(updates = {}) {
+  const current = readLocalConfig();
+  const next = { ...current, ...updates };
+  fs.writeFileSync(localConfigFile, JSON.stringify(next, null, 2), "utf8");
+  return next;
+}
+
+// 运行时可热更新的 API Key（env var 优先，其次 local config）
+let _runtimeApiKey = process.env.TIKPAN_API_KEY || readLocalConfig().tikpanApiKey || "";
+
+function getApiKey() {
+  return process.env.TIKPAN_API_KEY || _runtimeApiKey;
 }
 
 const port = Number(process.env.PORT || 3456);
@@ -21,9 +83,7 @@ const providerMode = (process.env.PROVIDER || "comfy").toLowerCase();
 const comfyBase = process.env.COMFY_URL || "http://127.0.0.1:8188";
 const upstreamBase = process.env.UPSTREAM_URL || "";
 const upstreamToken = process.env.UPSTREAM_TOKEN || "";
-const tikpanApiKey = process.env.TIKPAN_API_KEY || "";
-const webAppBase = process.env.WEB_APP_URL || "";
-const requireLogin = ["1", "true", "yes"].includes(String(process.env.REQUIRE_LOGIN || "").toLowerCase());
+// API Key 通过 getApiKey() 获取，支持 env var 和本地配置文件热更新
 const clientId = crypto.randomUUID();
 
 const mimeTypes = new Map([
@@ -304,12 +364,19 @@ function writePlatformConfig(config) {
 
 function readProfiles() {
   ensureProfilesFile();
+  const now = Date.now();
+  if (_profilesCache && now - _profilesCacheTime < PROFILES_CACHE_TTL) {
+    return _profilesCache;
+  }
   const profiles = JSON.parse(fs.readFileSync(profilesFile, "utf8"));
-  return Array.isArray(profiles) ? profiles : [];
+  _profilesCache = Array.isArray(profiles) ? profiles : [];
+  _profilesCacheTime = now;
+  return _profilesCache;
 }
 
 function writeProfiles(profiles) {
   fs.writeFileSync(profilesFile, JSON.stringify(profiles, null, 2), "utf8");
+  invalidateProfilesCache();
 }
 
 function sendJson(res, status, payload) {
@@ -349,23 +416,15 @@ function safeName(name, fallback = "canvas-project") {
     .slice(0, 80) || fallback;
 }
 
-function bearerToken(req) {
-  const auth = req.headers.authorization || "";
-  return auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+// 本地模式：不按用户分目录，直接用 data/projects 和 data/assets
+function userProjectDir(_user) {
+  fs.mkdirSync(projectsDir, { recursive: true });
+  return projectsDir;
 }
 
-function userProjectDir(user) {
-  const key = safeName(user?.id || user?.email || user?.username || "guest", "guest");
-  const dir = path.join(projectsDir, key);
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-function userAssetDir(user) {
-  const key = safeName(user?.id || user?.email || user?.username || "guest", "guest");
-  const dir = path.join(assetsDir, key);
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
+function userAssetDir(_user) {
+  fs.mkdirSync(assetsDir, { recursive: true });
+  return assetsDir;
 }
 
 function normalizeAsset(asset = {}) {
@@ -385,60 +444,21 @@ function normalizeAsset(asset = {}) {
   };
 }
 
-async function fetchWebAppJson(route, options = {}) {
-  if (!webAppBase) throw new Error("WEB_APP_URL is not configured.");
-  const target = new URL(route, webAppBase);
-  const response = await fetch(target, options);
-  const bodyText = await response.text();
-  let data = {};
-  try {
-    data = bodyText ? JSON.parse(bodyText) : {};
-  } catch {
-    data = { error: bodyText || response.statusText };
-  }
-  if (!response.ok) {
-    throw new Error(data.error || data.message || `WEB_APP ${response.status}`);
-  }
-  return data;
-}
 
-async function resolveUser(req) {
-  const token = bearerToken(req);
-  if (webAppBase && token) {
-    const data = await fetchWebAppJson("/api/user/info", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const user = data.user || {};
-    return {
-      authenticated: true,
-      token,
-      id: user.id || user.username || "web-user",
-      email: user.username || user.email || "",
-      username: user.username || user.email || "",
-      nickname: user.nickname || user.username || "已登录用户",
-      balance: user.balance ?? 0,
-      role: user.role || "user",
-      source: "web_app",
-    };
-  }
+// 本地软件模式：不需要账户体系，直接返回本地用户
+async function resolveUser(_req) {
   return {
-    authenticated: false,
-    id: "guest",
-    nickname: "访客",
+    authenticated: true,
+    id: "local",
+    nickname: "本地用户",
     balance: null,
-    role: "guest",
-    source: webAppBase ? "web_app" : "standalone",
+    role: "user",
+    source: "local",
   };
 }
 
 async function requireUser(req) {
-  const user = await resolveUser(req);
-  if (requireLogin && !user.authenticated) {
-    const error = new Error("请先登录后再生成或保存项目。");
-    error.status = 401;
-    throw error;
-  }
-  return user;
+  return resolveUser(req);
 }
 
 function findProfile(profileId) {
@@ -677,10 +697,10 @@ async function buildTikpanNodeWorkflow(request, { previewOnly = false } = {}) {
     inputs[node.seedInput] = Number(request.parameters.seed || 0);
   }
   if (node.apiKeyInput) {
-    const key = process.env[profile.credentialEnv || "TIKPAN_API_KEY"] || tikpanApiKey || "";
+    const key = process.env[profile.credentialEnv || "TIKPAN_API_KEY"] || getApiKey() || "";
     inputs[node.apiKeyInput] = key || "sk-";
     if (!key && !previewOnly) {
-      throw new Error(`Please set ${profile.credentialEnv || "TIKPAN_API_KEY"} before running ${profile.name}.`);
+      throw new Error(`请先在设置中配置 API 密钥，或设置环境变量 ${profile.credentialEnv || "TIKPAN_API_KEY"}。`);
     }
   }
 
@@ -856,109 +876,81 @@ async function generateWithUpstream(request) {
   };
 }
 
-async function handleApi(req, res, url) {
+async function handleApi(req, res, url, reqId = "", _sendJson = sendJson) {
+  // 局部 sendJson 优先使用带 requestId 的版本
+  const reply = _sendJson;
   if (url.pathname === "/api/health") {
-    sendJson(res, 200, {
+    reply(res, 200, {
       ok: true,
+      mode: "local",
       provider: providerMode,
       comfyBase,
       upstreamConfigured: Boolean(upstreamBase),
-      tikpanKeyConfigured: Boolean(tikpanApiKey),
-      webAppConfigured: Boolean(webAppBase),
-      requireLogin,
+      apiKeyConfigured: Boolean(getApiKey()),
       clientId,
     });
     return;
   }
 
   if (url.pathname === "/api/provider") {
-    sendJson(res, 200, {
+    reply(res, 200, {
       ok: true,
       provider: providerMode,
       options: ["comfy", "upstream"],
       comfyBase,
       upstreamConfigured: Boolean(upstreamBase),
-      tikpanKeyConfigured: Boolean(tikpanApiKey),
-      webAppConfigured: Boolean(webAppBase),
-      requireLogin,
+      apiKeyConfigured: Boolean(getApiKey()),
     });
     return;
   }
 
   if (url.pathname === "/api/session" && req.method === "GET") {
-    const user = await resolveUser(req);
-    sendJson(res, 200, {
+    reply(res, 200, {
       ok: true,
-      authenticated: user.authenticated,
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        nickname: user.nickname,
-        balance: user.balance,
-        role: user.role,
-        source: user.source,
-      },
-      auth: {
-        webAppConfigured: Boolean(webAppBase),
-        requireLogin,
-      },
+      mode: "local",
+      apiKeyConfigured: Boolean(getApiKey()),
+      apiKeySource: process.env.TIKPAN_API_KEY ? "env" : (_runtimeApiKey ? "config" : "none"),
     });
     return;
   }
 
-  if (url.pathname === "/api/auth/login" && req.method === "POST") {
-    if (!webAppBase) {
-      sendJson(res, 400, { ok: false, error: "WEB_APP_URL 未配置，当前只能以访客模式使用。" });
-      return;
-    }
+  // --- local config API ---
+  if (url.pathname === "/api/config" && req.method === "GET") {
+    const cfg = readLocalConfig();
+    const key = getApiKey();
+    reply(res, 200, {
+      ok: true,
+      apiKeyConfigured: Boolean(key),
+      apiKeySource: process.env.TIKPAN_API_KEY ? "env" : (cfg.tikpanApiKey ? "config" : "none"),
+      apiKeyMasked: key ? (key.slice(0, 6) + "*".repeat(Math.max(0, key.length - 10)) + key.slice(-4)) : "",
+      comfyUrl: cfg.comfyUrl || comfyBase,
+    });
+    return;
+  }
+
+  if (url.pathname === "/api/config" && req.method === "POST") {
     const payload = JSON.parse(await readBody(req) || "{}");
-    const data = await fetchWebAppJson("/api/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: payload.email, password: payload.password }),
-    });
-    sendJson(res, 200, { ok: true, token: data.token, user: data.user });
-    return;
-  }
-
-  if (url.pathname === "/api/auth/register" && req.method === "POST") {
-    if (!webAppBase) {
-      sendJson(res, 400, { ok: false, error: "WEB_APP_URL 未配置，当前只能以访客模式使用。" });
-      return;
+    const updates = {};
+    if (typeof payload.tikpanApiKey === "string") {
+      updates.tikpanApiKey = payload.tikpanApiKey.trim();
+      if (!process.env.TIKPAN_API_KEY) _runtimeApiKey = updates.tikpanApiKey;
     }
-    const payload = JSON.parse(await readBody(req) || "{}");
-    const data = await fetchWebAppJson("/api/register", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    sendJson(res, 200, { ok: true, token: data.token, user: data.user || { email: payload.email } });
-    return;
-  }
-
-  if (url.pathname === "/api/auth/send-code" && req.method === "POST") {
-    if (!webAppBase) {
-      sendJson(res, 400, { ok: false, error: "WEB_APP_URL 未配置，无法发送验证码。" });
-      return;
+    if (typeof payload.comfyUrl === "string" && payload.comfyUrl.trim()) {
+      updates.comfyUrl = payload.comfyUrl.trim();
     }
-    const payload = JSON.parse(await readBody(req) || "{}");
-    const data = await fetchWebAppJson("/api/send-code", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    sendJson(res, 200, { ok: true, ...data });
+    const saved = writeLocalConfig(updates);
+    log.info("local config saved", { hasKey: Boolean(getApiKey()) }, reqId);
+    reply(res, 200, { ok: true, apiKeyConfigured: Boolean(getApiKey()), comfyUrl: saved.comfyUrl || comfyBase });
     return;
   }
 
-  if (url.pathname === "/api/profiles" && req.method === "GET") {
-    sendJson(res, 200, { ok: true, profiles: readProfiles() });
+    if (url.pathname === "/api/profiles" && req.method === "GET") {
+    reply(res, 200, { ok: true, profiles: readProfiles() });
     return;
   }
 
   if (url.pathname === "/api/admin/config" && req.method === "GET") {
-    sendJson(res, 200, {
+    reply(res, 200, {
       ok: true,
       config: readPlatformConfig(),
       profiles: readProfiles().map((profile) => ({
@@ -975,12 +967,12 @@ async function handleApi(req, res, url) {
   if (url.pathname === "/api/admin/config" && req.method === "POST") {
     const payload = JSON.parse(await readBody(req) || "{}");
     const config = writePlatformConfig(payload.config || {});
-    sendJson(res, 200, { ok: true, config });
+    reply(res, 200, { ok: true, config });
     return;
   }
 
   if (url.pathname === "/api/content-factory/workflows" && req.method === "GET") {
-    sendJson(res, 200, {
+    reply(res, 200, {
       ok: true,
       workflows: contentFactoryWorkflows,
     });
@@ -989,7 +981,7 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === "/api/content-factory/plan" && req.method === "POST") {
     const payload = JSON.parse(await readBody(req) || "{}");
-    sendJson(res, 200, buildContentFactoryPlan(payload.workflowId, payload.brief || ""));
+    reply(res, 200, buildContentFactoryPlan(payload.workflowId, payload.brief || ""));
     return;
   }
 
@@ -1010,13 +1002,13 @@ async function handleApi(req, res, url) {
     if (index >= 0) profiles[index] = profile;
     else profiles.push(profile);
     writeProfiles(profiles);
-    sendJson(res, 200, { ok: true, profile, profiles });
+    reply(res, 200, { ok: true, profile, profiles });
     return;
   }
 
   if (url.pathname === "/api/comfy/status") {
     const response = await comfyFetch("/system_stats");
-    sendJson(res, 200, { ok: true, comfyBase, stats: await response.json() });
+    reply(res, 200, { ok: true, comfyBase, stats: await response.json() });
     return;
   }
 
@@ -1024,7 +1016,7 @@ async function handleApi(req, res, url) {
     const response = await comfyFetch("/object_info/CheckpointLoaderSimple");
     const info = await response.json();
     const checkpoints = info?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
-    sendJson(res, 200, { ok: true, checkpoints });
+    reply(res, 200, { ok: true, checkpoints });
     return;
   }
 
@@ -1044,7 +1036,7 @@ async function handleApi(req, res, url) {
     const payload = JSON.parse(await readBody(req) || "{}");
     const request = buildGenerationRequest(payload);
     const workflow = request.provider === "comfy" ? await buildWorkflow(request, { previewOnly: true }) : null;
-    sendJson(res, 200, {
+    reply(res, 200, {
       ok: true,
       provider: request.provider,
       request: {
@@ -1061,10 +1053,24 @@ async function handleApi(req, res, url) {
     await requireUser(req);
     const payload = JSON.parse(await readBody(req) || "{}");
     const request = buildGenerationRequest(payload);
-    const result = request.provider === "upstream"
-      ? await generateWithUpstream(request)
-      : await generateWithComfy(request);
-    sendJson(res, 200, {
+    const genStart = Date.now();
+    log.gen("generate start", { profile: request.profileId, engine: request.engine, provider: request.provider }, reqId);
+    let result;
+    try {
+      result = request.provider === "upstream"
+        ? await generateWithUpstream(request)
+        : await generateWithComfy(request);
+    } catch (genErr) {
+      log.error("generate failed", { profile: request.profileId, ms: Date.now() - genStart, reason: genErr.message }, reqId);
+      throw genErr;
+    }
+    log.gen("generate ok", {
+      profile: request.profileId,
+      ms: Date.now() - genStart,
+      images: (result.images || []).length,
+      media: (result.media || []).length,
+    }, reqId);
+    reply(res, 200, {
       ...result,
       request: { ...request, profile: undefined },
     });
@@ -1077,7 +1083,7 @@ async function handleApi(req, res, url) {
     const projects = fs.readdirSync(dir)
       .filter((file) => file.endsWith(".json"))
       .map((file) => file.replace(/\.json$/, ""));
-    sendJson(res, 200, { ok: true, projects });
+    reply(res, 200, { ok: true, projects });
     return;
   }
 
@@ -1093,7 +1099,7 @@ async function handleApi(req, res, url) {
       updatedAt: new Date().toISOString(),
     };
     fs.writeFileSync(file, JSON.stringify(project, null, 2), "utf8");
-    sendJson(res, 200, { ok: true, name, project });
+    reply(res, 200, { ok: true, name, project });
     return;
   }
 
@@ -1102,10 +1108,10 @@ async function handleApi(req, res, url) {
     const name = safeName(decodeURIComponent(url.pathname.slice("/api/projects/".length)));
     const file = path.join(userProjectDir(user), `${name}.json`);
     if (!fs.existsSync(file)) {
-      sendJson(res, 404, { ok: false, error: "Project not found." });
+      reply(res, 404, { ok: false, error: "Project not found." });
       return;
     }
-    sendJson(res, 200, { ok: true, name, project: JSON.parse(fs.readFileSync(file, "utf8")) });
+    reply(res, 200, { ok: true, name, project: JSON.parse(fs.readFileSync(file, "utf8")) });
     return;
   }
 
@@ -1116,7 +1122,7 @@ async function handleApi(req, res, url) {
       .filter((file) => file.endsWith(".json"))
       .map((file) => JSON.parse(fs.readFileSync(path.join(dir, file), "utf8")))
       .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
-    sendJson(res, 200, { ok: true, assets });
+    reply(res, 200, { ok: true, assets });
     return;
   }
 
@@ -1132,11 +1138,67 @@ async function handleApi(req, res, url) {
         fs.writeFileSync(file, JSON.stringify(normalized, null, 2), "utf8");
         return normalized;
       });
-    sendJson(res, 200, { ok: true, assets: saved });
+    reply(res, 200, { ok: true, assets: saved });
     return;
   }
 
-  sendJson(res, 404, { ok: false, error: "Unknown API route." });
+  // --- 画布自动保存（存到 data/canvas-autosave.json）---
+  if (url.pathname === "/api/autosave" && req.method === "GET") {
+    const autosaveFile = path.join(dataDir, "canvas-autosave.json");
+    try {
+      if (!fs.existsSync(autosaveFile)) {
+        reply(res, 200, { ok: true, data: null });
+        return;
+      }
+      const data = JSON.parse(fs.readFileSync(autosaveFile, "utf8"));
+      reply(res, 200, { ok: true, data });
+    } catch {
+      reply(res, 200, { ok: true, data: null });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/autosave" && req.method === "POST") {
+    const autosaveFile = path.join(dataDir, "canvas-autosave.json");
+    try {
+      const payload = JSON.parse(await readBody(req) || "{}");
+      fs.writeFileSync(autosaveFile, JSON.stringify(payload, null, 2), "utf8");
+      reply(res, 200, { ok: true });
+    } catch (e) {
+      reply(res, 500, { ok: false, error: e.message });
+    }
+    return;
+  }
+
+  // --- 数据目录路径（供设置面板展示）---
+  if (url.pathname === "/api/data-path" && req.method === "GET") {
+    reply(res, 200, {
+      ok: true,
+      dataDir: path.resolve(dataDir),
+      logsDir: path.resolve(logsDir),
+      projectsDir: path.resolve(projectsDir),
+      note: "复制 data/ 文件夹可完整备份和迁移画布、项目、配置。",
+    });
+    return;
+  }
+
+    if (url.pathname === "/api/logs" && req.method === "GET") {
+    const tail = Math.min(500, Math.max(1, Number(url.searchParams.get("tail") || 100)));
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const lines = [];
+    for (const date of [yesterday, today]) {
+      const file = path.join(logsDir, `canvas-${date}.log`);
+      if (fs.existsSync(file)) {
+        lines.push(...fs.readFileSync(file, "utf8").split("\n").filter(Boolean));
+      }
+    }
+    const recent = lines.slice(-tail);
+    reply(res, 200, { ok: true, lines: recent, total: lines.length });
+    return;
+  }
+
+  reply(res, 404, { ok: false, error: "Unknown API route." });
 }
 
 function serveStatic(req, res, url) {
@@ -1156,25 +1218,52 @@ function serveStatic(req, res, url) {
 }
 
 const server = http.createServer(async (req, res) => {
+  const reqId = crypto.randomUUID().slice(0, 8);
+  const start = Date.now();
+  let statusCode = 200;
+
+  // 把 requestId 注入进所有响应头
+  const _sendJson = sendJson;
+  const trackedSendJson = (r, status, payload) => {
+    statusCode = status;
+    const body = JSON.stringify({ ...payload, requestId: reqId }, null, 2);
+    r.writeHead(status, {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "x-request-id": reqId,
+    });
+    r.end(body);
+  };
+
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   try {
     if (url.pathname.startsWith("/api/")) {
-      await handleApi(req, res, url);
+      await handleApi(req, res, url, reqId, trackedSendJson);
       return;
     }
     serveStatic(req, res, url);
   } catch (error) {
-    sendJson(res, error.status || 500, { ok: false, error: error.message, stack: String(error.stack || "").split("\n").slice(0, 5) });
+    statusCode = error.status || 500;
+    log.error(error.message, { stack: error.stack?.split("\n").slice(0, 4).join(" | ") }, reqId);
+    const isDev = process.env.NODE_ENV !== "production";
+    trackedSendJson(res, statusCode, {
+      ok: false,
+      error: error.message,
+      ...(isDev && { stack: String(error.stack || "").split("\n").slice(0, 5) }),
+    });
+  } finally {
+    log.req(req.method, url.pathname, statusCode, Date.now() - start, reqId);
   }
 });
 
 ensureProfilesFile();
 ensurePlatformConfigFile();
 server.listen(port, () => {
-  console.log(`Infinite Canvas for ComfyUI running at http://127.0.0.1:${port}`);
-  console.log(`Provider mode: ${providerMode}`);
-  console.log(`ComfyUI target: ${comfyBase}`);
-  console.log(`Tikpan key configured: ${Boolean(tikpanApiKey)}`);
-  console.log(`Web app auth bridge: ${webAppBase || "disabled"} | require login: ${requireLogin}`);
-  if (upstreamBase) console.log(`Upstream target: ${upstreamBase}`);
+  log.info("Canvas Model Studio started", {
+    url: "http://127.0.0.1:" + port,
+    provider: providerMode,
+    comfy: comfyBase,
+    apiKey: getApiKey() ? "configured" : "NOT configured - open settings",
+    logs: logsDir,
+  });
 });

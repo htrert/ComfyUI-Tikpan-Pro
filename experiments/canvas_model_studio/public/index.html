@@ -37,15 +37,18 @@
         </div>
 
         <section class="panel user-panel">
-          <div class="panel-title">用户</div>
-          <div id="userSummary" class="user-summary">
-            <strong>访客模式</strong>
-            <span>可以编辑画布；商业生成建议接入正式网站账号。</span>
+          <div class="panel-title">本地配置</div>
+          <div id="localStatus" class="local-status">
+            <div class="status-row">
+              <span class="status-dot" id="apiKeyDot"></span>
+              <span id="apiKeyStatus">API 密钥：检查中…</span>
+            </div>
+            <div class="status-row">
+              <span class="status-dot" id="comfyDot"></span>
+              <span id="comfyStatus">ComfyUI：检查中…</span>
+            </div>
           </div>
-          <div class="button-row">
-            <button id="loginButton">登录</button>
-            <button id="logoutButton">退出</button>
-          </div>
+          <button id="settingsButton" class="primary" style="width:100%;margin-top:8px">设置 API 密钥</button>
         </section>
 
         <section class="panel">
@@ -166,7 +169,7 @@
         <section class="panel">
           <div class="panel-title">我的资产</div>
           <div id="assetList" class="asset-list">
-            <p class="status-text">登录后，导入和生成的图片/媒体会归档到资产库。</p>
+            <p class="status-text">导入或生成的图片/媒体会自动归档到资产库。</p>
           </div>
         </section>
       </aside>
@@ -185,9 +188,7 @@
             <button data-menu="director">导演台</button>
           </nav>
           <div class="stage-actions">
-            <a href="/admin.html">后台</a>
-            <button id="shareButton">分享</button>
-            <button id="rechargeButton">充值</button>
+            <a href="/admin.html">后台管理</a>
           </div>
         </header>
 
@@ -227,6 +228,9 @@
         <div class="bottom-toolbar">
           <button id="miniMapButton">地图</button>
           <button id="gridButton">网格</button>
+          <button id="undoButton" title="撤销 Ctrl+Z">撤销</button>
+          <button id="redoButton" title="重做 Ctrl+Y">重做</button>
+          <button id="duplicateButton" title="复制当前节点 Ctrl+D">复制</button>
           <button id="centerButton">居中</button>
           <input id="zoomRange" type="range" min="16" max="300" value="78">
           <span id="zoomLabel">100%</span>
@@ -252,35 +256,39 @@
       </article>
     </template>
 
-    <div id="authModal" class="modal">
+    <div id="settingsModal" class="modal">
       <div class="modal-card">
         <div class="modal-head">
-          <strong>登录创作账号</strong>
-          <button id="authCloseButton" aria-label="关闭">×</button>
-        </div>
-        <div class="auth-tabs">
-          <button id="authLoginTab" class="active">登录</button>
-          <button id="authRegisterTab">注册</button>
+          <strong>本地软件设置</strong>
+          <button id="settingsCloseButton" aria-label="关闭">×</button>
         </div>
         <label>
-          邮箱
-          <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com">
-        </label>
-        <label>
-          密码
-          <input id="authPassword" type="password" autocomplete="current-password" placeholder="至少 6 位">
-        </label>
-        <label id="authCodeField" hidden>
-          验证码
-          <div class="code-row">
-            <input id="authCode" inputmode="numeric" placeholder="邮箱验证码">
-            <button id="sendCodeButton">发送</button>
+          Tikpan API 密钥
+          <small style="color:var(--muted);font-weight:400">前往 <a href="https://tikpan.com" target="_blank" style="color:var(--accent)">tikpan.com</a> 获取</small>
+          <div class="key-row">
+            <input id="settingsApiKey" type="password" placeholder="sk-xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+            <button id="settingsKeyToggle" type="button">显示</button>
           </div>
         </label>
-        <button id="authSubmitButton" class="generate">登录</button>
-        <p id="authMessage" class="status-text"></p>
+        <label>
+          ComfyUI 地址
+          <input id="settingsComfyUrl" value="http://127.0.0.1:8188" placeholder="http://127.0.0.1:8188">
+        </label>
+        <button id="settingsSaveButton" class="generate">保存并应用</button>
+        <p id="settingsMessage" class="status-text"></p>
+        <div id="dataPathInfo" class="data-path-info" style="display:none">
+          <div class="data-path-label">数据存储目录</div>
+          <code id="dataPathText" class="data-path-text"></code>
+          <p style="margin:6px 0 0;color:var(--muted);font-size:11px">
+            复制此目录可完整备份和迁移画布、项目、API 密钥。<br>
+            删除此软件只需删除软件文件夹，不会有任何残留文件。
+          </p>
+        </div>
+        <p class="status-text" style="margin-top:6px">密钥仅保存在本地 <code>data/local-config.json</code>，不会上传到任何服务器。</p>
       </div>
     </div>
+
+    <div id="toastContainer" role="region" aria-live="polite" aria-label="通知"></div>
 
     <script src="/app.js"></script>
   </body>

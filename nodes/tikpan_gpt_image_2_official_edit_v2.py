@@ -24,6 +24,21 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 API_HOST = "https://tikpan.com"
 
+MODEL_OPTIONS = ["gpt-image-2"]
+MODERATION_OPTIONS = ["auto", "low"]
+SIZE_OPTIONS = ["Auto", "1024x1024", "1536x1024", "1024x1536", "2048x2048", "2048x1152", "1152x2048", "3840x2160", "2160x3840"]
+SIZE_BY_TIER_ASPECT = {
+    ("1K", "1:1"): "1024x1024",
+    ("1K", "16:9"): "1536x1024",
+    ("1K", "9:16"): "1024x1536",
+    ("2K", "1:1"): "2048x2048",
+    ("2K", "16:9"): "2048x1152",
+    ("2K", "9:16"): "1152x2048",
+    ("4K", "1:1"): "2880x2880",
+    ("4K", "16:9"): "3840x2160",
+    ("4K", "9:16"): "2160x3840",
+}
+
 
 class TikpanGptImage2OfficialEditV2:
     @classmethod
@@ -47,8 +62,10 @@ class TikpanGptImage2OfficialEditV2:
                     ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "21:9", "9:21"],
                     {"default": "Auto"},
                 ),
+                "尺寸": (SIZE_OPTIONS, {"default": "Auto"}),
                 "画质": (QUALITY_OPTIONS, {"default": "均衡质量｜medium"}),
                 "背景模式": (BACKGROUND_OPTIONS, {"default": "自动背景｜auto"}),
+                "审核等级": (MODERATION_OPTIONS, {"default": "auto"}),
                 "遮罩反相": ("BOOLEAN", {"default": False}),
                 "提示增强": ("BOOLEAN", {"default": True}),
                 "超时秒数": ("INT", {"default": 300, "min": 30, "max": 1800, "step": 10}),
@@ -86,14 +103,18 @@ class TikpanGptImage2OfficialEditV2:
             n = int(kwargs.get("生成张数", 1))
             res_tier = kwargs.get("分辨率档位", "2K")
             aspect = kwargs.get("画面比例", "Auto")
+            size_option = kwargs.get("尺寸", "Auto")
             quality = option_value(kwargs.get("画质", "均衡质量｜medium"), "medium")
             bg = option_value(kwargs.get("背景模式", "自动背景｜auto"), "auto")
+            moderation = kwargs.get("审核等级", "auto")
+            if bg == "transparent":
+                bg = "auto"
             invert_mask = bool(kwargs.get("遮罩反相", False))
             boost_prompt = bool(kwargs.get("提示增强", True))
             timeout = int(kwargs.get("超时秒数", 300))
 
             self.validate_image_tensor(main_img, "主图像")
-            w, h = self.compute_size(main_img, res_tier, aspect)
+            w, h, size_label = self.compute_size(main_img, res_tier, aspect, size_option)
             main_pil = self.to_pil(main_img[0])
 
             ref_inputs = [kwargs.get(f"参考图{i}") for i in range(1, 16)]
@@ -150,24 +171,15 @@ class TikpanGptImage2OfficialEditV2:
             data = {
                 "model": "gpt-image-2",
                 "prompt": final_prompt,
-                "n": str(n),
+                "n": "1",
                 "quality": quality,
-                "size": f"{w}x{h}",
+                "size": size_label,
                 "background": bg,
+                "moderation": moderation,
             }
             files_hash = short_hash([total_bytes, len(files), has_mask])
-            idempotency_key = make_idempotency_key("images/edits", data, files_hash)
-            headers["Idempotency-Key"] = idempotency_key
-            recovery_path = save_recovery_record(
-                "official_edit_v2",
-                idempotency_key,
-                "pending",
-                endpoint="/v1/images/edits",
-                payload_hash=short_hash(data),
-                files_hash=files_hash,
-                size=f"{w}x{h}",
-            )
-
+            imgs = []
+            response_count = 0
             with requests.Session() as sess:
                 sess.trust_env = False
 
@@ -184,70 +196,27 @@ class TikpanGptImage2OfficialEditV2:
                 sess.mount("https://", adapter)
                 sess.mount("http://", adapter)
 
-                try:
-                    resp = sess.post(
-                        f"{api_host}/v1/images/edits",
-                        headers=headers,
-                        files=files,
-                        data=data,
-                        timeout=(15, timeout),
-                        verify=False,
-                    )
-                except requests.exceptions.ConnectTimeout:
-                    raise Exception("连接上游超时：请检查本地网络环境，或稍后重试")
-                except requests.exceptions.ReadTimeout:
+                for request_index in range(max(1, n)):
+                    if len(imgs) >= n:
+                        break
+                    loop_data = dict(data)
+                    idempotency_payload = dict(loop_data)
+                    idempotency_payload["request_index"] = request_index + 1
+                    idempotency_key = make_idempotency_key("images/edits", idempotency_payload, files_hash)
+                    loop_headers = dict(headers)
+                    loop_headers["Idempotency-Key"] = idempotency_key
                     save_recovery_record(
                         "official_edit_v2",
                         idempotency_key,
-                        "post_disconnected",
+                        "pending",
                         endpoint="/v1/images/edits",
-                        payload_hash=short_hash(data),
+                        payload_hash=short_hash(idempotency_payload),
                         files_hash=files_hash,
-                        error=f"ReadTimeout after {timeout}s",
+                        size=size_label,
                     )
-                    raise Exception(f"上游处理超时：超过 {timeout} 秒未返回结果，建议降低分辨率、减少参考图数量或稍后重试")
-                except requests.exceptions.ProxyError as e:
-                    raise Exception(f"代理连接异常：{e}")
-                except requests.exceptions.SSLError as e:
-                    raise Exception(f"TLS/SSL 握手异常：{e}")
-                except requests.exceptions.ConnectionError as e:
-                    raise Exception(f"网络连接失败：{e}")
-                except requests.exceptions.RequestException as e:
-                    raise Exception(f"请求发送失败：{e}")
-
-                if resp.status_code == 429:
-                    raise Exception("HTTP 429: 当前分组/通道限流或繁忙，请稍后再试，或切换更稳定的令牌分组")
-                elif resp.status_code == 401:
-                    raise Exception(f"HTTP 401: API Key 无效或鉴权失败。响应: {self.safe_text(resp.text)}")
-                elif resp.status_code == 403:
-                    raise Exception(f"HTTP 403: 当前令牌无权限访问该接口。响应: {self.safe_text(resp.text)}")
-                elif resp.status_code != 200:
-                    raise Exception(f"HTTP {resp.status_code}: {self.safe_text(resp.text)}")
-
-                try:
-                    resj = resp.json()
-                except Exception:
-                    raise Exception(f"接口返回不是合法 JSON：{self.safe_text(resp.text)}")
-
-                save_recovery_record(
-                    "official_edit_v2",
-                    idempotency_key,
-                    "response_received",
-                    endpoint="/v1/images/edits",
-                    http_status=resp.status_code,
-                    response=safe_json_for_log(resj),
-                )
-                upstream_urls = self.extract_result_urls(resj)
-                if upstream_urls:
-                    save_recovery_record(
-                        "official_edit_v2",
-                        idempotency_key,
-                        "image_pointer_received",
-                        endpoint="/v1/images/edits",
-                        image_urls=upstream_urls,
-                    )
-
-                imgs = self.parse_images(resj, sess)
+                    resj = self.post_edit_once(sess, api_host, loop_headers, files, loop_data, timeout, idempotency_key, files_hash)
+                    response_count += 1
+                    imgs.extend(self.parse_images(resj, sess))
 
             if not imgs:
                 raise Exception("❌ 接口返回成功，但未解析到有效结果图")
@@ -271,10 +240,11 @@ class TikpanGptImage2OfficialEditV2:
 
             log = (
                 f"✅ 编辑成功 | 结果张数:{len(tlist)} | "
+                f"请求次数:{response_count} | "
                 f"参考图:{len(ref_pils)} | "
                 f"参考流:{len(ref_stream_pils)} | "
                 f"遮罩:{'有' if has_mask else '无'} | "
-                f"目标尺寸:{w}x{h} | "
+                f"目标尺寸:{size_label} | "
                 f"上传总大小:{total_bytes / 1024 / 1024:.2f}MB | "
                 f"预处理:等比例缩放+补边"
             )
@@ -323,25 +293,115 @@ class TikpanGptImage2OfficialEditV2:
             return text[:max_len] + "..."
         return text
 
-    def compute_size(self, img_t, tier, asp):
+    def post_edit_once(self, sess, api_host, headers, files, data, timeout, idempotency_key, files_hash):
+        try:
+            resp = sess.post(
+                f"{api_host}/v1/images/edits",
+                headers=headers,
+                files=files,
+                data=data,
+                timeout=(15, timeout),
+                verify=False,
+            )
+        except requests.exceptions.ConnectTimeout:
+            raise Exception("连接上游超时：请检查本地网络环境，或稍后重试")
+        except requests.exceptions.ReadTimeout:
+            save_recovery_record(
+                "official_edit_v2",
+                idempotency_key,
+                "post_disconnected",
+                endpoint="/v1/images/edits",
+                payload_hash=short_hash(data),
+                files_hash=files_hash,
+                error=f"ReadTimeout after {timeout}s",
+            )
+            raise Exception(f"上游处理超时：超过 {timeout} 秒未返回结果，建议降低分辨率、减少参考图数量或稍后重试")
+        except requests.exceptions.ProxyError as e:
+            raise Exception(f"代理连接异常：{e}")
+        except requests.exceptions.SSLError as e:
+            raise Exception(f"TLS/SSL 握手异常：{e}")
+        except requests.exceptions.ConnectionError as e:
+            raise Exception(f"网络连接失败：{e}")
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"请求发送失败：{e}")
+
+        if resp.status_code == 429:
+            raise Exception("HTTP 429: 当前分组/通道限流或繁忙，请稍后再试，或切换更稳定的令牌分组")
+        if resp.status_code == 401:
+            raise Exception(f"HTTP 401: API Key 无效或鉴权失败。响应: {self.safe_text(resp.text)}")
+        if resp.status_code == 403:
+            raise Exception(f"HTTP 403: 当前令牌无权限访问该接口。响应: {self.safe_text(resp.text)}")
+        if resp.status_code != 200:
+            raise Exception(f"HTTP {resp.status_code}: {self.safe_text(resp.text)}")
+
+        try:
+            resj = resp.json()
+        except Exception:
+            raise Exception(f"接口返回不是合法 JSON：{self.safe_text(resp.text)}")
+
+        save_recovery_record(
+            "official_edit_v2",
+            idempotency_key,
+            "response_received",
+            endpoint="/v1/images/edits",
+            http_status=resp.status_code,
+            response=safe_json_for_log(resj),
+        )
+        upstream_urls = self.extract_result_urls(resj)
+        if upstream_urls:
+            save_recovery_record(
+                "official_edit_v2",
+                idempotency_key,
+                "image_pointer_received",
+                endpoint="/v1/images/edits",
+                image_urls=upstream_urls,
+            )
+        return resj
+
+    def compute_size(self, img_t, tier, asp, size_option="Auto"):
         bs, h, w, c = img_t.shape
+        explicit = str(size_option or "Auto").strip()
+        if explicit and explicit != "Auto":
+            ew, eh = self.parse_size_label(explicit)
+            return ew, eh, f"{ew}x{eh}"
+
+        if tier != "Auto" and asp in ("1:1", "16:9", "9:16"):
+            mapped = SIZE_BY_TIER_ASPECT.get((tier, asp))
+            if mapped:
+                ew, eh = self.parse_size_label(mapped)
+                return ew, eh, mapped
 
         if tier == "Auto":
             if asp == "Auto":
-                return self.legalize(w, h)
+                ww, hh = self.legalize(w, h)
+                return ww, hh, f"{ww}x{hh}"
             rw, rh = map(int, asp.split(":"))
             ratio = rw / rh
             pixels = max(1, w * h)
             hh = math.sqrt(pixels / ratio)
             ww = hh * ratio
-            return self.legalize(int(ww), int(hh))
+            ww, hh = self.legalize(int(ww), int(hh))
+            return ww, hh, f"{ww}x{hh}"
 
         ratio = (w / h) if asp == "Auto" else (int(asp.split(":")[0]) / int(asp.split(":")[1]))
         tgt = {"1K": 1048576, "2K": 4194304, "4K": 8294400}.get(tier, 4194304)
 
         hh = math.sqrt(tgt / ratio)
         ww = hh * ratio
-        return self.legalize(int(ww), int(hh))
+        ww, hh = self.legalize(int(ww), int(hh))
+        return ww, hh, f"{ww}x{hh}"
+
+    def parse_size_label(self, size_label):
+        try:
+            w_text, h_text = str(size_label).lower().split("x", 1)
+            w = int(w_text.strip())
+            h = int(h_text.strip())
+        except Exception as exc:
+            raise Exception(f"尺寸格式非法：{size_label}") from exc
+        lw, lh = self.legalize(w, h)
+        if (lw, lh) != (w, h):
+            raise Exception(f"尺寸不符合上游限制：{size_label}，建议选择尺寸下拉中的合法值")
+        return w, h
 
     def legalize(self, w, h):
         w = max(16, int(round(w / 16) * 16))

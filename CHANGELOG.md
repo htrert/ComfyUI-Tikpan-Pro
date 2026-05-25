@@ -12,6 +12,43 @@
 4. `README.md`：只在新增大类能力或主推模型发生变化时更新简介。
 5. `CHANGELOG.md`：记录新增功能、修复、文档同步和验证命令。
 
+## [v1.3.1] - 2026-05-25
+
+### Bug Fixes
+
+- **GPT Image 2 编辑节点 v2（`tikpan_gpt_image_2_official_edit_v2.py`）**：修复 `("4K", "1:1")` 分辨率映射错误——原值为 `2048x2048`（与 2K 1:1 完全一样），导致选择"4K + 1:1"实际只生成 2K 图像。已修正为 `2880x2880`（4K 总像素 ≈ 829 万，1:1 比例下最大可用正方形尺寸，符合 API 像素上限）。4K 16:9 / 9:16 不受影响。
+
+### Canvas Model Studio 工具重构（`experiments/canvas_model_studio/`）
+
+本次对配套的本地无限画布工具进行了较大重构，方向是**纯本地软件模式**：不需要账户，不写注册表，所有文件在软件文件夹内，复制文件夹即可迁移。
+
+**架构改进**
+
+- 去掉全部账户体系（登录/注册/验证码/Token/余额显示），以访客/本地用户替代
+- API Key 和 ComfyUI 地址存入 `data/local-config.json`，运行时热更新无需重启
+- 画布状态（节点、相机位置）从浏览器 `localStorage` 迁移到 `data/canvas-autosave.json`，换电脑不丢数据
+- 项目和资产目录去掉用户分层，直接使用 `data/projects/` 和 `data/assets/`
+- 新增 `.gitignore`，保护 `local-config.json`（含 API Key）不被提交到 git
+
+**新增功能**
+
+- 设置弹窗：侧边栏显示 API Key 状态（绿点/红点），首次启动无 Key 时自动弹出
+- 数据目录路径展示：设置弹窗内显示 `data/` 绝对路径，方便备份和定位
+- Toast 弹窗通知系统：成功/失败/警告分色，右下角滑入，代替纯状态栏小字
+- 节点"生成中"状态：生成期间节点显示斜纹 shimmer 动画，直观知道等哪张
+- 右键上下文菜单：右键节点弹出复制/删除菜单，Esc 关闭
+- Ctrl+Enter 快捷键：全局触发生成
+- 图片摆放算法修复：生成结果使用 `findClearRect` 螺旋算法而非简单偏移，多张结果不再重叠
+
+**可靠性改进**
+
+- 结构化请求日志：每条请求打 `requestId`、耗时、状态码，写入 `logs/canvas-YYYY-MM-DD.log`
+- 新增 `GET /api/logs?tail=N` 端点，可在浏览器查看近期日志
+- `POST /api/generate` 单独打 GEN 日志，记录模型档案、耗时、返回图片数量
+- `profile.json` 10 秒内存缓存，减少重复读盘
+- `previewRequest` 补充 try/catch，修复无错误处理的 bug
+- 一键启动脚本：`start.bat`（Windows）和 `start.sh`（Mac/Linux），自动检测 Node.js、延迟打开浏览器
+
 ## [v1.3.0] - 2026-05-23
 
 ### New Features

@@ -25,20 +25,17 @@ const gridButton = document.getElementById("gridButton");
 const miniMap = document.getElementById("miniMap");
 const miniMapBody = document.getElementById("miniMapBody");
 const miniMapCount = document.getElementById("miniMapCount");
-const userSummary = document.getElementById("userSummary");
-const loginButton = document.getElementById("loginButton");
-const logoutButton = document.getElementById("logoutButton");
-const authModal = document.getElementById("authModal");
-const authCloseButton = document.getElementById("authCloseButton");
-const authLoginTab = document.getElementById("authLoginTab");
-const authRegisterTab = document.getElementById("authRegisterTab");
-const authEmail = document.getElementById("authEmail");
-const authPassword = document.getElementById("authPassword");
-const authCode = document.getElementById("authCode");
-const authCodeField = document.getElementById("authCodeField");
-const sendCodeButton = document.getElementById("sendCodeButton");
-const authSubmitButton = document.getElementById("authSubmitButton");
-const authMessage = document.getElementById("authMessage");
+const localStatusEl = document.getElementById("localStatus");
+const apiKeyStatusEl = document.getElementById("apiKeyStatus");
+const comfyStatusEl = document.getElementById("comfyStatus");
+const settingsButton = document.getElementById("settingsButton");
+const settingsModal = document.getElementById("settingsModal");
+const settingsCloseButton = document.getElementById("settingsCloseButton");
+const settingsApiKey = document.getElementById("settingsApiKey");
+const settingsKeyToggle = document.getElementById("settingsKeyToggle");
+const settingsComfyUrl = document.getElementById("settingsComfyUrl");
+const settingsSaveButton = document.getElementById("settingsSaveButton");
+const settingsMessage = document.getElementById("settingsMessage");
 
 const providerBadge = document.getElementById("providerBadge");
 const providerHint = document.getElementById("providerHint");
@@ -84,9 +81,236 @@ const state = {
 };
 
 let drag = null;
+let clipboardNode = null;
+
+const history = {
+  past: [],
+  future: [],
+  last: "",
+  max: 50,
+};
+
+const PLACEMENT_GAP = 32;
+const PLACEMENT_STEP = 80;
+const PLACEMENT_MAX_TRIES = 64;
+const NODE_DEFAULT_SIZE = {
+  prompt: { width: 300, height: 214 },
+  note: { width: 320, height: 180 },
+  image: { width: 320, height: 360 },
+  video: { width: 420, height: 240 },
+  audio: { width: 360, height: 110 },
+};
+
+function cloneData(value) {
+  if (typeof structuredClone === "function") return structuredClone(value);
+  return JSON.parse(JSON.stringify(value));
+}
+
+function historySnapshot() {
+  return {
+    projectName: state.projectName,
+    nodes: cloneData(state.nodes),
+    selectedId: state.selectedId,
+    nextId: state.nextId,
+  };
+}
+
+function resetHistory() {
+  history.past = [];
+  history.future = [];
+  history.last = JSON.stringify(historySnapshot());
+  updateHistoryButtons();
+}
+
+function captureHistory() {
+  const snapshot = historySnapshot();
+  const serialized = JSON.stringify(snapshot);
+  if (serialized === history.last) return;
+  if (history.last) {
+    history.past.push(JSON.parse(history.last));
+    if (history.past.length > history.max) history.past.shift();
+  }
+  history.last = serialized;
+  history.future = [];
+  updateHistoryButtons();
+}
+
+function applyHistorySnapshot(snapshot) {
+  state.projectName = snapshot.projectName || "Untitled Canvas";
+  state.nodes = cloneData(snapshot.nodes || []);
+  state.selectedId = snapshot.selectedId || null;
+  state.nextId = snapshot.nextId || state.nodes.length + 1;
+  setProjectName(state.projectName, { persist: false });
+  redraw();
+  persistLocal();
+}
+
+function undoCanvas() {
+  if (!history.past.length) return;
+  const current = historySnapshot();
+  const previous = history.past.pop();
+  history.future.push(current);
+  history.last = JSON.stringify(previous);
+  applyHistorySnapshot(previous);
+  updateHistoryButtons();
+}
+
+function redoCanvas() {
+  if (!history.future.length) return;
+  const current = historySnapshot();
+  const next = history.future.pop();
+  history.past.push(current);
+  history.last = JSON.stringify(next);
+  applyHistorySnapshot(next);
+  updateHistoryButtons();
+}
+
+function updateHistoryButtons() {
+  const undoButton = document.getElementById("undoButton");
+  const redoButton = document.getElementById("redoButton");
+  if (undoButton) undoButton.disabled = history.past.length === 0;
+  if (redoButton) redoButton.disabled = history.future.length === 0;
+}
+
+function defaultNodeSize(type) {
+  return NODE_DEFAULT_SIZE[type] || NODE_DEFAULT_SIZE.image;
+}
+
+function rectOfNode(node) {
+  const fallback = defaultNodeSize(node.type);
+  return {
+    x: Number(node.x) || 0,
+    y: Number(node.y) || 0,
+    width: Number(node.width) || fallback.width,
+    height: Number(node.height) || fallback.height,
+  };
+}
+
+function rectsIntersect(a, b, gap = PLACEMENT_GAP) {
+  return !(
+    a.x + a.width + gap <= b.x ||
+    b.x + b.width + gap <= a.x ||
+    a.y + a.height + gap <= b.y ||
+    b.y + b.height + gap <= a.y
+  );
+}
+
+function anyRectIntersects(rect, others, gap = PLACEMENT_GAP) {
+  return others.some((other) => rectsIntersect(rect, other, gap));
+}
+
+function* spiralOffsets(step, maxTries) {
+  yield { dx: 0, dy: 0 };
+  let x = 0;
+  let y = 0;
+  let tries = 1;
+  let leg = 1;
+  while (tries < maxTries) {
+    for (let i = 0; i < leg && tries < maxTries; i += 1) {
+      x += step;
+      tries += 1;
+      yield { dx: x, dy: y };
+    }
+    for (let i = 0; i < leg && tries < maxTries; i += 1) {
+      y += step;
+      tries += 1;
+      yield { dx: x, dy: y };
+    }
+    leg += 1;
+    for (let i = 0; i < leg && tries < maxTries; i += 1) {
+      x -= step;
+      tries += 1;
+      yield { dx: x, dy: y };
+    }
+    for (let i = 0; i < leg && tries < maxTries; i += 1) {
+      y -= step;
+      tries += 1;
+      yield { dx: x, dy: y };
+    }
+    leg += 1;
+  }
+}
+
+function adaptivePlacementStep(rects, fallback = PLACEMENT_STEP) {
+  return rects.reduce((max, rect) => Math.max(max, rect.width + PLACEMENT_GAP, rect.height + PLACEMENT_GAP), fallback);
+}
+
+function fallbackRightmost(rect, existing) {
+  if (!existing.length) return { x: rect.x, y: rect.y };
+  const maxRight = existing.reduce((max, item) => Math.max(max, item.x + item.width), -Infinity);
+  return { x: maxRight + PLACEMENT_GAP, y: rect.y };
+}
+
+function findClearRect(rect, existing) {
+  const passes = [
+    { step: PLACEMENT_STEP, tries: Math.min(24, PLACEMENT_MAX_TRIES) },
+    { step: adaptivePlacementStep([rect, ...existing]), tries: PLACEMENT_MAX_TRIES },
+  ];
+  for (const pass of passes) {
+    for (const offset of spiralOffsets(pass.step, pass.tries)) {
+      const candidate = { ...rect, x: rect.x + offset.dx, y: rect.y + offset.dy };
+      if (!anyRectIntersects(candidate, existing)) return candidate;
+    }
+  }
+  return { ...rect, ...fallbackRightmost(rect, existing) };
+}
+
+function placeNodeRect(node, existingNodes = state.nodes) {
+  const desired = rectOfNode(node);
+  const existing = existingNodes.filter((item) => item.id !== node.id).map(rectOfNode);
+  return findClearRect(desired, existing);
+}
+
+function boundingRect(rects) {
+  return rects.reduce((box, rect) => ({
+    x: Math.min(box.x, rect.x),
+    y: Math.min(box.y, rect.y),
+    right: Math.max(box.right, rect.x + rect.width),
+    bottom: Math.max(box.bottom, rect.y + rect.height),
+  }), { x: Infinity, y: Infinity, right: -Infinity, bottom: -Infinity });
+}
+
+function placeNodeBatch(nodes, existingNodes = state.nodes) {
+  if (!nodes.length) return { dx: 0, dy: 0 };
+  const rects = nodes.map(rectOfNode);
+  const box = boundingRect(rects);
+  const groupRect = { x: box.x, y: box.y, width: box.right - box.x, height: box.bottom - box.y };
+  const existing = existingNodes.map(rectOfNode);
+  const placed = findClearRect(groupRect, existing);
+  return { dx: placed.x - groupRect.x, dy: placed.y - groupRect.y };
+}
 
 function setStatus(text) {
   statusText.textContent = text;
+}
+
+// ─── Toast 通知系统 ────────────────────────────────────────────────────────
+// type: "info" | "success" | "error" | "warn"
+function toast(message, type = "info", duration = 5000) {
+  const container = document.getElementById("toastContainer");
+  if (!container) return;
+  const el = document.createElement("div");
+  el.className = `toast toast-${type}`;
+  const icons = { success: "✓", error: "✕", warn: "⚠", info: "ℹ" };
+  el.innerHTML = `<span class="toast-icon">${icons[type] || icons.info}</span><span class="toast-msg">${message}</span><button class="toast-close" aria-label="关闭">×</button>`;
+  el.querySelector(".toast-close").addEventListener("click", () => dismissToast(el));
+  container.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("toast-in"));
+  const timer = setTimeout(() => dismissToast(el), duration);
+  el._toastTimer = timer;
+}
+
+function dismissToast(el) {
+  clearTimeout(el._toastTimer);
+  el.classList.remove("toast-in");
+  el.classList.add("toast-out");
+  el.addEventListener("transitionend", () => el.remove(), { once: true });
+}
+
+// ─── 节点生成中状态 ────────────────────────────────────────────────────────
+function setNodeGenerating(nodeId, isGenerating) {
+  const el = nodeId ? world.querySelector(`[data-id="${nodeId}"]`) : null;
+  if (el) el.classList.toggle("generating", isGenerating);
 }
 
 function applyTheme(mode = "system") {
@@ -105,57 +329,54 @@ function setProjectName(value, options = {}) {
   if (options.persist !== false) persistLocal();
 }
 
-function authToken() {
-  return localStorage.getItem("tikpan_token") || "";
-}
-
-function setAuthToken(token) {
-  if (token) localStorage.setItem("tikpan_token", token);
-  else localStorage.removeItem("tikpan_token");
-}
-
+// 简单 fetch 包装（本地模式无需 token）
 async function authedFetch(url, options = {}) {
-  const headers = new Headers(options.headers || {});
-  const token = authToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  return fetch(url, { ...options, headers });
+  return fetch(url, options);
 }
 
-async function refreshSession() {
+// ─── 本地配置 / 设置弹窗 ─────────────────────────────────────────────────
+async function loadLocalConfig() {
   try {
-    const response = await authedFetch("/api/session");
+    const response = await fetch("/api/config");
     const data = await response.json();
-    state.session = data;
-    const user = data.user || {};
-    const name = data.authenticated ? (user.nickname || user.username || "已登录用户") : "访客模式";
-    const balance = data.authenticated && user.balance !== null && user.balance !== undefined
-      ? `余额 ${user.balance} 额度`
-      : (data.auth?.webAppConfigured ? "未登录，生成可能受限" : "本地独立模式");
-    userSummary.innerHTML = `
-      <strong>${name}</strong>
-      <span>${balance}</span>
-    `;
-    loginButton.hidden = Boolean(data.authenticated);
-    logoutButton.hidden = !data.authenticated;
+    if (!data.ok) return;
+    
+    // 更新状态栏
+    if (apiKeyStatusEl) {
+      apiKeyStatusEl.textContent = data.apiKeyConfigured
+        ? ("API 密钥：" + (data.apiKeyMasked || "已配置"))
+        : "API 密钥：未配置";
+      apiKeyStatusEl.dataset.ok = data.apiKeyConfigured ? "1" : "0";
+    }
+    if (settingsComfyUrl) settingsComfyUrl.value = data.comfyUrl || "http://127.0.0.1:8188";
+
+    // 没有 Key 时自动打开设置
+    if (!data.apiKeyConfigured) {
+      setTimeout(() => openSettings(), 800);
+    }
     return data;
-  } catch (error) {
-    userSummary.innerHTML = `<strong>用户状态异常</strong><span>${error.message}</span>`;
-    return null;
+  } catch (e) {
+    if (apiKeyStatusEl) apiKeyStatusEl.textContent = "配置读取失败";
   }
 }
 
-function openAuth(mode = "login") {
-  state.authMode = mode;
-  authModal.classList.add("open");
-  authLoginTab.classList.toggle("active", mode === "login");
-  authRegisterTab.classList.toggle("active", mode === "register");
-  authCodeField.hidden = mode !== "register";
-  authSubmitButton.textContent = mode === "login" ? "登录" : "注册并登录";
-  authMessage.textContent = "";
+function openSettings() {
+  if (settingsModal) settingsModal.classList.add("open");
+  if (settingsApiKey) { settingsApiKey.value = ""; settingsApiKey.focus(); }
+  if (settingsMessage) settingsMessage.textContent = "";
+  // 加载数据目录路径
+  fetch("/api/data-path").then(r => r.json()).then(data => {
+    const info = document.getElementById("dataPathInfo");
+    const text = document.getElementById("dataPathText");
+    if (info && text && data.ok) {
+      text.textContent = data.dataDir;
+      info.style.display = "block";
+    }
+  }).catch(() => {});
 }
 
-function closeAuth() {
-  authModal.classList.remove("open");
+function closeSettings() {
+  if (settingsModal) settingsModal.classList.remove("open");
 }
 
 function activeProfile() {
@@ -395,8 +616,14 @@ function createNodeElement(node) {
   return element;
 }
 
-function addNode(node) {
+function addNode(node, options = {}) {
   node.id = node.id || `node-${state.nextId++}`;
+  if (options.place !== false) {
+    const placed = placeNodeRect(node);
+    node.x = placed.x;
+    node.y = placed.y;
+  }
+  if (options.capture !== false) captureHistory();
   state.nodes.push(node);
   createNodeElement(node);
   selectNode(node.id);
@@ -423,7 +650,18 @@ function addPromptAt(point, text = "a refined product photo of a futuristic desk
   });
 }
 
-function addImageAt(point, src, width, height, title) {
+function duplicateSelectedNode(offset = { x: 42, y: 42 }) {
+  const source = state.nodes.find((item) => item.id === state.selectedId);
+  if (!source) return null;
+  const copy = cloneData(source);
+  delete copy.id;
+  copy.x = source.x + offset.x;
+  copy.y = source.y + offset.y;
+  copy.title = copy.title ? `${copy.title} copy` : copy.title;
+  return addNode(copy);
+}
+
+function addImageAt(point, src, width, height, title, options = {}) {
   const maxSide = 520;
   const ratio = Math.min(maxSide / width, maxSide / height, 1);
   const node = addNode({
@@ -434,12 +672,12 @@ function addImageAt(point, src, width, height, title) {
     height: Math.max(140, Math.round(height * ratio)),
     src,
     title,
-  });
+  }, options);
   saveAssetMetadata({ id: node.id, nodeId: node.id, type: "image", src, width, height, title });
   return node;
 }
 
-function addMediaAt(point, src, kind, title) {
+function addMediaAt(point, src, kind, title, options = {}) {
   const node = addNode({
     type: kind,
     x: point.x,
@@ -448,7 +686,7 @@ function addMediaAt(point, src, kind, title) {
     height: kind === "audio" ? 110 : 240,
     src,
     title,
-  });
+  }, options);
   saveAssetMetadata({ id: node.id, nodeId: node.id, type: kind, src, title });
   return node;
 }
@@ -461,35 +699,72 @@ function redraw() {
   updateEmptyHint();
 }
 
-function persistLocal() {
-  localStorage.setItem("comfyInfiniteCanvas", JSON.stringify({
+// ─── 画布状态持久化（服务器文件 + localStorage 双备份）─────────────────────
+// 所有画布数据写入 data/canvas-autosave.json，复制该文件夹即可完整迁移。
+// localStorage 仅作快速缓存/离线备份，不是主存储。
+let _saveTimer = null;
+
+function _buildSaveSnapshot() {
+  return {
     projectName: state.projectName,
     theme: state.theme,
     camera: state.camera,
     nodes: state.nodes,
     selectedId: state.selectedId,
     nextId: state.nextId,
-  }));
+    savedAt: new Date().toISOString(),
+  };
 }
 
-function restoreLocal() {
-  const saved = localStorage.getItem("comfyInfiniteCanvas");
-  if (!saved) {
-    updateEmptyHint();
-    return;
-  }
+function persistLocal() {
+  const snapshot = _buildSaveSnapshot();
+  // 快速写 localStorage（同步，供刷新/重开浏览器用）
+  try { localStorage.setItem("comfyInfiniteCanvas", JSON.stringify(snapshot)); } catch { /* quota 满时忽略 */ }
+  // 防抖 500ms 写服务器文件
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => _saveToServer(snapshot), 500);
+}
+
+async function _saveToServer(snapshot) {
   try {
-    const data = JSON.parse(saved);
-    if (data.projectName) setProjectName(data.projectName, { persist: false });
-    if (data.theme) applyTheme(data.theme);
-    state.camera = data.camera || state.camera;
-    state.nodes = data.nodes || [];
-    state.selectedId = data.selectedId || null;
-    state.nextId = data.nextId || state.nodes.length + 1;
-    redraw();
-  } catch {
-    updateEmptyHint();
-  }
+    await fetch("/api/autosave", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(snapshot),
+    });
+  } catch { /* 服务不可用时静默失败，localStorage 仍有备份 */ }
+}
+
+function _applySnapshot(data) {
+  if (!data) { updateEmptyHint(); return; }
+  if (data.projectName) setProjectName(data.projectName, { persist: false });
+  if (data.theme) applyTheme(data.theme);
+  state.camera = data.camera || state.camera;
+  state.nodes = data.nodes || [];
+  state.selectedId = data.selectedId || null;
+  state.nextId = data.nextId || state.nodes.length + 1;
+  redraw();
+  resetHistory();
+}
+
+async function restoreLocal() {
+  // 优先从服务器文件读取（可迁移、可备份）
+  try {
+    const res = await fetch("/api/autosave");
+    const result = await res.json();
+    if (result.ok && result.data && Array.isArray(result.data.nodes)) {
+      _applySnapshot(result.data);
+      return;
+    }
+  } catch { /* 服务不可用，回退 localStorage */ }
+
+  // 回退：浏览器 localStorage
+  try {
+    const saved = localStorage.getItem("comfyInfiniteCanvas");
+    if (saved) { _applySnapshot(JSON.parse(saved)); return; }
+  } catch { /* ignore */ }
+
+  updateEmptyHint();
 }
 
 function fieldValue(profile, key) {
@@ -588,7 +863,7 @@ async function loadProvider() {
     providerBadge.textContent = state.provider === "upstream" ? "云端上游" : "本地 ComfyUI";
     providerHint.textContent = state.provider === "upstream"
       ? (data.upstreamConfigured ? "请求会发到 UPSTREAM_URL" : "尚未配置 UPSTREAM_URL")
-      : `${data.comfyBase}${data.tikpanKeyConfigured ? " · Tikpan Key 已配置" : " · 未配置 TIKPAN_API_KEY"}`;
+      : `${data.comfyBase}${data.apiKeyConfigured ? " · API 密钥已配置" : " · 未配置 API 密钥"}`;
     connectionLabel.textContent = state.provider === "upstream" ? "云端请求模式" : "本地 ComfyUI 模式";
   } catch (error) {
     providerBadge.textContent = "离线";
@@ -632,6 +907,8 @@ async function loadProfiles() {
 }
 
 async function loadCheckpoints() {
+  const dot = document.getElementById("comfyDot");
+  const label = document.getElementById("comfyStatus");
   try {
     const response = await fetch("/api/comfy/checkpoints");
     const data = await response.json();
@@ -644,11 +921,15 @@ async function loadCheckpoints() {
       checkpointSelect.appendChild(option);
     }
     connectionLabel.textContent = `已连接 ComfyUI，${data.checkpoints.length} 个 checkpoint`;
-    setStatus("ComfyUI 已连接。Tikpan 节点档案会通过本地 ComfyUI 调用自定义节点。");
+    setStatus("ComfyUI 已连接，Tikpan 节点档案通过本地 ComfyUI 执行。");
+    if (dot) dot.dataset.ok = "1";
+    if (label) label.textContent = `ComfyUI：已连接（${data.checkpoints.length} 个模型）`;
   } catch (error) {
     checkpointSelect.innerHTML = "<option value=''>未连接 ComfyUI</option>";
     if (state.provider === "comfy") connectionLabel.textContent = "未连接 ComfyUI";
     setStatus(`ComfyUI 连接失败：${error.message}`);
+    if (dot) dot.dataset.ok = "0";
+    if (label) label.textContent = "ComfyUI：未连接";
   }
 }
 
@@ -810,12 +1091,19 @@ async function buildFactoryCanvas() {
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "工作流生成失败");
     const stamp = Date.now();
+    captureHistory();
     state.nodes = state.nodes.filter((node) => node.factory?.templateId !== data.workflow.id);
-    for (const [index, node] of data.nodes.entries()) {
-      addNode({
+    const incomingNodes = data.nodes.map((node, index) => ({
         ...node,
         id: `${node.id}-${stamp}-${index}`,
-      });
+    }));
+    const offset = placeNodeBatch(incomingNodes, state.nodes);
+    for (const node of incomingNodes) {
+      addNode({
+        ...node,
+        x: node.x + offset.dx,
+        y: node.y + offset.dy,
+      }, { place: false, capture: false });
     }
     if (data.workflow?.name) setProjectName(`${data.workflow.name} - ${new Date().toLocaleDateString()}`);
     state.camera = { x: 920, y: 330, scale: 0.72 };
@@ -954,14 +1242,24 @@ function createProfileNode(profileId, point = { x: 0, y: 0 }) {
 
 async function previewRequest() {
   const payload = collectPayload();
+  try {
     const response = await authedFetch("/api/request/preview", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = await response.json();
-  requestPreview.value = JSON.stringify(data, null, 2);
-  setStatus(data.ok ? "已生成请求预览。这里能看到 Tikpan 节点 workflow 或云端请求结构。" : `预览失败：${data.error}`);
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    requestPreview.value = JSON.stringify(data, null, 2);
+    if (data.ok) {
+      setStatus("已生成请求预览。这里能看到 Tikpan 节点 workflow 或云端请求结构。");
+    } else {
+      toast(`预览失败：${data.error}`, "error");
+      setStatus(`预览失败：${data.error}`);
+    }
+  } catch (error) {
+    toast(`预览请求异常：${error.message}`, "error");
+    setStatus(`预览请求异常：${error.message}`);
+  }
 }
 
 async function saveCurrentProfile() {
@@ -1009,56 +1307,93 @@ async function generateImage() {
   const profile = activeProfile();
   const payload = collectPayload();
   if (!payload.prompt) {
+    toast("先写一个 prompt，或者选中一个 prompt 卡片。", "warn");
     setStatus("先写一个 prompt，或者选中一个 prompt 卡片。");
     return;
   }
   if (isSdxlProfile(profile) && state.provider === "comfy" && !payload.checkpoint) {
+    toast("本地 SDXL 模式需要先选择 checkpoint。", "warn");
     setStatus("本地 SDXL 模式需要先选择 checkpoint。");
     return;
   }
   if (profile?.requiresSelectedImage && payload.canvas.selectedNodeType !== "image") {
+    toast("这个编辑档案需要先选中一张图片节点。", "warn");
     setStatus("这个编辑档案需要先选中一张图片节点。");
     return;
   }
 
-  setStatus("已提交请求，正在等待生成结果...");
-  document.getElementById("generateButton").disabled = true;
+  const genBtn = document.getElementById("generateButton");
+  const selectedNode = state.nodes.find((item) => item.id === state.selectedId);
+
+  genBtn.disabled = true;
+  genBtn.textContent = "生成中…";
+  setNodeGenerating(state.selectedId, true);
+  setStatus("已提交请求，正在等待生成结果…");
+
   try {
     const response = await authedFetch("/api/generate", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const data = await response.json();
-    requestPreview.value = JSON.stringify(data.request || data, null, 2);
-    if (!data.ok) throw new Error(data.error || "生成失败");
 
-    const selected = state.nodes.find((item) => item.id === state.selectedId);
-    const anchor = selected || { x: -120, y: -120, width: 300, height: 180 };
+    // 先检查 HTTP 状态，再解析 JSON
+    const data = await response.json().catch(() => ({ ok: false, error: `HTTP ${response.status}` }));
+    if (!response.ok || !data.ok) {
+      const msg = data.error || `服务器返回 ${response.status}`;
+      if (msg.includes("密钥")) openSettings();
+      throw new Error(msg);
+    }
+
+    requestPreview.value = JSON.stringify(data.request || data, null, 2);
+
+    const anchor = selectedNode || { x: -120, y: -120, width: 300, height: 180 };
     const images = data.images || [];
     const media = data.media || [];
+
+    if (images.length || media.length) captureHistory();
+
+    // 使用 findClearRect 算法摆放结果，避免重叠
+    const existingRects = state.nodes.map(rectOfNode);
+    const startX = anchor.x + anchor.width + 42;
+    const startY = anchor.y;
+
     images.forEach((image, index) => {
-      addImageAt({
-        x: anchor.x + anchor.width + 42 + index * 34,
-        y: anchor.y + index * 34,
-      }, image.url, payload.width || 1024, payload.height || 1024, `${profile?.name || data.provider} seed ${data.seed}`);
+      const w = 320, h = 360;
+      const candidate = { x: startX + index * 16, y: startY + index * 16, width: w, height: h };
+      const placed = findClearRect(candidate, existingRects);
+      existingRects.push(placed);
+      addImageAt(placed, image.url, payload.width || 1024, payload.height || 1024,
+        `${profile?.name || data.provider} · seed ${data.seed}`, { capture: false });
     });
+
     media.forEach((item, index) => {
-      addMediaAt({
-        x: anchor.x + anchor.width + 42 + (images.length + index) * 34,
-        y: anchor.y + (images.length + index) * 34,
-      }, item.url, item.kind || "video", `${profile?.name || "Media"} ${data.requestId || ""}`);
+      const w = item.kind === "audio" ? 360 : 420;
+      const h = item.kind === "audio" ? 110 : 240;
+      const candidate = { x: startX + (images.length + index) * 16, y: startY + (images.length + index) * 16, width: w, height: h };
+      const placed = findClearRect(candidate, existingRects);
+      existingRects.push(placed);
+      addMediaAt(placed, item.url, item.kind || "video",
+        `${profile?.name || "Media"} ${data.requestId || ""}`, { capture: false });
     });
-    if (!images.length && !media.length) {
-      setStatus(`任务完成但没有找到可贴回的图片/媒体。请求 ID: ${data.requestId || data.promptId}`);
+
+    const total = images.length + media.length;
+    if (!total) {
+      toast(`任务完成，但未返回可贴回的图片/媒体。请求 ID: ${data.requestId || data.promptId || "—"}`, "warn", 8000);
+      setStatus(`任务完成但无结果。请求 ID: ${data.requestId || data.promptId}`);
       return;
     }
-    setStatus(`生成完成，已贴回画布。请求 ID: ${data.requestId || data.promptId}`);
+
+    toast(`生成完成，已贴回 ${total} 张${images.length ? "图片" : ""}${media.length ? "·媒体" : ""}`, "success");
+    setStatus(`生成完成 | ${total} 张结果 | 请求 ID: ${data.requestId || data.promptId || "—"}`);
+
   } catch (error) {
-      if (error.message.includes("请先登录")) openAuth("login");
-      setStatus(`生成失败：${error.message}`);
+    toast(`生成失败：${error.message}`, "error", 10000);
+    setStatus(`生成失败：${error.message}`);
   } finally {
-    document.getElementById("generateButton").disabled = false;
+    genBtn.disabled = false;
+    genBtn.textContent = "生成到画布";
+    setNodeGenerating(state.selectedId, false);
   }
 }
 
@@ -1118,6 +1453,7 @@ async function loadProject() {
   if (data.project.profileId) profileSelect.value = data.project.profileId;
   redraw();
   applyProfile(activeProfile());
+  resetHistory();
   persistLocal();
   setStatus(`已加载项目：${data.name}`);
 }
@@ -1167,8 +1503,10 @@ canvas.addEventListener("pointermove", (event) => {
 canvas.addEventListener("pointerup", (event) => {
   const shouldOpenLauncher = drag?.type === "pan" && drag.blankCanvas && !drag.moved;
   const point = shouldOpenLauncher ? screenToWorld(event.clientX, event.clientY) : null;
+  const changedNode = drag?.type === "node";
   drag = null;
   canvas.classList.remove("panning");
+  if (changedNode) captureHistory();
   persistLocal();
   if (shouldOpenLauncher) showLauncherAt(point, event.clientX, event.clientY);
 });
@@ -1190,8 +1528,119 @@ canvas.addEventListener("dblclick", (event) => {
   showLauncherAt(screenToWorld(event.clientX, event.clientY), event.clientX, event.clientY);
 });
 
+// ─── 右键上下文菜单 ────────────────────────────────────────────────────────
+let _ctxMenu = null;
+
+function hideContextMenu() {
+  if (_ctxMenu) { _ctxMenu.remove(); _ctxMenu = null; }
+}
+
+function showContextMenu(nodeId, clientX, clientY) {
+  hideContextMenu();
+  const node = state.nodes.find((n) => n.id === nodeId);
+  if (!node) return;
+
+  const menu = document.createElement("div");
+  menu.className = "ctx-menu";
+  menu.style.left = `${clientX}px`;
+  menu.style.top  = `${clientY}px`;
+
+  const items = [
+    { label: "复制节点  Ctrl+D", action: () => { duplicateSelectedNode(); toast("已复制节点", "info", 2500); } },
+    { label: "复制到剪贴板  Ctrl+C", action: () => { clipboardNode = cloneData(node); toast("已复制到剪贴板", "info", 2500); } },
+    { type: "sep" },
+    { label: "删除节点  Del", danger: true, action: () => {
+        captureHistory();
+        state.nodes = state.nodes.filter((n) => n.id !== nodeId);
+        state.selectedId = null;
+        redraw(); persistLocal();
+        toast("已删除节点", "info", 2500);
+      },
+    },
+  ];
+
+  for (const item of items) {
+    if (item.type === "sep") {
+      const sep = document.createElement("hr");
+      sep.className = "ctx-sep";
+      menu.appendChild(sep);
+      continue;
+    }
+    const btn = document.createElement("button");
+    btn.className = `ctx-item${item.danger ? " ctx-danger" : ""}`;
+    btn.textContent = item.label;
+    btn.addEventListener("click", () => { hideContextMenu(); item.action(); });
+    menu.appendChild(btn);
+  }
+
+  document.body.appendChild(menu);
+  _ctxMenu = menu;
+
+  // 防止菜单超出视窗
+  requestAnimationFrame(() => {
+    const r = menu.getBoundingClientRect();
+    if (r.right  > window.innerWidth)  menu.style.left = `${clientX - r.width  - 4}px`;
+    if (r.bottom > window.innerHeight) menu.style.top  = `${clientY - r.height - 4}px`;
+  });
+}
+
+document.addEventListener("click", () => hideContextMenu());
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideContextMenu(); });
+
+canvas.addEventListener("contextmenu", (event) => {
+  const nodeEl = event.target.closest(".node");
+  if (!nodeEl) return;
+  event.preventDefault();
+  selectNode(nodeEl.dataset.id);
+  showContextMenu(nodeEl.dataset.id, event.clientX, event.clientY);
+});
+
 window.addEventListener("keydown", (event) => {
-  if ((event.key === "Delete" || event.key === "Backspace") && state.selectedId && document.activeElement.tagName !== "TEXTAREA" && document.activeElement.tagName !== "INPUT") {
+  const activeTag = document.activeElement?.tagName || "";
+  const isEditingText = activeTag === "TEXTAREA" || activeTag === "INPUT";
+  // Ctrl+Enter / Cmd+Enter → 生成
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    const genBtn = document.getElementById("generateButton");
+    if (genBtn && !genBtn.disabled) generateImage();
+    return;
+  }
+  const key = event.key.toLowerCase();
+  if ((event.ctrlKey || event.metaKey) && !isEditingText) {
+    if (key === "z" && !event.shiftKey) {
+      event.preventDefault();
+      undoCanvas();
+      return;
+    }
+    if (key === "y" || (key === "z" && event.shiftKey)) {
+      event.preventDefault();
+      redoCanvas();
+      return;
+    }
+    if (key === "c" && state.selectedId) {
+      event.preventDefault();
+      const selected = state.nodes.find((item) => item.id === state.selectedId);
+      clipboardNode = selected ? cloneData(selected) : null;
+      setStatus(clipboardNode ? "已复制当前节点。" : "没有可复制的节点。");
+      return;
+    }
+    if (key === "v" && clipboardNode) {
+      event.preventDefault();
+      const copy = cloneData(clipboardNode);
+      delete copy.id;
+      copy.x = (copy.x || 0) + 48;
+      copy.y = (copy.y || 0) + 48;
+      addNode(copy);
+      return;
+    }
+    if (key === "d" && state.selectedId) {
+      event.preventDefault();
+      duplicateSelectedNode();
+      return;
+    }
+  }
+  if ((event.key === "Delete" || event.key === "Backspace") && state.selectedId && !isEditingText) {
+    captureHistory();
     state.nodes = state.nodes.filter((item) => item.id !== state.selectedId);
     state.selectedId = null;
     redraw();
@@ -1243,10 +1692,14 @@ document.getElementById("generateButton").addEventListener("click", generateImag
 document.getElementById("previewButton").addEventListener("click", previewRequest);
 document.getElementById("saveProfileButton").addEventListener("click", saveCurrentProfile);
 document.getElementById("fitButton").addEventListener("click", fitView);
+document.getElementById("undoButton")?.addEventListener("click", undoCanvas);
+document.getElementById("redoButton")?.addEventListener("click", redoCanvas);
+document.getElementById("duplicateButton")?.addEventListener("click", () => duplicateSelectedNode());
 document.getElementById("saveButton").addEventListener("click", saveProject);
 document.getElementById("loadButton").addEventListener("click", loadProject);
 document.getElementById("clearButton").addEventListener("click", () => {
   if (!confirm("清空当前画布？")) return;
+  captureHistory();
   state.nodes = [];
   state.selectedId = null;
   state.nextId = 1;
@@ -1314,68 +1767,49 @@ zoomRange.addEventListener("input", () => {
   persistLocal();
 });
 document.getElementById("centerButton").addEventListener("click", fitView);
-document.getElementById("shareButton").addEventListener("click", () => setStatus("分享功能后续可生成只读项目链接。"));
-document.getElementById("rechargeButton").addEventListener("click", () => setStatus("充值入口后续接入 web_app 的充值方案。"));
+// shareButton / rechargeButton 已在本地软件模式移除
 
-loginButton.addEventListener("click", () => openAuth("login"));
-logoutButton.addEventListener("click", async () => {
-  setAuthToken("");
-  await refreshSession();
-  await loadAssets();
-  setStatus("已退出登录，画布仍保留在本地。");
+// ─── 设置弹窗事件 ────────────────────────────────────────────────────────
+if (settingsButton) settingsButton.addEventListener("click", openSettings);
+if (settingsCloseButton) settingsCloseButton.addEventListener("click", closeSettings);
+if (settingsModal) settingsModal.addEventListener("click", (e) => {
+  if (e.target === settingsModal) closeSettings();
 });
-authCloseButton.addEventListener("click", closeAuth);
-authLoginTab.addEventListener("click", () => openAuth("login"));
-authRegisterTab.addEventListener("click", () => openAuth("register"));
-sendCodeButton.addEventListener("click", async () => {
-  const email = authEmail.value.trim();
-  if (!email) {
-    authMessage.textContent = "请先填写邮箱。";
+if (settingsKeyToggle) settingsKeyToggle.addEventListener("click", () => {
+  const isPassword = settingsApiKey.type === "password";
+  settingsApiKey.type = isPassword ? "text" : "password";
+  settingsKeyToggle.textContent = isPassword ? "隐藏" : "显示";
+});
+if (settingsSaveButton) settingsSaveButton.addEventListener("click", async () => {
+  const key = settingsApiKey.value.trim();
+  const url = settingsComfyUrl ? settingsComfyUrl.value.trim() : "";
+  if (!key && !url) {
+    settingsMessage.textContent = "请填写 API 密钥。";
     return;
   }
-  sendCodeButton.disabled = true;
-  authMessage.textContent = "正在发送验证码...";
+  settingsSaveButton.disabled = true;
+  settingsMessage.textContent = "保存中…";
   try {
-    const response = await fetch("/api/auth/send-code", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    const data = await response.json();
-    if (!data.ok && !data.success) throw new Error(data.error || "发送失败");
-    authMessage.textContent = data.code_preview ? `开发模式验证码：${data.code_preview}` : "验证码已发送。";
-  } catch (error) {
-    authMessage.textContent = error.message;
-  } finally {
-    sendCodeButton.disabled = false;
-  }
-});
-authSubmitButton.addEventListener("click", async () => {
-  const endpoint = state.authMode === "register" ? "/api/auth/register" : "/api/auth/login";
-  const payload = {
-    email: authEmail.value.trim(),
-    password: authPassword.value.trim(),
-  };
-  if (state.authMode === "register") payload.code = authCode.value.trim();
-  authSubmitButton.disabled = true;
-  authMessage.textContent = state.authMode === "register" ? "正在注册..." : "正在登录...";
-  try {
-    const response = await fetch(endpoint, {
+    const payload = {};
+    if (key) payload.tikpanApiKey = key;
+    if (url) payload.comfyUrl = url;
+    const response = await fetch("/api/config", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
     });
     const data = await response.json();
-    if (!data.ok) throw new Error(data.error || "登录失败");
-    setAuthToken(data.token);
-    closeAuth();
-    await refreshSession();
-    await loadAssets();
-    setStatus("已登录，后续生成和项目保存会绑定到当前账号。");
+    if (!data.ok) throw new Error(data.error || "保存失败");
+    settingsMessage.textContent = "";
+    settingsApiKey.value = "";
+    closeSettings();
+    await loadLocalConfig();
+    toast("API 密钥已保存，立即生效", "success");
+    setStatus("API 密钥已保存。");
   } catch (error) {
-    authMessage.textContent = error.message;
+    settingsMessage.textContent = error.message;
   } finally {
-    authSubmitButton.disabled = false;
+    settingsSaveButton.disabled = false;
   }
 });
 
@@ -1388,4 +1822,4 @@ loadProvider();
 loadProfiles();
 loadCheckpoints();
 loadFactoryWorkflows();
-refreshSession().then(loadAssets);
+loadLocalConfig().then(loadAssets);
