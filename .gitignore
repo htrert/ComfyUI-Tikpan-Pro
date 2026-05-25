@@ -4,12 +4,8 @@ __pycache__/
 recovery/
 tmp_test_output/
 
-web_app/data/*.db
-web_app/data/*.db-*
-web_app/data/*.export.json
-web_app/data/*.backup.json
-web_app/data/config.local.json
-web_app/outputs/
-
+# web_app 和 experiments 已迁移到独立仓库，不在此追踪
+web_app/
 experiments/
+
 docs/assets/wechat-cover-v1.0.1.png
