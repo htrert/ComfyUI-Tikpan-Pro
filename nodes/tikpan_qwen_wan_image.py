@@ -4,7 +4,9 @@ import json
 import time
 import traceback
 from io import BytesIO
+from pathlib import Path
 
+import folder_paths
 import numpy as np
 import requests
 import torch
@@ -197,20 +199,39 @@ class _TikpanOpenImageBase:
             pbar.update(76)
             tensors = []
             source_logs = []
+            saved_paths = []
+            failed_items = []
             for idx, (img_raw, raw_type) in enumerate(image_items, start=1):
-                image = self.load_result_image(session, img_raw, raw_type)
-                tensors.append(self.pil_to_tensor(image))
-                source_logs.append(f"{idx}:{raw_type}")
+                try:
+                    image = self.load_result_image(session, img_raw, raw_type)
+                    saved_paths.extend(self.save_result_image(image, model, idx, raw_type))
+                    tensors.append(self.pil_to_tensor(image))
+                    source_logs.append(f"{idx}:{raw_type}")
+                except Exception as exc:
+                    failed_items.append({"index": idx, "source": raw_type, "reason": str(exc)})
+                    print(f"[Tikpan-{self.MODEL_ID}] WARNING: image {idx} failed, skipped: {exc}", flush=True)
                 pbar.update(76 + int(idx * 18 / max(len(image_items), 1)))
+
+            if not tensors:
+                msg = f"ERROR: all returned image items failed to decode/download | failures={failed_items}"
+                if not skip_error:
+                    raise RuntimeError(msg)
+                return (self.black_image(width, height), self.skip_error_message(msg))
 
             image_batch = self.normalize_batch(tensors)
             elapsed = round(time.time() - start_time, 2)
             log = (
-                f"SUCCESS: {self.MODEL_NAME} generated {len(tensors)} image(s). "
+                f"SUCCESS: {self.MODEL_NAME} requested {count}, returned {len(image_items)}, succeeded {len(tensors)}, failed {len(failed_items)}. "
                 f"model={model}, mode={resolved_mode}, refs={len(reference_images)}, aspect_ratio={aspect_ratio}, "
                 f"resolution={resolution}, size={size}, quality={quality}, n={count}, response_format={response_format}, "
                 f"sources={','.join(source_logs)}, elapsed={elapsed}s"
             )
+            if saved_paths:
+                log += "\nSaved files:\n" + "\n".join(saved_paths[:40])
+            if failed_items:
+                log += "\nFailures skipped:\n" + "\n".join(
+                    f"- item {item['index']} source={item['source']} reason={item['reason']}" for item in failed_items[:20]
+                )
             print(f"[Tikpan-{self.MODEL_ID}] {log}", flush=True)
             pbar.update(100)
             return (image_batch, log)
@@ -390,6 +411,24 @@ class _TikpanOpenImageBase:
             return Image.open(BytesIO(response.content)).convert("RGB")
         clean = str(img_raw).split("base64,")[-1]
         return Image.open(BytesIO(base64.b64decode(clean))).convert("RGB")
+
+    def save_result_image(self, image, model, index, source):
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        safe_model = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in str(model or self.MODEL_ID))[:80]
+        filename = f"tikpan_{self.MODEL_ID}_{safe_model}_{stamp}_{index:02d}.png"
+        paths = []
+        for base in (
+            Path(folder_paths.get_output_directory()),
+            Path(__file__).resolve().parents[1] / "recovery" / self.MODEL_ID / "images",
+        ):
+            try:
+                base.mkdir(parents=True, exist_ok=True)
+                path = base / filename
+                image.save(path, "PNG")
+                paths.append(str(path))
+            except Exception as exc:
+                print(f"[Tikpan-{self.MODEL_ID}] WARNING: save {source} image failed: {exc}", flush=True)
+        return paths
 
     def extract_image_items(self, res_json):
         items = []

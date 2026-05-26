@@ -28,7 +28,9 @@ import base64
 import torch
 import numpy as np
 from io import BytesIO
+from pathlib import Path
 from PIL import Image
+import folder_paths
 import comfy.utils
 import urllib3
 import traceback
@@ -311,6 +313,38 @@ class TikpanDoubaoImageNode:
 
         return None, "unknown", "unknown"
 
+    def save_result_image(self, img_pil, idx, source_type):
+        stamp = __import__("time").strftime("%Y%m%d-%H%M%S")
+        filename = f"tikpan_doubao_seedream_{stamp}_{idx:02d}_{source_type}.png"
+        paths = []
+        for base in (
+            Path(folder_paths.get_output_directory()),
+            Path(__file__).resolve().parents[1] / "recovery" / "doubao_image" / "images",
+        ):
+            try:
+                base.mkdir(parents=True, exist_ok=True)
+                path = base / filename
+                img_pil.save(path, "PNG")
+                paths.append(str(path))
+            except Exception as exc:
+                print(f"[Tikpan-Doubao] WARNING save image failed: {exc}", flush=True)
+        return paths
+
+    def save_failure_report(self, idx, reason, img_data=None):
+        stamp = __import__("time").strftime("%Y%m%d-%H%M%S")
+        failure_dir = Path(__file__).resolve().parents[1] / "recovery" / "doubao_image" / "failures"
+        failure_dir.mkdir(parents=True, exist_ok=True)
+        path = failure_dir / f"failed_{stamp}_{idx:02d}.json"
+        payload = {
+            "time": stamp,
+            "index": idx,
+            "reason": reason,
+            "raw_preview": json.dumps(img_data, ensure_ascii=False, default=str)[:2000] if img_data is not None else "",
+            "hint": "如果 raw_preview 中有完整 url/b64_json，可用恢复脚本或手动下载；若 Base64 被截断则无法还原。",
+        }
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return str(path)
+
     def normalize_response_data_list(self, res_json):
         if not isinstance(res_json, dict):
             return []
@@ -564,6 +598,9 @@ class TikpanDoubaoImageNode:
             decoded_tensors = []
             size_logs = []
             source_logs = []
+            saved_paths = []
+            failed_items = []
+            failed_reports = []
 
             total_items = len(data_list)
             progress_start = 55
@@ -576,18 +613,30 @@ class TikpanDoubaoImageNode:
                 if img_pil is None:
                     error_info = img_data.get("error", {})
                     if error_info:
+                        reason = error_info.get("message", "未知错误")
                         print(
-                            f"[Tikpan-Doubao] ⚠️ 第 {idx + 1} 张生成失败: {error_info.get('message', '未知错误')}",
+                            f"[Tikpan-Doubao] ⚠️ 第 {idx + 1} 张生成失败: {reason}",
                             flush=True
                         )
                     else:
+                        reason = "图片解析失败"
                         print(f"[Tikpan-Doubao] ⚠️ 第 {idx + 1} 张图片解析失败，已跳过", flush=True)
+                    failed_items.append(f"第{idx + 1}张: {reason}")
+                    failed_reports.append(self.save_failure_report(idx + 1, reason, img_data))
                     continue
 
-                tensor_img = self.pil_to_tensor(img_pil)
-                decoded_tensors.append(tensor_img)
-                size_logs.append(f"第{idx + 1}张: {actual_size}")
-                source_logs.append(f"第{idx + 1}张来源: {source_type}")
+                try:
+                    saved_paths.extend(self.save_result_image(img_pil, idx + 1, source_type))
+                    tensor_img = self.pil_to_tensor(img_pil)
+                    decoded_tensors.append(tensor_img)
+                    size_logs.append(f"第{idx + 1}张: {actual_size}")
+                    source_logs.append(f"第{idx + 1}张来源: {source_type}")
+                except Exception as exc:
+                    reason = f"保存或转 Tensor 失败: {exc}"
+                    failed_items.append(f"第{idx + 1}张: {reason}")
+                    failed_reports.append(self.save_failure_report(idx + 1, reason, img_data))
+                    print(f"[Tikpan-Doubao] ⚠️ 第 {idx + 1} 张处理失败，已跳过: {exc}", flush=True)
+                    continue
 
                 pbar.update(progress_start + int((idx + 1) * (progress_end - progress_start) / progress_span))
 
@@ -621,6 +670,8 @@ class TikpanDoubaoImageNode:
                 f"📐 请求尺寸: {size_display}\n"
                 f"🧮 实际提交尺寸参数: {size}\n"
                 f"🖼️ 返回图片数量: {len(normalized_tensors)}\n"
+                f"✅ 成功数量: {len(normalized_tensors)}\n"
+                f"❌ 失败数量: {len(failed_items)}\n"
                 f"📦 返回格式: {response_format}\n"
                 f"🎨 图片格式: {output_format}\n"
                 f"🧷 水印: {'开启' if watermark == '有水印' else '关闭'}\n"
@@ -630,6 +681,16 @@ class TikpanDoubaoImageNode:
 
             if resized_count > 0:
                 log_msg += f"\n⚠️ 已自动缩放图片数量: {resized_count}"
+
+            if saved_paths:
+                log_msg += "\n📁 成功文件保存位置:\n" + "\n".join(saved_paths[:40])
+
+            if failed_reports:
+                log_msg += "\n🧯 失败记录保存位置:\n" + "\n".join(failed_reports[:40])
+
+            if failed_items:
+                log_msg += "\n⚠️ 失败原因（已自动跳过）:\n" + "\n".join(failed_items[:20])
+                log_msg += "\n🔁 恢复建议: 查看失败 JSON；如果其中有完整 url/b64_json 可手动下载或用恢复脚本恢复，截断 Base64 无法还原。"
 
             if web_search == "自动":
                 log_msg += "\n🌐 联网搜索增强: 已开启"

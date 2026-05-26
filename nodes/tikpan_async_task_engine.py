@@ -91,6 +91,7 @@ def submit_image_task(api_key, payload):
         },
         "events": [],
         "image_paths": [],
+        "failed_items": [],
         "error": "",
     }
     with _LOCK:
@@ -223,16 +224,36 @@ def _run_image_task(task_id, api_key, payload):
                 _write_task_file(task)
 
         image_paths = []
+        failed_items = []
         for index, (img_raw, raw_type) in enumerate(image_items, start=1):
-            image = _load_result_image(session, img_raw, raw_type).convert("RGB")
-            image_path = _save_image(task_id, index, image)
-            image_paths.append(image_path)
+            try:
+                image = _load_result_image(session, img_raw, raw_type).convert("RGB")
+                image_path = _save_image(task_id, index, image)
+                image_paths.append(image_path)
+            except Exception as exc:
+                failed_items.append({"index": index, "source": raw_type, "reason": str(exc)})
+                with _LOCK:
+                    task = _TASKS.get(task_id)
+                    if task:
+                        task["failed_items"] = failed_items
+                        _add_event_locked(task, "oss", "warning", f"Skipped image {index}: {exc}", progress=70)
+                        _write_task_file(task)
+
+        if not image_paths:
+            raise RuntimeError(f"All returned image pointers failed to download/decode: {failed_items}")
 
         with _LOCK:
             task = _TASKS.get(task_id)
             if task:
                 task["image_paths"] = image_paths
-                _add_event_locked(task, "oss", "success", f"Saved {len(image_paths)} image(s) locally.", progress=88)
+                task["failed_items"] = failed_items
+                _add_event_locked(
+                    task,
+                    "oss",
+                    "success" if not failed_items else "partial_success",
+                    f"Saved {len(image_paths)} image(s) locally; skipped {len(failed_items)} failed item(s).",
+                    progress=88,
+                )
                 _add_event_locked(task, "cdn", "success", "Images are ready for ComfyUI query nodes.", progress=100)
                 task["status"] = "success"
                 task["stage"] = "cdn"

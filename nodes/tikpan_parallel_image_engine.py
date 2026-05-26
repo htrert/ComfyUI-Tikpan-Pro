@@ -4,7 +4,9 @@ import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
+from pathlib import Path
 
+import folder_paths
 import numpy as np
 import requests
 import torch
@@ -285,18 +287,30 @@ class TikpanParallelImageEngineNode:
 
         tensors = []
         sources = []
-        for img_raw, raw_type in image_items:
-            image = self.load_result_image(session, img_raw, raw_type).convert("RGB")
-            tensors.append(self.pil_to_tensor(image))
-            sources.append(raw_type)
+        saved_paths = []
+        failures = []
+        for index, (img_raw, raw_type) in enumerate(image_items, start=1):
+            try:
+                image = self.load_result_image(session, img_raw, raw_type).convert("RGB")
+                saved_paths.extend(self.save_result_image(image, model, index, idempotency_key, raw_type))
+                tensors.append(self.pil_to_tensor(image))
+                sources.append(raw_type)
+            except Exception as exc:
+                failures.append({"index": index, "source": raw_type, "reason": str(exc)})
+                print(f"[Tikpan-ParallelEngine] WARNING: job image {index} failed, skipped: {exc}", flush=True)
+
+        if not tensors:
+            return self.error_record(job, "upstream", f"All returned image pointers failed to download/decode: {failures}")
 
         return {
             "status": "success",
             "stage": "upstream",
             "model": model,
             "relay_host": relay_host,
-            "message": f"Generated {len(tensors)} image(s).",
+            "message": f"Generated {len(tensors)} image(s), skipped {len(failures)} failed item(s).",
             "sources": sources,
+            "saved_paths": saved_paths,
+            "failures": failures,
             "idempotency_key": idempotency_key,
             "_tensors": tensors,
         }
@@ -363,12 +377,27 @@ class TikpanParallelImageEngineNode:
         elapsed = round(time.time() - start_time, 2)
         ok = sum(1 for item in records if item.get("status") == "success")
         failed = sum(1 for item in records if item.get("status") != "success")
+        saved_paths = []
+        skipped_items = []
+        for record in records:
+            saved_paths.extend(record.get("saved_paths") or [])
+            skipped_items.extend(record.get("failures") or [])
         lines = [
             f"Tikpan Parallel Engine finished in {elapsed}s",
             f"Success jobs: {ok} | Failed jobs: {failed}",
+            f"Saved files: {len(saved_paths)} | Skipped image items: {len(skipped_items)}",
             "Stages:",
         ]
         lines.extend(f"- [{item['status']}] {item['stage']}: {item['message']}" for item in events)
+        if saved_paths:
+            lines.append("Saved file paths:")
+            lines.extend(f"- {path}" for path in saved_paths[:40])
+        if skipped_items:
+            lines.append("Skipped item reasons:")
+            lines.extend(
+                f"- item {item.get('index')} source={item.get('source')} reason={item.get('reason')}"
+                for item in skipped_items[:40]
+            )
         return "\n".join(lines)
 
     def error_record(self, job, stage, message):
@@ -463,6 +492,25 @@ class TikpanParallelImageEngineNode:
             return Image.open(BytesIO(response.content)).convert("RGB")
         clean = img_raw.split("base64,")[-1] if isinstance(img_raw, str) else img_raw
         return Image.open(BytesIO(base64.b64decode(clean))).convert("RGB")
+
+    def save_result_image(self, image, model, index, idempotency_key, source):
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        safe_model = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in str(model or "model"))[:80]
+        safe_key = str(idempotency_key or "job")[-8:]
+        filename = f"tikpan_parallel_{safe_model}_{stamp}_{index:02d}_{safe_key}.png"
+        paths = []
+        for base in (
+            Path(folder_paths.get_output_directory()),
+            Path(__file__).resolve().parents[1] / "recovery" / "parallel_image_engine" / "images",
+        ):
+            try:
+                base.mkdir(parents=True, exist_ok=True)
+                path = base / filename
+                image.save(path, "PNG")
+                paths.append(str(path))
+            except Exception as exc:
+                print(f"[Tikpan-ParallelEngine] WARNING: save {source} image failed: {exc}", flush=True)
+        return paths
 
     def pil_to_tensor(self, image):
         arr = np.array(image).astype(np.float32) / 255.0
