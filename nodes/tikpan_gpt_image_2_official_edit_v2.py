@@ -1,7 +1,9 @@
 import math
 import base64
+import re
 import traceback
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
 from pathlib import Path
 
@@ -71,6 +73,11 @@ class TikpanGptImage2OfficialEditV2:
                 "审核等级": (MODERATION_OPTIONS, {"default": "auto"}),
                 "遮罩反相": ("BOOLEAN", {"default": False}),
                 "提示增强": ("BOOLEAN", {"default": True}),
+                "并发请求数": ("INT", {"default": 2, "min": 1, "max": 4, "step": 1}),
+                "恢复保存模式": (
+                    ["快速：只保存到ComfyUI输出", "安全：输出+Recovery双写", "关闭：只返回节点不额外保存"],
+                    {"default": "快速：只保存到ComfyUI输出"},
+                ),
                 "超时秒数": ("INT", {"default": 300, "min": 30, "max": 1800, "step": 10}),
             },
             "optional": {
@@ -88,6 +95,7 @@ class TikpanGptImage2OfficialEditV2:
     CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
 
     def edit_image(self, **kwargs):
+        start_time = time.time()
         w, h = 1024, 1024
         skip_error = bool(kwargs.get("跳过错误", False))
 
@@ -114,6 +122,8 @@ class TikpanGptImage2OfficialEditV2:
                 bg = "auto"
             invert_mask = bool(kwargs.get("遮罩反相", False))
             boost_prompt = bool(kwargs.get("提示增强", True))
+            max_workers = max(1, min(int(kwargs.get("并发请求数", 2) or 2), max(1, min(n, 4))))
+            save_mode = str(kwargs.get("恢复保存模式") or "快速：只保存到ComfyUI输出")
             timeout = int(kwargs.get("超时秒数", 300))
 
             self.validate_image_tensor(main_img, "主图像")
@@ -188,6 +198,8 @@ class TikpanGptImage2OfficialEditV2:
             successful_requests = 0
             recovery_keys = []
             response_count = 0
+            timing_items = []
+            preprocess_elapsed = round(time.time() - start_time, 2)
             with requests.Session() as sess:
                 sess.trust_env = False
 
@@ -204,9 +216,8 @@ class TikpanGptImage2OfficialEditV2:
                 sess.mount("https://", adapter)
                 sess.mount("http://", adapter)
 
+                job_specs = []
                 for request_index in range(max(1, n)):
-                    if len(imgs) >= n:
-                        break
                     loop_data = dict(data)
                     idempotency_payload = dict(loop_data)
                     idempotency_payload["request_index"] = request_index + 1
@@ -214,6 +225,7 @@ class TikpanGptImage2OfficialEditV2:
                     loop_headers = dict(headers)
                     loop_headers["Idempotency-Key"] = idempotency_key
                     recovery_keys.append(idempotency_key)
+                    job_specs.append((request_index + 1, loop_headers, loop_data, idempotency_key, idempotency_payload))
                     save_recovery_record(
                         "official_edit_v2",
                         idempotency_key,
@@ -223,54 +235,133 @@ class TikpanGptImage2OfficialEditV2:
                         files_hash=files_hash,
                         size=size_label,
                     )
-                    try:
-                        resj = self.post_edit_once(sess, api_host, loop_headers, files, loop_data, timeout, idempotency_key, files_hash)
-                        response_count += 1
-                        parsed, paths, errors = self.parse_images(resj, sess, idempotency_key, request_index + 1)
-                        imgs.extend(parsed)
-                        saved_paths.extend(paths)
-                        if parsed:
-                            successful_requests += 1
-                        for error in errors:
-                            failed_items.append({
-                                "request_index": request_index + 1,
+
+                def run_one_request(spec):
+                    request_no, loop_headers, loop_data, idempotency_key, _idempotency_payload = spec
+                    local_session = self.create_download_session()
+                    request_start = time.time()
+                    resj = self.post_edit_once(local_session, api_host, loop_headers, files, loop_data, timeout, idempotency_key, files_hash)
+                    post_elapsed = round(time.time() - request_start, 2)
+                    parse_start = time.time()
+                    parsed, paths, errors = self.parse_images(resj, local_session, idempotency_key, request_no, save_mode)
+                    parse_elapsed = round(time.time() - parse_start, 2)
+                    timing = {
+                        "request_index": request_no,
+                        "post_wait_seconds": post_elapsed,
+                        "download_parse_save_seconds": parse_elapsed,
+                        "request_total_seconds": round(time.time() - request_start, 2),
+                    }
+                    return request_no, idempotency_key, parsed, paths, errors, timing
+
+                if max_workers == 1:
+                    iterator = ((spec, None) for spec in job_specs)
+                    for spec, _future in iterator:
+                        request_no, _headers, _data, idempotency_key, _payload = spec
+                        if len(imgs) >= n:
+                            break
+                        try:
+                            request_no, idempotency_key, parsed, paths, errors, timing = run_one_request(spec)
+                            response_count += 1
+                            timing_items.append(timing)
+                            imgs.extend(parsed)
+                            saved_paths.extend(paths)
+                            if parsed:
+                                successful_requests += 1
+                            for error in errors:
+                                failed_items.append({
+                                    "request_index": request_no,
+                                    "idempotency_key": idempotency_key,
+                                    "stage": "parse_or_download",
+                                    "reason": error,
+                                    "recoverable": "maybe",
+                                    "hint": "如果 recovery JSON 中有完整 URL/Base64，可运行 scripts/recover_gpt_image_2_outputs.py 恢复；旧版截断 JSON 无法恢复。",
+                                })
+                            save_recovery_record(
+                                "official_edit_v2",
+                                idempotency_key,
+                                "local_saved" if parsed else "parse_failed",
+                                endpoint="/v1/images/edits",
+                                saved_paths=paths,
+                                parse_errors=errors,
+                                parsed_count=len(parsed),
+                            )
+                        except Exception as e:
+                            failure = {
+                                "request_index": request_no,
                                 "idempotency_key": idempotency_key,
-                                "stage": "parse_or_download",
-                                "reason": error,
+                                "stage": "request_or_upstream_response",
+                                "reason": str(e),
                                 "recoverable": "maybe",
-                                "hint": "如果 recovery JSON 中有完整 URL/Base64，可运行 scripts/recover_gpt_image_2_outputs.py 恢复；旧版截断 JSON 无法恢复。",
-                            })
-                        save_recovery_record(
-                            "official_edit_v2",
-                            idempotency_key,
-                            "local_saved" if parsed else "parse_failed",
-                            endpoint="/v1/images/edits",
-                            saved_paths=paths,
-                            parse_errors=errors,
-                            parsed_count=len(parsed),
-                        )
-                    except Exception as e:
-                        failure = {
-                            "request_index": request_index + 1,
-                            "idempotency_key": idempotency_key,
-                            "stage": "request_or_upstream_response",
-                            "reason": str(e),
-                            "recoverable": "maybe",
-                            "hint": "如果中转站后台显示已生成/扣费，请用幂等 Key 或后台日志反查；如果 recovery JSON 有完整 URL/Base64，可运行恢复脚本。",
-                        }
-                        failed_items.append(failure)
-                        report_paths = self.save_failure_report(failure)
-                        failed_reports.extend(report_paths)
-                        save_recovery_record(
-                            "official_edit_v2",
-                            idempotency_key,
-                            "request_failed_after_submit",
-                            endpoint="/v1/images/edits",
-                            error=str(e),
-                            failure_report_paths=report_paths,
-                        )
-                        print(f"[Tikpan GPT-Image-2 Edit V2] 第 {request_index + 1} 次请求失败，继续处理后续批次: {e}", flush=True)
-                        continue
+                                "hint": "如果中转站后台显示已生成/扣费，请用幂等 Key 或后台日志反查；如果 recovery JSON 有完整 URL/Base64，可运行恢复脚本。",
+                            }
+                            failed_items.append(failure)
+                            report_paths = self.save_failure_report(failure)
+                            failed_reports.extend(report_paths)
+                            save_recovery_record(
+                                "official_edit_v2",
+                                idempotency_key,
+                                "request_failed_after_submit",
+                                endpoint="/v1/images/edits",
+                                error=str(e),
+                                failure_report_paths=report_paths,
+                            )
+                            print(f"[Tikpan GPT-Image-2 Edit V2] 第 {request_no} 次请求失败，继续处理后续批次: {e}", flush=True)
+
+                else:
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        future_map = {executor.submit(run_one_request, spec): spec for spec in job_specs}
+                        for future in as_completed(future_map):
+                            spec = future_map[future]
+                            request_no, _headers, _data, idempotency_key, _payload = spec
+                            try:
+                                request_no, idempotency_key, parsed, paths, errors, timing = future.result()
+                                response_count += 1
+                                timing_items.append(timing)
+                                imgs.extend(parsed)
+                                saved_paths.extend(paths)
+                                if parsed:
+                                    successful_requests += 1
+                                for error in errors:
+                                    failed_items.append({
+                                        "request_index": request_no,
+                                        "idempotency_key": idempotency_key,
+                                        "stage": "parse_or_download",
+                                        "reason": error,
+                                        "recoverable": "maybe",
+                                        "hint": "如果 recovery JSON 中有完整 URL/Base64，可运行 scripts/recover_gpt_image_2_outputs.py 恢复；旧版截断 JSON 无法恢复。",
+                                    })
+                                save_recovery_record(
+                                    "official_edit_v2",
+                                    idempotency_key,
+                                    "local_saved" if parsed else "parse_failed",
+                                    endpoint="/v1/images/edits",
+                                    saved_paths=paths,
+                                    parse_errors=errors,
+                                    parsed_count=len(parsed),
+                                )
+                            except Exception as e:
+                                failure = {
+                                    "request_index": request_no,
+                                    "idempotency_key": idempotency_key,
+                                    "stage": "request_or_upstream_response",
+                                    "reason": str(e),
+                                    "recoverable": "maybe",
+                                    "hint": "如果中转站后台显示已生成/扣费，请用幂等 Key 或后台日志反查；如果 recovery JSON 有完整 URL/Base64，可运行恢复脚本。",
+                                }
+                                failed_items.append(failure)
+                                report_paths = self.save_failure_report(failure)
+                                failed_reports.extend(report_paths)
+                                save_recovery_record(
+                                    "official_edit_v2",
+                                    idempotency_key,
+                                    "request_failed_after_submit",
+                                    endpoint="/v1/images/edits",
+                                    error=str(e),
+                                    failure_report_paths=report_paths,
+                                )
+                                print(f"[Tikpan GPT-Image-2 Edit V2] 第 {request_no} 次请求失败，继续处理后续批次: {e}", flush=True)
+
+
 
             if not imgs:
                 raise Exception(
@@ -278,6 +369,7 @@ class TikpanGptImage2OfficialEditV2:
                     f"本次幂等键: {', '.join(recovery_keys)}；失败详情: {self.format_failures(failed_items[:6])}"
                 )
 
+            tensor_start = time.time()
             base_sz = imgs[0].size
             tlist = []
             for i, im in enumerate(imgs):
@@ -304,6 +396,8 @@ class TikpanGptImage2OfficialEditV2:
                 raise Exception("❌ 未得到可用结果图")
 
             batch = torch.stack(tlist, dim=0)
+            tensor_elapsed = round(time.time() - tensor_start, 2)
+            total_elapsed = round(time.time() - start_time, 2)
             requested_count = max(1, n)
             success_count = len(tlist)
             failed_count = max(requested_count - success_count, len(failed_items))
@@ -596,7 +690,24 @@ class TikpanGptImage2OfficialEditV2:
             b = b.unsqueeze(0)
         return [self.to_pil(b[i]) for i in range(b.shape[0])]
 
-    def parse_images(self, resj, sess, idempotency_key="", request_index=1):
+    def create_download_session(self):
+        session = requests.Session()
+        session.trust_env = False
+        get_retry = Retry(
+            total=2,
+            connect=2,
+            read=2,
+            backoff_factor=1,
+            status_forcelist=[500, 502, 503, 504],
+            allowed_methods=frozenset(["GET"]),
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=get_retry)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        return session
+
+    def parse_images(self, resj, sess, idempotency_key="", request_index=1, save_mode="safe_dual"):
         out = []
         saved_paths = []
         errors = []
@@ -615,7 +726,7 @@ class TikpanGptImage2OfficialEditV2:
                     image_bytes = base64.b64decode(b64_clean)
                     img = Image.open(BytesIO(image_bytes)).convert("RGB")
                     out.append(img)
-                    saved_paths.extend(self.save_result_image(img, idempotency_key, request_index, item_index, source="base64"))
+                    saved_paths.extend(self.save_result_image(img, idempotency_key, request_index, item_index, source="base64", save_mode=save_mode))
                 except Exception as e:
                     msg = f"Base64 图片解析失败: {e}"
                     errors.append(msg)
@@ -625,36 +736,38 @@ class TikpanGptImage2OfficialEditV2:
                     resp = get_with_retry(sess, url, timeout=(5, 90), verify=False, attempts=4)
                     img = Image.open(BytesIO(resp.content)).convert("RGB")
                     out.append(img)
-                    saved_paths.extend(self.save_result_image(img, idempotency_key, request_index, item_index, source="url", source_url=url))
+                    saved_paths.extend(self.save_result_image(img, idempotency_key, request_index, item_index, source="url", source_url=url, save_mode=save_mode))
                 except Exception as e:
                     msg = f"URL 图片下载失败 ({url}): {e}"
                     errors.append(msg)
                     print(msg, flush=True)
         return out, saved_paths, errors
 
-    def save_result_image(self, img, idempotency_key, request_index, item_index, source="", source_url=""):
+    def save_result_image(self, img, idempotency_key, request_index, item_index, source="", source_url="", save_mode="safe_dual"):
         safe_key = str(idempotency_key or f"request-{request_index}").replace(":", "_").replace("/", "_")
         stamp = time.strftime("%Y%m%d-%H%M%S")
         filename = f"tikpan_gpt_image_2_edit_v2_{stamp}_{request_index:02d}_{item_index:02d}_{safe_key[-8:]}.png"
         paths = []
 
-        try:
-            output_dir = Path(folder_paths.get_output_directory())
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_path = output_dir / filename
-            img.save(output_path, "PNG")
-            paths.append(str(output_path))
-        except Exception as e:
-            print(f"ComfyUI output 保存失败: {e}", flush=True)
+        if "??" not in str(save_mode):
+            try:
+                output_dir = Path(folder_paths.get_output_directory())
+                output_dir.mkdir(parents=True, exist_ok=True)
+                output_path = output_dir / filename
+                img.save(output_path, "PNG")
+                paths.append(str(output_path))
+            except Exception as e:
+                print(f"ComfyUI output save failed: {e}", flush=True)
 
-        try:
-            recovery_dir = Path(__file__).resolve().parents[1] / "recovery" / "gpt_image_2" / "images"
-            recovery_dir.mkdir(parents=True, exist_ok=True)
-            recovery_path = recovery_dir / filename
-            img.save(recovery_path, "PNG")
-            paths.append(str(recovery_path))
-        except Exception as e:
-            print(f"Recovery 图片保存失败: {e}", flush=True)
+        if "??" in str(save_mode) or str(save_mode) == "safe_dual":
+            try:
+                recovery_dir = Path(__file__).resolve().parents[1] / "recovery" / "gpt_image_2" / "images"
+                recovery_dir.mkdir(parents=True, exist_ok=True)
+                recovery_path = recovery_dir / filename
+                img.save(recovery_path, "PNG")
+                paths.append(str(recovery_path))
+            except Exception as e:
+                print(f"Recovery image save failed: {e}", flush=True)
 
         save_recovery_record(
             "official_edit_v2",
@@ -737,10 +850,21 @@ class TikpanGptImage2OfficialEditV2:
 
         def scan(obj):
             if isinstance(obj, str):
-                if obj.startswith(("http://", "https://")):
-                    add("url", obj)
-                elif obj.startswith("data:image"):
-                    add("base64", obj)
+                text = obj.strip()
+                for pattern in (
+                    r"!\[[^\]]*\]\((https?://[^\s)]+)\)",
+                    r"\[[^\]]*\]\((https?://[^\s)]+)\)",
+                    r"(https?://[^\s)]+\.(?:png|jpg|jpeg|webp)(?:\?[^\s)]*)?)",
+                    r"(https?://t\.filesystem\.site/[^\s)]+)",
+                ):
+                    match = re.search(pattern, text, re.IGNORECASE)
+                    if match:
+                        add("url", match.group(1).strip().rstrip(".,;"))
+                        return
+                if text.startswith(("http://", "https://")):
+                    add("url", text)
+                elif text.startswith("data:image"):
+                    add("base64", text)
                 return
             if isinstance(obj, list):
                 for item in obj:
@@ -756,11 +880,13 @@ class TikpanGptImage2OfficialEditV2:
             nested_image_url = obj.get("image_url")
             if isinstance(nested_image_url, dict):
                 add("url", nested_image_url.get("url"))
+            for key in ("message", "content"):
+                scan(obj.get(key))
 
         if not isinstance(resj, dict):
             return items
 
-        for key in ("data", "result", "output", "images"):
+        for key in ("data", "result", "output", "images", "choices"):
             scan(resj.get(key))
         scan(resj)
         return items

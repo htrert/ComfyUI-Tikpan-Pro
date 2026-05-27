@@ -39,6 +39,21 @@ def save_recovery_record(kind, idempotency_key, status, **fields):
     return str(latest_path)
 
 
+def save_request_snapshot(kind, idempotency_key, payload, **fields):
+    RECOVERY_DIR.mkdir(parents=True, exist_ok=True)
+    snapshot = {
+        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "kind": kind,
+        "idempotency_key": idempotency_key,
+        "status": "request_snapshot",
+        **fields,
+        "payload": payload,
+    }
+    path = RECOVERY_DIR / f"{idempotency_key}.request.json"
+    path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+    return str(path)
+
+
 def safe_json_for_log(value, max_len=4000):
     try:
         text = json.dumps(value, ensure_ascii=False)

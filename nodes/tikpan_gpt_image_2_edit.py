@@ -8,7 +8,7 @@ from io import BytesIO
 from PIL import Image, ImageOps
 import comfy.utils
 from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host
-from .tikpan_gpt_image_recovery import get_with_retry, make_idempotency_key, safe_json_for_log, save_recovery_record, short_hash
+from .tikpan_gpt_image_recovery import get_with_retry, make_idempotency_key, safe_json_for_log, save_recovery_record, save_request_snapshot, short_hash
 
 # 🔐 Tikpan 官方聚合路由
 API_BASE_URL = "https://tikpan.com"
@@ -118,6 +118,14 @@ class TikpanGptImage2EditNode:
 
         idempotency_key = make_idempotency_key("chat/completions-edit", payload)
         headers["Idempotency-Key"] = idempotency_key
+        request_snapshot_path = save_request_snapshot(
+            "all_edit",
+            idempotency_key,
+            payload,
+            endpoint="/v1/chat/completions",
+            payload_hash=short_hash(payload),
+            size=f"{width}x{height}",
+        )
         recovery_path = save_recovery_record(
             "all_edit",
             idempotency_key,
@@ -125,26 +133,20 @@ class TikpanGptImage2EditNode:
             endpoint="/v1/chat/completions",
             payload_hash=short_hash(payload),
             size=f"{width}x{height}",
+            request_snapshot=request_snapshot_path,
         )
 
         try:
             pbar.update(30)
             url = f"{api_host}/v1/chat/completions" # 使用统一聊天绘图路由
-            try:
-                response = session.post(url, json=payload, headers=headers, timeout=300)
-            except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
-                save_recovery_record(
-                    "all_edit",
-                    idempotency_key,
-                    "post_disconnected",
-                    endpoint="/v1/chat/completions",
-                    payload_hash=short_hash(payload),
-                    error=str(e),
-                )
-                raise RuntimeError(
-                    "上游可能已经接收并执行了修图请求，但本地等待响应时断开。"
-                    f"请用相同参数重跑以复用幂等键。 Idempotency-Key: {idempotency_key} | recovery: {recovery_path}"
-                )
+            response = self.post_chat_completion_with_retry(
+                session,
+                url,
+                payload,
+                headers,
+                idempotency_key,
+                recovery_path,
+            )
 
             if response.status_code != 200:
                 return (self.black_image(width, height), f"❌ 手术失败: {response.text}")
@@ -188,6 +190,61 @@ class TikpanGptImage2EditNode:
         except Exception as e:
             return (self.black_image(width, height), f"❌ 运行异常: {str(e)}")
 
+    def post_chat_completion_with_retry(self, session, url, payload, headers, idempotency_key, recovery_path):
+        payload_hash = short_hash(payload)
+        attempts = [600, 900, 1200]
+        last_error = None
+        for attempt_index, read_timeout in enumerate(attempts, start=1):
+            try:
+                response = session.post(url, json=payload, headers=headers, timeout=(15, read_timeout))
+                if attempt_index > 1:
+                    save_recovery_record(
+                        "all_edit",
+                        idempotency_key,
+                        "post_recovered_after_retry",
+                        endpoint="/v1/chat/completions",
+                        payload_hash=payload_hash,
+                        retry_attempt=attempt_index,
+                        read_timeout_seconds=read_timeout,
+                        request_snapshot=recovery_path.replace(".json", ".request.json"),
+                    )
+                return response
+            except requests.exceptions.ConnectTimeout as e:
+                last_error = e
+                save_recovery_record(
+                    "all_edit",
+                    idempotency_key,
+                    "connect_timeout",
+                    endpoint="/v1/chat/completions",
+                    payload_hash=payload_hash,
+                    retry_attempt=attempt_index,
+                    request_snapshot=recovery_path.replace(".json", ".request.json"),
+                    error=str(e),
+                )
+                break
+            except (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as e:
+                last_error = e
+                save_recovery_record(
+                    "all_edit",
+                    idempotency_key,
+                    "post_disconnected_retrying" if attempt_index < len(attempts) else "post_disconnected",
+                    endpoint="/v1/chat/completions",
+                    payload_hash=payload_hash,
+                    retry_attempt=attempt_index,
+                    read_timeout_seconds=read_timeout,
+                    request_snapshot=recovery_path.replace(".json", ".request.json"),
+                    error=str(e),
+                )
+                if attempt_index < len(attempts):
+                    continue
+        raise RuntimeError(
+            "上游可能已经接收并执行了修图请求，但本地多次等待响应时断开。"
+            f"已使用相同 Idempotency-Key 自动重试 {len(attempts)} 次。"
+            "请在中转站后台按 Idempotency-Key 或请求时间反查原始响应。"
+            f"Idempotency-Key: {idempotency_key} | recovery: {recovery_path} | "
+            f"request_snapshot: {recovery_path.replace('.json', '.request.json')} | last_error: {last_error}"
+        )
+
     def black_image(self, w, h):
         return torch.zeros((1, h, w, 3))
 
@@ -209,7 +266,13 @@ class TikpanGptImage2EditNode:
 
         def from_item(item):
             if isinstance(item, str):
-                return add(item)
+                found = add(item)
+                if found:
+                    return found
+                found = self.extract_markdown_image_url(item)
+                if found:
+                    return found
+                return ""
             if not isinstance(item, dict):
                 return ""
             for key in ("url", "image_url", "imageUrl", "b64_json", "image_base64", "base64", "image"):
@@ -222,6 +285,10 @@ class TikpanGptImage2EditNode:
                 if found:
                     return found
             content = item.get("content")
+            if isinstance(content, str):
+                found = from_item(content)
+                if found:
+                    return found
             if isinstance(content, list):
                 for part in content:
                     found = from_item(part)
@@ -262,6 +329,21 @@ class TikpanGptImage2EditNode:
                     return found
 
         return from_item(res_json)
+
+    def extract_markdown_image_url(self, text):
+        if not isinstance(text, str):
+            return ""
+        patterns = [
+            r"!\[[^\]]*\]\((https?://[^\s)]+)\)",
+            r"\[[^\]]*\]\((https?://[^\s)]+)\)",
+            r"(https?://[^\s)]+\.(?:png|jpg|jpeg|webp)(?:\?[^\s)]*)?)",
+            r"(https?://t\.filesystem\.site/[^\s)]+)",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                return match.group(1).strip().rstrip('.,;')
+        return ""
 
     def load_result_image(self, session, img_raw):
         img_raw = str(img_raw).strip()
