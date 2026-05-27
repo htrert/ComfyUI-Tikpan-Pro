@@ -1,5 +1,7 @@
 import math
 import base64
+import hashlib
+import json
 import re
 import traceback
 import time
@@ -74,11 +76,7 @@ class TikpanGptImage2OfficialEditV2:
                 "遮罩反相": ("BOOLEAN", {"default": False}),
                 "提示增强": ("BOOLEAN", {"default": True}),
                 "并发请求数": ("INT", {"default": 2, "min": 1, "max": 4, "step": 1}),
-                "恢复保存模式": (
-                    ["快速：只保存到ComfyUI输出", "安全：输出+Recovery双写", "关闭：只返回节点不额外保存"],
-                    {"default": "快速：只保存到ComfyUI输出"},
-                ),
-                "超时秒数": ("INT", {"default": 300, "min": 30, "max": 1800, "step": 10}),
+                "超时秒数": ("INT", {"default": 600, "min": 30, "max": 1800, "step": 10}),
             },
             "optional": {
                 "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
@@ -123,8 +121,7 @@ class TikpanGptImage2OfficialEditV2:
             invert_mask = bool(kwargs.get("遮罩反相", False))
             boost_prompt = bool(kwargs.get("提示增强", True))
             max_workers = max(1, min(int(kwargs.get("并发请求数", 2) or 2), max(1, min(n, 4))))
-            save_mode = str(kwargs.get("恢复保存模式") or "快速：只保存到ComfyUI输出")
-            timeout = int(kwargs.get("超时秒数", 300))
+            timeout = int(kwargs.get("超时秒数", 600))
 
             self.validate_image_tensor(main_img, "主图像")
             w, h, size_label = self.compute_size(main_img, res_tier, aspect, size_option)
@@ -190,7 +187,11 @@ class TikpanGptImage2OfficialEditV2:
                 "background": bg,
                 "moderation": moderation,
             }
-            files_hash = short_hash([total_bytes, len(files), has_mask])
+            content_hasher = hashlib.sha256()
+            for _field, (_name, blob, _mime) in files:
+                content_hasher.update(blob)
+                content_hasher.update(b"|")
+            files_hash = content_hasher.hexdigest()[:16]
             imgs = []
             saved_paths = []
             failed_items = []
@@ -202,6 +203,7 @@ class TikpanGptImage2OfficialEditV2:
             preprocess_elapsed = round(time.time() - start_time, 2)
             with requests.Session() as sess:
                 sess.trust_env = False
+                sess.proxies = {"http": None, "https": None}
 
                 get_retry = Retry(
                     total=2,
@@ -243,7 +245,7 @@ class TikpanGptImage2OfficialEditV2:
                     resj = self.post_edit_once(local_session, api_host, loop_headers, files, loop_data, timeout, idempotency_key, files_hash)
                     post_elapsed = round(time.time() - request_start, 2)
                     parse_start = time.time()
-                    parsed, paths, errors = self.parse_images(resj, local_session, idempotency_key, request_no, save_mode)
+                    parsed, paths, errors = self.parse_images(resj, local_session, idempotency_key, request_no)
                     parse_elapsed = round(time.time() - parse_start, 2)
                     timing = {
                         "request_index": request_no,
@@ -274,7 +276,7 @@ class TikpanGptImage2OfficialEditV2:
                                     "stage": "parse_or_download",
                                     "reason": error,
                                     "recoverable": "maybe",
-                                    "hint": "如果 recovery JSON 中有完整 URL/Base64，可运行 scripts/recover_gpt_image_2_outputs.py 恢复；旧版截断 JSON 无法恢复。",
+                                    "hint": "中转站已返回响应但本地解析或下载失败；recovery JSON 通常含完整 URL/Base64，可重跑节点或检查 recovery/gpt_image_2 目录。",
                                 })
                             save_recovery_record(
                                 "official_edit_v2",
@@ -292,7 +294,7 @@ class TikpanGptImage2OfficialEditV2:
                                 "stage": "request_or_upstream_response",
                                 "reason": str(e),
                                 "recoverable": "maybe",
-                                "hint": "如果中转站后台显示已生成/扣费，请用幂等 Key 或后台日志反查；如果 recovery JSON 有完整 URL/Base64，可运行恢复脚本。",
+                                "hint": "请求已送达中转站但未拿到结果；为避免重复扣费节点不会自动重发。请到中转站后台核实是否已扣费，并联系客服协助查询/补图。",
                             }
                             failed_items.append(failure)
                             report_paths = self.save_failure_report(failure)
@@ -328,7 +330,7 @@ class TikpanGptImage2OfficialEditV2:
                                         "stage": "parse_or_download",
                                         "reason": error,
                                         "recoverable": "maybe",
-                                        "hint": "如果 recovery JSON 中有完整 URL/Base64，可运行 scripts/recover_gpt_image_2_outputs.py 恢复；旧版截断 JSON 无法恢复。",
+                                        "hint": "中转站已返回响应但本地解析或下载失败；recovery JSON 通常含完整 URL/Base64，可重跑节点或检查 recovery/gpt_image_2 目录。",
                                     })
                                 save_recovery_record(
                                     "official_edit_v2",
@@ -346,7 +348,7 @@ class TikpanGptImage2OfficialEditV2:
                                     "stage": "request_or_upstream_response",
                                     "reason": str(e),
                                     "recoverable": "maybe",
-                                    "hint": "如果中转站后台显示已生成/扣费，请用幂等 Key 或后台日志反查；如果 recovery JSON 有完整 URL/Base64，可运行恢复脚本。",
+                                    "hint": "请求已送达中转站但未拿到结果；为避免重复扣费节点不会自动重发。请到中转站后台核实是否已扣费，并联系客服协助查询/补图。",
                                 }
                                 failed_items.append(failure)
                                 report_paths = self.save_failure_report(failure)
@@ -365,7 +367,7 @@ class TikpanGptImage2OfficialEditV2:
 
             if not imgs:
                 raise Exception(
-                    "❌ 未解析到有效结果图。若中转站已扣费，请到 recovery/gpt_image_2 查看恢复记录；"
+                    "❌ 未解析到有效结果图。若中转站已扣费，请联系中转站客服协助核实/补图；"
                     f"本次幂等键: {', '.join(recovery_keys)}；失败详情: {self.format_failures(failed_items[:6])}"
                 )
 
@@ -413,7 +415,7 @@ class TikpanGptImage2OfficialEditV2:
                 f"目标尺寸:{size_label} | "
                 f"上传总大小:{total_bytes / 1024 / 1024:.2f}MB | "
                 f"本地保存:{len(saved_paths)}个文件 | "
-                f"恢复目录:{recovery_dir} | "
+                f"调试日志目录:{recovery_dir} | "
                 f"预处理:等比例缩放+补边"
             )
             if saved_paths:
@@ -423,14 +425,13 @@ class TikpanGptImage2OfficialEditV2:
             if failed_items:
                 log += "\n\n⚠️ 失败原因与恢复建议:\n" + self.format_failures(failed_items[:20])
                 log += (
-                    "\n\n🔁 恢复尝试方法:\n"
-                    "1. 先打开上面的失败记录 JSON/TXT，看里面的 idempotency_key、stage、reason。\n"
-                    "2. 如果 recovery JSON 中有完整 URL 或 Base64，运行：D:\\ComfyUI-aki-v2\\python\\python.exe scripts\\recover_gpt_image_2_outputs.py\n"
-                    "3. 如果 reason 是 post_disconnected/read timeout，但中转站后台有成功日志，用 idempotency_key 在中转站后台反查原始结果；旧版被 truncated 的 JSON 无法直接还原图片。\n"
-                    "4. 下次同类大批量建议先把生成张数降到 2-3 或提高超时秒数，避免本地连接中断。"
+                    "\n\n🔁 处理说明:\n"
+                    "1. 只有 TCP 连不通（请求未发出）才会自动重试，避免重复扣费。\n"
+                    "2. 请求已送达中转站后的超时/异常不会自动重发——请先到中转站后台确认是否已扣费，再决定是否重跑。\n"
+                    "3. 如果是经常超时，建议：① 排查代理是否绕路（tikpan.com 是国内中转站，最好直连）；② 把节点上「超时秒数」调大；③ 联系中转站客服核实通道速度。"
                 )
             if recovery_keys:
-                log += "\n\n🧾 幂等恢复Key:\n" + "\n".join(recovery_keys)
+                log += "\n\n🧾 本次请求 Idempotency-Key（调试/客服反查用）:\n" + "\n".join(recovery_keys)
             return (batch, log)
 
         except Exception as e:
@@ -477,36 +478,57 @@ class TikpanGptImage2OfficialEditV2:
         return text
 
     def post_edit_once(self, sess, api_host, headers, files, data, timeout, idempotency_key, files_hash):
-        try:
-            resp = sess.post(
-                f"{api_host}/v1/images/edits",
-                headers=headers,
-                files=files,
-                data=data,
-                timeout=(15, timeout),
-                verify=False,
-            )
-        except requests.exceptions.ConnectTimeout:
-            raise Exception("连接上游超时：请检查本地网络环境，或稍后重试")
-        except requests.exceptions.ReadTimeout:
-            save_recovery_record(
-                "official_edit_v2",
-                idempotency_key,
-                "post_disconnected",
-                endpoint="/v1/images/edits",
-                payload_hash=short_hash(data),
-                files_hash=files_hash,
-                error=f"ReadTimeout after {timeout}s",
-            )
-            raise Exception(f"上游处理超时：超过 {timeout} 秒未返回结果，建议降低分辨率、减少参考图数量或稍后重试")
-        except requests.exceptions.ProxyError as e:
-            raise Exception(f"代理连接异常：{e}")
-        except requests.exceptions.SSLError as e:
-            raise Exception(f"TLS/SSL 握手异常：{e}")
-        except requests.exceptions.ConnectionError as e:
-            raise Exception(f"网络连接失败：{e}")
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"请求发送失败：{e}")
+        # 重试策略：只对 ConnectTimeout（请求未发出，0 扣费风险）做有限重试；
+        # ReadTimeout/ConnectionError/HTTP 5xx 等"请求已送达上游"的错误一律不重试，
+        # 避免在中转站未实现 Idempotency-Key 幂等缓存的情况下造成重复扣费。
+        max_connect_attempts = 3
+        connect_backoff = [3, 6]
+
+        for attempt_index in range(1, max_connect_attempts + 1):
+            try:
+                resp = sess.post(
+                    f"{api_host}/v1/images/edits",
+                    headers=headers,
+                    files=files,
+                    data=data,
+                    timeout=(15, timeout),
+                    verify=False,
+                    proxies={"http": None, "https": None},
+                )
+                break
+            except requests.exceptions.ConnectTimeout:
+                if attempt_index < max_connect_attempts:
+                    wait_s = connect_backoff[attempt_index - 1]
+                    print(
+                        f"[Tikpan GPT-Image-2 Edit V2] TCP 连接超时（第 {attempt_index}/{max_connect_attempts} 次，请求未发出，无扣费风险），{wait_s}s 后重连",
+                        flush=True,
+                    )
+                    time.sleep(wait_s)
+                    continue
+                raise Exception("连接上游超时：本地网络无法在 15 秒内与中转站建立 TCP 连接，请检查网络或代理设置")
+            except requests.exceptions.ReadTimeout:
+                save_recovery_record(
+                    "official_edit_v2",
+                    idempotency_key,
+                    "post_read_timeout",
+                    endpoint="/v1/images/edits",
+                    payload_hash=short_hash(data),
+                    files_hash=files_hash,
+                    error=f"ReadTimeout after {timeout}s",
+                )
+                raise Exception(
+                    f"上游响应等待超时：请求已送达中转站，但 {timeout} 秒内未收到结果。"
+                    f"为避免重复扣费，节点不会自动重发。建议先到中转站后台核实是否已扣费、能否补图，"
+                    f"或在节点上把「超时秒数」调大后再手动重跑。本次幂等键：{idempotency_key}"
+                )
+            except requests.exceptions.ProxyError as e:
+                raise Exception(f"代理连接异常：{e}（如开启了系统代理/TUN，请把 tikpan.com 加入直连规则）")
+            except requests.exceptions.SSLError as e:
+                raise Exception(f"TLS/SSL 握手异常：{e}")
+            except requests.exceptions.ConnectionError as e:
+                raise Exception(f"网络连接失败：{e}（请求可能已部分送达，为避免重复扣费不自动重试）")
+            except requests.exceptions.RequestException as e:
+                raise Exception(f"请求发送失败：{e}")
 
         if resp.status_code == 429:
             raise Exception("HTTP 429: 当前分组/通道限流或繁忙，请稍后再试，或切换更稳定的令牌分组")
@@ -693,6 +715,7 @@ class TikpanGptImage2OfficialEditV2:
     def create_download_session(self):
         session = requests.Session()
         session.trust_env = False
+        session.proxies = {"http": None, "https": None}
         get_retry = Retry(
             total=2,
             connect=2,
@@ -707,7 +730,7 @@ class TikpanGptImage2OfficialEditV2:
         session.mount("http://", adapter)
         return session
 
-    def parse_images(self, resj, sess, idempotency_key="", request_index=1, save_mode="safe_dual"):
+    def parse_images(self, resj, sess, idempotency_key="", request_index=1):
         out = []
         saved_paths = []
         errors = []
@@ -726,7 +749,7 @@ class TikpanGptImage2OfficialEditV2:
                     image_bytes = base64.b64decode(b64_clean)
                     img = Image.open(BytesIO(image_bytes)).convert("RGB")
                     out.append(img)
-                    saved_paths.extend(self.save_result_image(img, idempotency_key, request_index, item_index, source="base64", save_mode=save_mode))
+                    saved_paths.extend(self.save_result_image(img, idempotency_key, request_index, item_index, source="base64"))
                 except Exception as e:
                     msg = f"Base64 图片解析失败: {e}"
                     errors.append(msg)
@@ -736,38 +759,27 @@ class TikpanGptImage2OfficialEditV2:
                     resp = get_with_retry(sess, url, timeout=(5, 90), verify=False, attempts=4)
                     img = Image.open(BytesIO(resp.content)).convert("RGB")
                     out.append(img)
-                    saved_paths.extend(self.save_result_image(img, idempotency_key, request_index, item_index, source="url", source_url=url, save_mode=save_mode))
+                    saved_paths.extend(self.save_result_image(img, idempotency_key, request_index, item_index, source="url", source_url=url))
                 except Exception as e:
                     msg = f"URL 图片下载失败 ({url}): {e}"
                     errors.append(msg)
                     print(msg, flush=True)
         return out, saved_paths, errors
 
-    def save_result_image(self, img, idempotency_key, request_index, item_index, source="", source_url="", save_mode="safe_dual"):
+    def save_result_image(self, img, idempotency_key, request_index, item_index, source="", source_url=""):
         safe_key = str(idempotency_key or f"request-{request_index}").replace(":", "_").replace("/", "_")
         stamp = time.strftime("%Y%m%d-%H%M%S")
         filename = f"tikpan_gpt_image_2_edit_v2_{stamp}_{request_index:02d}_{item_index:02d}_{safe_key[-8:]}.png"
         paths = []
 
-        if "??" not in str(save_mode):
-            try:
-                output_dir = Path(folder_paths.get_output_directory())
-                output_dir.mkdir(parents=True, exist_ok=True)
-                output_path = output_dir / filename
-                img.save(output_path, "PNG")
-                paths.append(str(output_path))
-            except Exception as e:
-                print(f"ComfyUI output save failed: {e}", flush=True)
-
-        if "??" in str(save_mode) or str(save_mode) == "safe_dual":
-            try:
-                recovery_dir = Path(__file__).resolve().parents[1] / "recovery" / "gpt_image_2" / "images"
-                recovery_dir.mkdir(parents=True, exist_ok=True)
-                recovery_path = recovery_dir / filename
-                img.save(recovery_path, "PNG")
-                paths.append(str(recovery_path))
-            except Exception as e:
-                print(f"Recovery image save failed: {e}", flush=True)
+        try:
+            output_dir = Path(folder_paths.get_output_directory())
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_path = output_dir / filename
+            img.save(output_path, "PNG")
+            paths.append(str(output_path))
+        except Exception as e:
+            print(f"ComfyUI output save failed: {e}", flush=True)
 
         save_recovery_record(
             "official_edit_v2",
@@ -794,7 +806,6 @@ class TikpanGptImage2OfficialEditV2:
         payload = {
             "time": time.strftime("%Y-%m-%d %H:%M:%S"),
             **failure,
-            "recovery_script": r"D:\ComfyUI-aki-v2\python\python.exe scripts\recover_gpt_image_2_outputs.py",
             "recovery_dir": str(Path(__file__).resolve().parents[1] / "recovery" / "gpt_image_2"),
         }
         json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -804,10 +815,8 @@ class TikpanGptImage2OfficialEditV2:
             f"批次: {failure.get('request_index')}\n"
             f"幂等Key: {idempotency_key}\n"
             f"阶段: {failure.get('stage')}\n"
-            f"是否可恢复: {failure.get('recoverable')}\n"
             f"失败原因: {failure.get('reason')}\n"
-            f"恢复建议: {failure.get('hint')}\n"
-            f"恢复脚本: {payload['recovery_script']}\n",
+            f"处理建议: {failure.get('hint')}\n",
             encoding="utf-8",
         )
         return [str(json_path), str(txt_path)]
