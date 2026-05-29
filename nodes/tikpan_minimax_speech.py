@@ -155,37 +155,38 @@ class TikpanMiniMaxSpeech28BaseNode:
                 "获取密钥请访问": (
                     ["👉 https://tikpan.com (官方授权 Key 获取入口)"],
                 ),
-                "API_密钥": ("STRING", {"default": "sk-"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "合成文本": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": f"欢迎使用 Tikpan {cls.MODEL_NAME}。你可以在文本中加入 <#0.5#> 控制停顿，也可以使用 (laughs) 或 (sighs) 这类音效标签。",
+                        "tooltip": "需要被合成为语音的文本；支持 <#秒数#> 停顿、(laughs) 音效标签",
                     },
                 ),
-                "模型": ([cls.MODEL_NAME], {"default": cls.MODEL_NAME}),
+                "模型": ([cls.MODEL_NAME], {"default": cls.MODEL_NAME, "tooltip": "本节点使用的语音合成模型"}),
                 "调用方式": (
                     ["同步语音 /t2a_v2", "异步语音 /t2a_async_v2"],
-                    {"default": "同步语音 /t2a_v2"},
+                    {"default": "同步语音 /t2a_v2", "tooltip": "同步=直接等待返回；异步=适合长文本，配合任务查询节点"},
                 ),
-                "音色": (MINIMAX_VOICE_OPTIONS, {"default": minimax_voice_label(MINIMAX_SYSTEM_VOICES[0])}),
-                "语言增强": (languages, {"default": "auto"}),
-                "语速": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.05}),
-                "音量": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.1}),
-                "音调": ("INT", {"default": 0, "min": -12, "max": 12}),
+                "音色": (MINIMAX_VOICE_OPTIONS, {"default": minimax_voice_label(MINIMAX_SYSTEM_VOICES[0]), "tooltip": "选择说话人音色：每个音色对应不同的性别/年龄/风格"}),
+                "语言增强": (languages, {"default": "auto", "tooltip": "强化某种语言的发音；auto=自动识别"}),
+                "语速": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.05, "tooltip": "语速倍率：1.0 标准，>1 更快，<1 更慢"}),
+                "音量": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.1, "tooltip": "音量倍率：1.0 标准；过高可能爆音"}),
+                "音调": ("INT", {"default": 0, "min": -12, "max": 12, "tooltip": "调高半音：正数变尖，负数变沉"}),
                 "情绪": (
                     ["默认不传", "happy", "sad", "angry", "fearful", "disgusted", "surprised", "neutral"],
-                    {"default": "默认不传"},
+                    {"default": "默认不传", "tooltip": "情绪标签：happy 欢快 / sad 悲伤 / angry 愤怒 等"},
                 ),
-                "采样率": (["32000", "44100", "24000", "22050", "16000", "8000"], {"default": "32000"}),
-                "比特率": (["128000", "256000", "64000", "32000"], {"default": "128000"}),
-                "音频格式": (["mp3", "wav", "flac"], {"default": "mp3"}),
-                "声道数": (["1", "2"], {"default": "1"}),
-                "POST重试策略": (["幂等键轻重试", "保守不重试POST"], {"default": "幂等键轻重试"}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
+                "采样率": (["32000", "44100", "24000", "22050", "16000", "8000"], {"default": "32000", "tooltip": "输出音频采样率（Hz）；越高越清晰但文件越大"}),
+                "比特率": (["128000", "256000", "64000", "32000"], {"default": "128000", "tooltip": "音频比特率；越高音质越好文件越大"}),
+                "音频格式": (["mp3", "wav", "flac"], {"default": "mp3", "tooltip": "音频编码：mp3 通用，wav 无损未压缩，flac 无损压缩"}),
+                "声道数": (["1", "2"], {"default": "1", "tooltip": "1=单声道（更小），2=立体声"}),
+                "POST重试策略": (["幂等键轻重试", "保守不重试POST"], {"default": "幂等键轻重试", "tooltip": "网络异常重试方式；带幂等键更安全"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
                 "自定义voice_id": (
                     "STRING",
                     {
@@ -193,7 +194,7 @@ class TikpanMiniMaxSpeech28BaseNode:
                         "tooltip": "选择“自定义 voice_id”时填写；也兼容复刻音色、音色设计和官方新上线 voice_id。",
                     },
                 ),
-                "同步返回格式": (["hex", "url"], {"default": "hex"}),
+                "同步返回格式": (["hex", "url"], {"default": "hex", "tooltip": "同步模式返回音频的方式：hex 内联十六进制；url 云端链接"}),
                 "发音字典_tone_每行一条": (
                     "STRING",
                     {
@@ -217,13 +218,13 @@ class TikpanMiniMaxSpeech28BaseNode:
                         "tooltip": "示例：spacious_echo。留空则不传 sound_effects。",
                     },
                 ),
-                "音色修饰_pitch": ("INT", {"default": 0, "min": -100, "max": 100}),
-                "音色修饰_intensity": ("INT", {"default": 0, "min": -100, "max": 100}),
-                "音色修饰_timbre": ("INT", {"default": 0, "min": -100, "max": 100}),
-                "开启字幕": ("BOOLEAN", {"default": False}),
-                "字幕类型": (["sentence", "word"], {"default": "sentence"}),
-                "最长等待秒数": ("INT", {"default": 900, "min": 30, "max": 7200}),
-                "轮询间隔秒数": ("INT", {"default": 5, "min": 3, "max": 60}),
+                "音色修饰_pitch": ("INT", {"default": 0, "min": -100, "max": 100, "tooltip": "音高微调：正数变尖，负数变沉"}),
+                "音色修饰_intensity": ("INT", {"default": 0, "min": -100, "max": 100, "tooltip": "情感强度微调"}),
+                "音色修饰_timbre": ("INT", {"default": 0, "min": -100, "max": 100, "tooltip": "音色质感微调"}),
+                "开启字幕": ("BOOLEAN", {"default": False, "tooltip": "开启后会同时返回字幕时间轴"}),
+                "字幕类型": (["sentence", "word"], {"default": "sentence", "tooltip": "字幕粒度：sentence 按句；word 按词"}),
+                "最长等待秒数": ("INT", {"default": 900, "min": 30, "max": 7200, "tooltip": "异步任务等待上限秒数"}),
+                "轮询间隔秒数": ("INT", {"default": 5, "min": 3, "max": 60, "tooltip": "异步任务轮询间隔秒数"}),
                 "复用本地缓存": (
                     "BOOLEAN",
                     {
@@ -827,6 +828,7 @@ class TikpanMiniMaxSpeech28HDNode(TikpanMiniMaxSpeech28BaseNode):
     USER_AGENT_SUFFIX = "Speech-2.8-HD"
     CACHE_PREFIX = "tikpan-speech-2-8-hd"
     DISPLAY_NAME = "🎙️ Tikpan: speech-2.8-hd 高清语音合成"
+    DESCRIPTION = "📝 MiniMax speech-2.8-hd 高清语音合成：丰富音色库 + 20 种语言增强，支持情感/语速/音调/字幕/音色混合。适合商业广告、纪录片旁白。"
 
 
 class TikpanMiniMaxSpeech28TurboNode(TikpanMiniMaxSpeech28BaseNode):
@@ -838,6 +840,7 @@ class TikpanMiniMaxSpeech28TurboNode(TikpanMiniMaxSpeech28BaseNode):
     USER_AGENT_SUFFIX = "Speech-2.8-Turbo"
     CACHE_PREFIX = "tikpan-speech-2-8-turbo"
     DISPLAY_NAME = "🎙️ Tikpan: speech-2.8-turbo 极速语音合成"
+    DESCRIPTION = "📝 MiniMax speech-2.8-turbo 极速语音：HD 同款功能但响应更快、更便宜。适合短视频口播、批量配音、实时预览。"
 
 
 NODE_CLASS_MAPPINGS = {

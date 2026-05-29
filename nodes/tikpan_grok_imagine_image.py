@@ -39,23 +39,24 @@ class _TikpanGrokImagineBase:
                 "💰_福利_💰": (["🔥 0.6元RMB兑1美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
                 "节点说明": ([f"{cls.MODEL_NAME} | /v1/images/generations | 文生图 | 官方参数: n / aspect_ratio / resolution / response_format | {cls.PRICE_TEXT}"],),
-                "API_密钥": ("STRING", {"default": "sk-"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "生成指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "A cinematic product poster with precise details, realistic lighting, high-end commercial photography.",
+                        "tooltip": "描述你想生成的画面，越具体越准确，推荐英文",
                     },
                 ),
-                "模型": ([cls.MODEL_ID], {"default": cls.MODEL_ID}),
-                "生成张数": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1}),
-                "画面比例": (ASPECT_RATIO_OPTIONS, {"default": "auto"}),
-                "清晰度": (RESOLUTION_OPTIONS, {"default": "auto"}),
+                "模型": ([cls.MODEL_ID], {"default": cls.MODEL_ID, "tooltip": "本节点使用的 Grok Imagine 模型"}),
+                "生成张数": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1, "tooltip": "一次生成几张结果；张数越多越慢越贵"}),
+                "画面比例": (ASPECT_RATIO_OPTIONS, {"default": "auto", "tooltip": "画面比例：auto 让模型决定；常用 1:1 通用、16:9 横屏、9:16 竖屏"}),
+                "清晰度": (RESOLUTION_OPTIONS, {"default": "auto", "tooltip": "分辨率档位：1k 省钱快出；2k 更精细但更慢更贵"}),
             },
             "optional": {
-                "兼容尺寸": (SIZE_OPTIONS, {"default": "Auto"}),
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "返回方式": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0]}),
+                "兼容尺寸": (SIZE_OPTIONS, {"default": "Auto", "tooltip": "兼容老工作流的尺寸字段；Auto 由上面的比例+清晰度决定"}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "返回方式": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0], "tooltip": "url=返回云端链接（推荐）；b64_json=直接返回 Base64 数据"}),
                 "跳过错误": (
                     "BOOLEAN",
                     {
@@ -410,12 +411,14 @@ class TikpanGrokImagineImageNode(_TikpanGrokImagineBase):
     MODEL_ID = "grok-imagine-image"
     MODEL_NAME = "Grok Imagine Image"
     PRICE_TEXT = "0.208 RMB per image"
+    DESCRIPTION = "📝 Grok Imagine 标准版生图：xAI 的图像生成模型，性价比高，支持 1k/2k 分辨率、多种比例。适合社媒图、内容配图、批量出图。"
 
 
 class TikpanGrokImagineImageProNode(_TikpanGrokImagineBase):
     MODEL_ID = "grok-imagine-image-pro"
     MODEL_NAME = "Grok Imagine Image Pro"
     PRICE_TEXT = "0.728 RMB per image"
+    DESCRIPTION = "📝 Grok Imagine Pro 版生图：Pro 级画质，细节更丰富、光影更真实，更贵但效果更佳。适合商业海报、产品大图。"
 
 
 class _TikpanGrokImagineEditBase(_TikpanGrokImagineBase):
@@ -426,26 +429,27 @@ class _TikpanGrokImagineEditBase(_TikpanGrokImagineBase):
                 "💰_福利_💰": (["🔥 0.6元RMB兑1美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
                 "节点说明": ([f"{cls.MODEL_NAME} | /v1/images/edits | 参考图/修图 | 官方最多3张参考图 | {cls.PRICE_TEXT}"],),
-                "API_密钥": ("STRING", {"default": "sk-"}),
-                "参考图1": ("IMAGE",),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "参考图1": ("IMAGE", {"tooltip": "必填的主参考图，模型会基于这张图修图/重绘"}),
                 "编辑指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "Keep the main subject consistent, improve the composition, lighting, details, and commercial product quality.",
+                        "tooltip": "告诉 AI 怎么改图，例如『换成海边背景，保持人物姿势不变』，推荐英文",
                     },
                 ),
-                "模型": ([cls.MODEL_ID], {"default": cls.MODEL_ID}),
-                "生成张数": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1}),
-                "画面比例": (ASPECT_RATIO_OPTIONS, {"default": "auto"}),
-                "清晰度": (RESOLUTION_OPTIONS, {"default": "auto"}),
+                "模型": ([cls.MODEL_ID], {"default": cls.MODEL_ID, "tooltip": "本节点使用的 Grok Imagine 修图模型"}),
+                "生成张数": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1, "tooltip": "一次生成几张结果；张数越多越慢越贵"}),
+                "画面比例": (ASPECT_RATIO_OPTIONS, {"default": "auto", "tooltip": "画面比例：auto 跟随参考图；常用 1:1、16:9、9:16"}),
+                "清晰度": (RESOLUTION_OPTIONS, {"default": "auto", "tooltip": "分辨率档位：1k 省钱快出；2k 更精细但更慢更贵"}),
             },
             "optional": {
-                "参考图2": ("IMAGE",),
-                "参考图3": ("IMAGE",),
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "返回方式": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0]}),
-                "跳过错误": ("BOOLEAN", {"default": False}),
+                "参考图2": ("IMAGE", {"tooltip": "可选第 2 张参考图（最多 3 张）"}),
+                "参考图3": ("IMAGE", {"tooltip": "可选第 3 张参考图"}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "返回方式": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0], "tooltip": "url=返回云端链接（推荐）；b64_json=直接返回 Base64 数据"}),
+                "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回黑图，不打断后续工作流"}),
             },
         }
 
@@ -605,9 +609,11 @@ class TikpanGrokImagineImageEditNode(_TikpanGrokImagineEditBase):
     MODEL_ID = "grok-imagine-image"
     MODEL_NAME = "Grok Imagine Image Edit"
     PRICE_TEXT = "0.208 RMB per image"
+    DESCRIPTION = "📝 Grok Imagine 参考图/修图：基于 1-3 张参考图按指令重绘，性价比版。适合修图、风格迁移、产品融入。"
 
 
 class TikpanGrokImagineImageProEditNode(_TikpanGrokImagineEditBase):
     MODEL_ID = "grok-imagine-image-pro"
     MODEL_NAME = "Grok Imagine Image Pro Edit"
     PRICE_TEXT = "0.728 RMB per image"
+    DESCRIPTION = "📝 Grok Imagine Pro 参考图/修图：Pro 级修图，细节保持更好、融合更自然。适合商业修图、人像换装、品牌素材二创。"

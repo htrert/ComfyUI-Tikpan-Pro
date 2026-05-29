@@ -45,16 +45,16 @@ class TikpanGeminiVideoAnalystNode:
         return {
             "required": {
                 "获取密钥地址": (["👉 https://tikpan.com (官方授权Key获取点)"], ),
-                "API_密钥": ("STRING", {"default": "sk-"}),
-                "视频流_IMAGE": ("IMAGE",),
-                "视频帧率FPS": ("INT", {"default": 24, "min": 8, "max": 60, "tooltip": "用于计算视频真实物理时长"}),
-                "分析模型": (["gemini-3.1-flash", "gemini-3.1-pro", "gpt-5.4-mini", "gpt-4o"], {"default": "gemini-3.1-flash"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "视频流_IMAGE": ("IMAGE", {"tooltip": "接入 LoadVideo 等节点输出的视频帧序列"}),
+                "视频帧率FPS": ("INT", {"default": 24, "min": 8, "max": 60, "tooltip": "源视频的真实帧率，用于换算视频时长"}),
+                "分析模型": (["gemini-3.1-flash", "gemini-3.1-pro", "gpt-5.4-mini", "gpt-4o"], {"default": "gemini-3.1-flash", "tooltip": "选择负责分析的多模态模型：flash 快、pro 精细、gpt 更擅长文字"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "音频流_AUDIO": ("AUDIO",),
-                "重点分析要求": ("STRING", {"multiline": True, "default": "请重点关注物理规律、光影变化和人物微表情。"}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "音频流_AUDIO": ("AUDIO", {"tooltip": "可选音轨：让 AI 同步理解对白/音乐/音效"}),
+                "重点分析要求": ("STRING", {"multiline": True, "default": "请重点关注物理规律、光影变化和人物微表情。", "tooltip": "告诉 AI 你最在意的分析维度，例如运镜/光影/情绪/带货卖点"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             }
         }
 
@@ -62,6 +62,7 @@ class TikpanGeminiVideoAnalystNode:
     RETURN_NAMES = ("📄_专业分镜与脚本报告",)
     FUNCTION = "analyze_video"
     CATEGORY = '👑 Tikpan 官方独家节点/05 提示词与分析 Prompt & Analysis'
+    DESCRIPTION = "📝 AI 音视频双轨解析：自动抽帧 + 8MB 智能熔断 + 音频同步解析，生成好莱坞级分镜报告（机位/动作/光影/场景）。配合 Grok 重构节点可一键改片。"
 
     def analyze_video(
         self,

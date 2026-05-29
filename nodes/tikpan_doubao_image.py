@@ -79,21 +79,22 @@ class TikpanDoubaoImageNode:
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1虚拟美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "API_密钥": ("STRING", {"default": ""}),
+                "API_密钥": ("STRING", {"default": "", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "生成指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "一张极致高清的赛博朋克风格产品展示图，霓虹灯光效果，细腻质感",
+                        "tooltip": "描述你想生成的画面，越具体越准确，支持中英文",
                     },
                 ),
                 "尺寸模式": (
                     ["品质档位", "按比例输出精确尺寸"],
-                    {"default": "品质档位"},
+                    {"default": "品质档位", "tooltip": "品质档位=按 2K/3K 自动算；按比例=严格按选定比例输出像素"},
                 ),
                 "清晰度档位": (
                     ["2K", "3K"],
-                    {"default": "2K"},
+                    {"default": "2K", "tooltip": "分辨率档位：3K 更清晰但更慢更贵"},
                 ),
                 "画面比例": (
                     [
@@ -106,39 +107,39 @@ class TikpanDoubaoImageNode:
                         "2:3 海报竖版",
                         "21:9 超宽屏",
                     ],
-                    {"default": "1:1 正方形"},
+                    {"default": "1:1 正方形", "tooltip": "画面比例：1:1 通用，16:9 横屏，9:16 竖屏短视频"},
                 ),
                 "图片格式": (
                     IMAGE_FORMAT_OPTIONS[:2],
-                    {"default": "JPEG｜jpeg"},
+                    {"default": "JPEG｜jpeg", "tooltip": "图像编码：PNG 无损画质好，JPEG 体积小"},
                 ),
                 "返回方式": (
                     RESPONSE_FORMAT_OPTIONS,
-                    {"default": "云端链接｜url"},
+                    {"default": "云端链接｜url", "tooltip": "url=返回云端链接（推荐）；b64_json=直接返回 Base64"},
                 ),
                 "水印": (
                     WATERMARK_OPTIONS,
-                    {"default": "无水印"},
+                    {"default": "无水印", "tooltip": "是否在图片右下角加豆包官方水印"},
                 ),
                 "联网搜索增强": (
                     ON_OFF_AUTO_OPTIONS,
-                    {"default": "关闭"},
+                    {"default": "关闭", "tooltip": "开启后允许模型联网检索素材作为参考"},
                 ),
                 "多图生成": (
                     ON_OFF_AUTO_OPTIONS,
-                    {"default": "关闭"},
+                    {"default": "关闭", "tooltip": "开启后一次返回多张候选图；关闭=每次仅一张"},
                 ),
                 "最多生成张数": (
                     "INT",
-                    {"default": 4, "min": 1, "max": 15},
+                    {"default": 4, "min": 1, "max": 15, "tooltip": "多图生成时最多返回几张；越多越慢越贵"},
                 ),
                 "多图失败处理": (
                     ["严格报错", "自动降级为首图"],
-                    {"default": "严格报错"},
+                    {"default": "严格报错", "tooltip": "多图模式部分失败时的策略：严格=直接报错；自动降级=取首图返回"},
                 ),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
                 "参考图": ("IMAGE", {"tooltip": "参考图，支持单张或多张（Batch 最多14张）"}),
                 "图片URL或Base64": (
                     "STRING",
@@ -153,6 +154,7 @@ class TikpanDoubaoImageNode:
                     {
                         "multiline": True,
                         "default": "",
+                        "tooltip": "告诉模型不要出现什么，例如：blurry, low quality, watermark",
                     },
                 ),
             },
@@ -162,6 +164,7 @@ class TikpanDoubaoImageNode:
     RETURN_NAMES = ("🖼️_生成图像Batch", "📄_渲染日志")
     FUNCTION = "generate_image"
     CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    DESCRIPTION = "📝 豆包 Seedream 图像生成：火山引擎旗舰生图模型，支持 2K/3K、8 种比例、多图生成、联网搜索增强。中文理解强，适合本土化创意。"
 
     def looks_like_base64(self, s):
         if not s:

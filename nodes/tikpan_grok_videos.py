@@ -41,25 +41,26 @@ class TikpanGrokVideoNode:
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "API_密钥": ("STRING", {"default": "sk-"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "生成指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "一段极具视觉冲击力的赛博朋克城市夜景，霓虹灯闪烁，飞行汽车穿梭...",
+                        "tooltip": "描述你想生成的视频画面/动作/氛围，越具体越准确",
                     },
                 ),
-                "模型": (["grok-videos"], {"default": "grok-videos"}),
-                "视频时长": (GROK_DURATION_OPTIONS, {"default": "6秒｜6s"}),
-                "画面比例": (GROK_ASPECT_OPTIONS, {"default": "16:9 横屏｜16:9"}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+                "模型": (["grok-videos"], {"default": "grok-videos", "tooltip": "本节点使用的 Grok-Videos 视频模型"}),
+                "视频时长": (GROK_DURATION_OPTIONS, {"default": "6秒｜6s", "tooltip": "生成视频的秒数；越长越慢越贵"}),
+                "画面比例": (GROK_ASPECT_OPTIONS, {"default": "16:9 横屏｜16:9", "tooltip": "视频比例：16:9 横屏，9:16 竖屏短视频，1:1 方屏"}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "参考图1": ("IMAGE",),
-                "参考图2": ("IMAGE",),
-                "参考图3": ("IMAGE",),
-                "参考图4": ("IMAGE",),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "参考图1": ("IMAGE", {"tooltip": "可选参考图 1：图生视频时作为首帧/视觉参考"}),
+                "参考图2": ("IMAGE", {"tooltip": "可选参考图 2"}),
+                "参考图3": ("IMAGE", {"tooltip": "可选参考图 3"}),
+                "参考图4": ("IMAGE", {"tooltip": "可选参考图 4"}),
             },
         }
 
@@ -68,6 +69,7 @@ class TikpanGrokVideoNode:
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
     CATEGORY = '👑 Tikpan 官方独家节点/02 视频 Video'
+    DESCRIPTION = "📝 Grok-Videos 视频生成：xAI 的多模式视频模型，6 秒/10 秒，支持纯文生视频或最多 4 张参考图图生视频。适合内容创作和广告短片。"
 
     def normalize_size(self, aspect_ratio):
         s = str(aspect_ratio or "").strip()

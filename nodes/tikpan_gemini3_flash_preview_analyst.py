@@ -55,8 +55,8 @@ class TikpanGemini3FlashPreviewAnalystNode:
                 "获取密钥地址": (
                     ["👉 https://tikpan.com 获取 Tikpan API Key"],
                 ),
-                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-")}),
-                "模型": (MODEL_OPTIONS, {"default": MODEL_NAME}),
+                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-"), "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "模型": (MODEL_OPTIONS, {"default": MODEL_NAME, "tooltip": "选择对应版本的 Gemini 图像/视频理解模型"}),
                 "分析任务": (
                     [
                         "通用分析",
@@ -67,47 +67,48 @@ class TikpanGemini3FlashPreviewAnalystNode:
                         "安全与合规检查",
                         "自定义",
                     ],
-                    {"default": "通用分析"},
+                    {"default": "通用分析", "tooltip": "预设场景，会自动加载对应的分析模板"},
                 ),
                 "分析要求": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "请分析画面主体、场景、动作、镜头、光线、色彩、文字信息、潜在问题，并给出可复用的生成提示词。",
+                        "tooltip": "具体想让 AI 关注/输出的内容，可在预设模板基础上微调",
                     },
                 ),
                 "输出格式": (
                     ["中文报告", "Markdown结构化", "JSON结构化", "提示词优化"],
-                    {"default": "Markdown结构化"},
+                    {"default": "Markdown结构化", "tooltip": "回答形式：报告/Markdown/JSON/直接产出提示词"},
                 ),
-                "最大输出Token": ("INT", {"default": 4096, "min": 256, "max": 32768, "step": 256}),
-                "创意温度": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 2.0, "step": 0.05}),
+                "最大输出Token": ("INT", {"default": 4096, "min": 256, "max": 32768, "step": 256, "tooltip": "回答最长字数上限（约 1 token≈0.7 个汉字）"}),
+                "创意温度": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "0=最稳，1=均衡，>1=更发散；事实分析建议低"}),
                 "媒体解析度": (
                     ["默认", "低清省费用｜low", "均衡｜medium", "高清细节｜high"],
-                    {"default": "默认"},
+                    {"default": "默认", "tooltip": "上传图像/视频帧的清晰度：越高越精细但 token 消耗越大"},
                 ),
                 "抽帧策略": (
                     ["均匀覆盖", "按秒抽帧", "首尾加密", "运动变化优先", "混合智能"],
-                    {"default": "混合智能"},
+                    {"default": "混合智能", "tooltip": "视频抽帧的算法：混合智能=综合最佳；运动变化优先适合动作分析"},
                 ),
-                "视频帧率FPS": ("INT", {"default": 24, "min": 1, "max": 120, "step": 1}),
-                "最大抽帧数": ("INT", {"default": 24, "min": 1, "max": MAX_FRAME_PARTS, "step": 1}),
+                "视频帧率FPS": ("INT", {"default": 24, "min": 1, "max": 120, "step": 1, "tooltip": "源视频的帧率（影响抽帧时长换算）"}),
+                "最大抽帧数": ("INT", {"default": 24, "min": 1, "max": MAX_FRAME_PARTS, "step": 1, "tooltip": "最多抽几帧用于分析；越多越准但更贵"}),
                 "视频输入策略": (
                     ["自动优先抽帧", "只用抽帧", "只用视频原件", "抽帧+视频原件(高成本)"],
-                    {"default": "自动优先抽帧"},
+                    {"default": "自动优先抽帧", "tooltip": "怎么把视频喂给模型：抽帧便宜；视频原件适合长视频但贵"},
                 ),
-                "URL错误处理": (["严格报错", "跳过坏链接并写日志"], {"default": "严格报错"}),
-                "POST重试策略": (["幂等键轻重试", "保守不重试POST"], {"default": "幂等键轻重试"}),
-                "复用本地缓存": ("BOOLEAN", {"default": True}),
-                "跳过错误": ("BOOLEAN", {"default": False}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
+                "URL错误处理": (["严格报错", "跳过坏链接并写日志"], {"default": "严格报错", "tooltip": "URL 拉取失败时的策略"}),
+                "POST重试策略": (["幂等键轻重试", "保守不重试POST"], {"default": "幂等键轻重试", "tooltip": "网络异常重试方式；带幂等键更安全"}),
+                "复用本地缓存": ("BOOLEAN", {"default": True, "tooltip": "开启后同一文件复用本地缓存，省带宽和时间"}),
+                "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回空，不打断后续工作流"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "图片1": ("IMAGE",),
-                "图片2": ("IMAGE",),
-                "图片3": ("IMAGE",),
-                "图片4": ("IMAGE",),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "图片1": ("IMAGE", {"tooltip": "可选输入图 1（最多 12 张图片）"}),
+                "图片2": ("IMAGE", {"tooltip": "可选输入图 2"}),
+                "图片3": ("IMAGE", {"tooltip": "可选输入图 3"}),
+                "图片4": ("IMAGE", {"tooltip": "可选输入图 4"}),
                 "图片URL列表": (
                     "STRING",
                     {
@@ -147,6 +148,7 @@ class TikpanGemini3FlashPreviewAnalystNode:
     OUTPUT_NODE = True
     FUNCTION = "analyze_media"
     CATEGORY = '👑 Tikpan 官方独家节点/04 文字与多模态 Text & Multimodal'
+    DESCRIPTION = "📝 Gemini 3 Flash 图片/视频分析：专业级图像和视频理解节点，支持视频抽帧（多种策略）、商品/广告诊断、提示词反推、合规检查。"
 
     def make_return(self, report="", prompt="", structured="", usage="", log=""):
         return (str(report or ""), str(prompt or ""), str(structured or ""), str(usage or ""), str(log or ""))

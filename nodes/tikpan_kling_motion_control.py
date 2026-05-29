@@ -48,8 +48,8 @@ class TikpanKlingMotionControlNode:
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "API_密钥": ("STRING", {"default": "sk-"}),
-                "角色图像": ("IMAGE",),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "角色图像": ("IMAGE", {"tooltip": "目标角色的静态图像，模型会让这个角色做参考视频里的动作"}),
                 "动作参考视频URL": (
                     "STRING",
                     {
@@ -62,11 +62,12 @@ class TikpanKlingMotionControlNode:
                     {
                         "multiline": True,
                         "default": "保持角色身份一致，将参考视频中的动作精准迁移到角色图像，生成自然流畅的全身动作视频。",
+                        "tooltip": "对动作迁移效果的补充描述，例如『保持人物表情自然』",
                     },
                 ),
-                "模型版本与模式": (KLING_MOTION_MODEL_OPTIONS, {"default": KLING_MOTION_MODEL_OPTIONS[0]}),
-                "视频时长": (KLING_MOTION_DURATION_OPTIONS, {"default": KLING_MOTION_DURATION_OPTIONS[0]}),
-                "画面比例": (KLING_MOTION_ASPECT_OPTIONS, {"default": KLING_MOTION_ASPECT_OPTIONS[0]}),
+                "模型版本与模式": (KLING_MOTION_MODEL_OPTIONS, {"default": KLING_MOTION_MODEL_OPTIONS[0], "tooltip": "选择 Kling 版本和质量模式：std 标准 720P；pro 高质 1080P"}),
+                "视频时长": (KLING_MOTION_DURATION_OPTIONS, {"default": KLING_MOTION_DURATION_OPTIONS[0], "tooltip": "生成视频秒数；auto=跟随参考视频时长"}),
+                "画面比例": (KLING_MOTION_ASPECT_OPTIONS, {"default": KLING_MOTION_ASPECT_OPTIONS[0], "tooltip": "视频比例：auto 跟随参考；常用 16:9 横屏、9:16 竖屏"}),
             },
             "optional": {
                 "本地动作视频路径": (
@@ -76,11 +77,11 @@ class TikpanKlingMotionControlNode:
                         "tooltip": "填写本地 mp4/mov/webm 路径后，节点会先上传到 Tikpan，再提交动作控制任务。",
                     },
                 ),
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "最长等待秒数": ("INT", {"default": 900, "min": 60, "max": 3600, "step": 30}),
-                "查询间隔秒数": ("INT", {"default": 8, "min": 5, "max": 60, "step": 1}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": False}),
-                "跳过错误": ("BOOLEAN", {"default": False}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "最长等待秒数": ("INT", {"default": 900, "min": 60, "max": 3600, "step": 30, "tooltip": "等待视频生成完成的最长秒数；长视频/pro 模式建议加大"}),
+                "查询间隔秒数": ("INT", {"default": 8, "min": 5, "max": 60, "step": 1, "tooltip": "轮询任务状态的间隔秒数"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": False, "tooltip": "默认关闭以兼容部分网络；遇到 SSL 问题可保持关闭"}),
+                "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回空，不打断后续工作流"}),
             },
         }
 
@@ -89,6 +90,7 @@ class TikpanKlingMotionControlNode:
     OUTPUT_NODE = True
     FUNCTION = "generate_motion_video"
     CATEGORY = "👑 Tikpan 官方独家节点/02 视频 Video"
+    DESCRIPTION = "📝 Kling Motion Control 动作控制：把参考视频里的动作精准迁移到角色图像上，保持角色身份一致。适合 IP 动作复刻、AI 数字人、TikTok 二创。"
 
     def generate_motion_video(self, **kwargs):
         pbar = comfy.utils.ProgressBar(100)

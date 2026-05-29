@@ -32,35 +32,36 @@ class TikpanGeminiImageMaxNode:
         return {
             "required": {
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "API_密钥": ("STRING", {"default": "sk-"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "修改指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "请参考提供的图片，生成一张高质量竖版海报，主体一致，画面精致，电影感光影。",
+                        "tooltip": "告诉模型要生成或修改的画面，建议结合参考图说明主体/风格/版式",
                     },
                 ),
                 "模型": (
                     ["gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview", "nano-banana-2", "nano-banana-pro"],
-                    {"default": "gemini-3-pro-image-preview"},
+                    {"default": "gemini-3-pro-image-preview", "tooltip": "选择生图模型：gemini-3-pro 质量最高；flash 更快；nano-banana 系列多图融合更稳"},
                 ),
                 "分辨率": (
                     ["none", "1K", "2K", "4K"],
-                    {"default": "2K"},
+                    {"default": "2K", "tooltip": "结果分辨率：档位越高越清晰但更慢更贵；none=由模型自由决定"},
                 ),
                 "画面比例": (
                     ["1:1", "16:9", "9:16", "21:9", "4:3", "3:4"],
-                    {"default": "9:16"},
+                    {"default": "9:16", "tooltip": "画面比例：1:1 通用，16:9 横屏，9:16 竖屏短视频"},
                 ),
                 "调用方式": (
                     ["gemini原生", "images_generations", "chat_completions"],
-                    {"default": "gemini原生"},
+                    {"default": "gemini原生", "tooltip": "走哪个接口：gemini原生 最稳；images_generations 兼容生图风格；chat_completions 兼容 OpenAI 协议"},
                 ),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff, "tooltip": "同种子+同提示词可复现画面；改种子可换不同结果"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                **{f"参考图_{i}": ("IMAGE",) for i in range(1, 15)},
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                **{f"参考图_{i}": ("IMAGE", {"tooltip": f"参考图 {i}：作为视觉参考输入；最多 14 张"}) for i in range(1, 15)},
             },
         }
 
@@ -68,6 +69,7 @@ class TikpanGeminiImageMaxNode:
     RETURN_NAMES = ("🖼️_生成结果图", "📄_渲染日志")
     FUNCTION = "execute"
     CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    DESCRIPTION = "📝 Gemini 14 图极限生图：支持 Gemini-3-Pro / Flash / Nano-Banana 等多模型，最多 14 张参考图融合，2K/4K 输出。适合主体一致性、多图合成、IP 衍生。"
 
     def black_image(self):
         return torch.zeros((1, 512, 512, 3), dtype=torch.float32)

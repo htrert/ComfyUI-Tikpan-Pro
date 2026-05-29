@@ -112,49 +112,50 @@ class TikpanHappyHorseT2VNode:
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1虚拟美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-")}),
+                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-"), "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "生成指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "一座由硬纸板和瓶盖搭建的微型城市，在夜晚焕发出生机。一列硬纸板火车缓缓驶过，小灯点缀其间，照亮前路。",
+                        "tooltip": "描述你想生成的视频画面/动作/氛围，越具体越准确",
                     },
                 ),
                 "执行方式": (
                     ["同步 (等待生成并下载)", "异步 (仅提交任务)"],
-                    {"default": "同步 (等待生成并下载)"},
+                    {"default": "同步 (等待生成并下载)", "tooltip": "同步=直接等到出片；异步=只提交任务，配合『异步任务查询』节点取结果（适合长视频/批量）"},
                 ),
                 "清晰度": (
                     ["720P", "1080P"],
-                    {"default": "1080P"},
+                    {"default": "1080P", "tooltip": "视频分辨率：1080P 更清晰但更慢更贵"},
                 ),
                 "画面比例": (
                     ["16:9", "9:16", "1:1", "4:3", "3:4"],
-                    {"default": "16:9"},
+                    {"default": "16:9", "tooltip": "视频比例：16:9 横屏，9:16 竖屏短视频，1:1 方屏"},
                 ),
                 "视频时长": (
                     VIDEO_DURATION_OPTIONS,
-                    {"default": "5秒｜5"},
+                    {"default": "5秒｜5", "tooltip": "生成视频的秒数；越长越慢越贵"},
                 ),
                 "水印": (
                     WATERMARK_OPTIONS,
-                    {"default": "无水印"},
+                    {"default": "无水印", "tooltip": "是否在视频右下角加官方水印"},
                 ),
                 "随机种子": (
                     "INT",
-                    {"default": 888888, "min": 0, "max": 2147483647},
+                    {"default": 888888, "min": 0, "max": 2147483647, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"},
                 ),
                 "最长等待秒数": (
                     "INT",
-                    {"default": 600, "min": 30, "max": 3600, "step": 10},
+                    {"default": 600, "min": 30, "max": 3600, "step": 10, "tooltip": "等待视频生成完成的最长秒数；1080P/长视频建议加大"},
                 ),
                 "查询间隔秒数": (
                     "INT",
-                    {"default": 10, "min": 5, "max": 60, "step": 5},
+                    {"default": 10, "min": 5, "max": 60, "step": 5, "tooltip": "轮询任务状态的间隔秒数"},
                 ),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
             },
         }
 
@@ -163,6 +164,7 @@ class TikpanHappyHorseT2VNode:
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
     CATEGORY = '👑 Tikpan 官方独家节点/02 视频 Video'
+    DESCRIPTION = "📝 HappyHorse 1.0 文生视频 T2V：纯文本提示词生成 3-15 秒视频，720P/1080P，支持同步等待或异步提交。适合快速文生短片。"
 
     # ------------------------------------------------------------------
     # 内部方法

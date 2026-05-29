@@ -85,15 +85,16 @@ class TikpanGemini35FlashNode:
                 "获取密钥请访问": (
                     ["👉 https://tikpan.com (官方授权 Key 获取地址)"],
                 ),
-                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-")}),
-                "模型": (MODEL_OPTIONS, {"default": MODEL_NAME}),
-                "接口模式": (ENDPOINT_OPTIONS, {"default": ENDPOINT_OPTIONS[0]}),
-                "任务类型": (TASK_OPTIONS, {"default": "通用问答"}),
+                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-"), "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "模型": (MODEL_OPTIONS, {"default": MODEL_NAME, "tooltip": "选择对应版本的 Gemini 模型"}),
+                "接口模式": (ENDPOINT_OPTIONS, {"default": ENDPOINT_OPTIONS[0], "tooltip": "走 Gemini 原生接口（更稳）或 OpenAI 兼容接口（更通用）"}),
+                "任务类型": (TASK_OPTIONS, {"default": "通用问答", "tooltip": "预设场景，会自动调整 system prompt 模板"}),
                 "用户问题": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "请根据输入内容，给出清晰、准确、可执行的中文回答。",
+                        "tooltip": "本次对话的提问内容；可结合上方的图片/视频/URL 输入",
                     },
                 ),
                 "系统指令": (
@@ -104,28 +105,29 @@ class TikpanGemini35FlashNode:
                             "你是 Tikpan 的商业级多模态 AI 助手。回答要准确、结构化、可执行；"
                             "不确定的信息要说明不确定，不要编造。"
                         ),
+                        "tooltip": "system prompt：约束 AI 的角色、口吻和回答风格",
                     },
                 ),
-                "输出格式": (OUTPUT_FORMAT_OPTIONS, {"default": "Markdown结构化"}),
-                "思考预算": (THINKING_OPTIONS, {"default": "自动｜auto"}),
-                "最大输出Token": ("INT", {"default": 8192, "min": 256, "max": 65536, "step": 256}),
-                "创意温度": ("FLOAT", {"default": 0.4, "min": 0.0, "max": 2.0, "step": 0.05}),
-                "Top_P": ("FLOAT", {"default": 0.95, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "启用搜索工具": ("BOOLEAN", {"default": False}),
-                "启用代码执行": ("BOOLEAN", {"default": False}),
-                "启用URL上下文": ("BOOLEAN", {"default": False}),
-                "POST重试策略": (RETRY_OPTIONS, {"default": "幂等键轻重试"}),
-                "跳过错误": ("BOOLEAN", {"default": False}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
+                "输出格式": (OUTPUT_FORMAT_OPTIONS, {"default": "Markdown结构化", "tooltip": "回答的呈现形式：自由文本 / Markdown / JSON 等"}),
+                "思考预算": (THINKING_OPTIONS, {"default": "自动｜auto", "tooltip": "思考链长度：auto 自适应；预算越大越擅长复杂推理但更慢更贵"}),
+                "最大输出Token": ("INT", {"default": 8192, "min": 256, "max": 65536, "step": 256, "tooltip": "回答最长字数上限（约 1 token≈0.7 个汉字）"}),
+                "创意温度": ("FLOAT", {"default": 0.4, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "0=最稳，1=均衡，>1=更发散；写作可调高，事实问答调低"}),
+                "Top_P": ("FLOAT", {"default": 0.95, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": "核采样概率，一般保持默认 0.95"}),
+                "启用搜索工具": ("BOOLEAN", {"default": False, "tooltip": "开启后允许模型联网检索最新信息（部分模型支持）"}),
+                "启用代码执行": ("BOOLEAN", {"default": False, "tooltip": "开启后允许模型在沙箱里跑 Python 验证答案"}),
+                "启用URL上下文": ("BOOLEAN", {"default": False, "tooltip": "开启后模型会读取你提供的网页 URL 内容"}),
+                "POST重试策略": (RETRY_OPTIONS, {"default": "幂等键轻重试", "tooltip": "网络异常时的重试方式；带幂等键更安全"}),
+                "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回空，不打断后续工作流"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "图片1": ("IMAGE",),
-                "图片2": ("IMAGE",),
-                "图片3": ("IMAGE",),
-                "图片4": ("IMAGE",),
-                "图片5": ("IMAGE",),
-                "图片6": ("IMAGE",),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "图片1": ("IMAGE", {"tooltip": "可选输入图 1，用于图文混合提问"}),
+                "图片2": ("IMAGE", {"tooltip": "可选输入图 2"}),
+                "图片3": ("IMAGE", {"tooltip": "可选输入图 3"}),
+                "图片4": ("IMAGE", {"tooltip": "可选输入图 4"}),
+                "图片5": ("IMAGE", {"tooltip": "可选输入图 5"}),
+                "图片6": ("IMAGE", {"tooltip": "可选输入图 6"}),
                 "图片URL列表": (
                     "STRING",
                     {
@@ -166,7 +168,7 @@ class TikpanGemini35FlashNode:
                         "tooltip": "每行一个本地文件路径；小文件会 base64 内联上传，大文件建议先上传 OSS/CDN 后填 URL。",
                     },
                 ),
-                "URL错误处理": (URL_ERROR_OPTIONS, {"default": "严格报错"}),
+                "URL错误处理": (URL_ERROR_OPTIONS, {"default": "严格报错", "tooltip": "URL 拉取失败时的策略：严格报错=立即中断；其它=跳过失败项继续"}),
                 "高级自定义JSON": (
                     "STRING",
                     {
@@ -183,6 +185,7 @@ class TikpanGemini35FlashNode:
     OUTPUT_NODE = True
     FUNCTION = "run"
     CATEGORY = "👑 Tikpan 官方独家节点/04 文字与多模态 Text & Multimodal"
+    DESCRIPTION = "📝 Gemini 3.5 Flash 多模态推理：支持图/视频/音频/PDF 输入，思考预算可调，可启用联网搜索和代码执行。适合复杂分析、报告生成、知识问答。"
 
     def make_return(self, answer="", prompt="", structured="", usage="", log=""):
         return (str(answer or ""), str(prompt or ""), str(structured or ""), str(usage or ""), str(log or ""))

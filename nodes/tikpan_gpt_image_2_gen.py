@@ -40,23 +40,24 @@ class TikpanGptImage2GenNode:
         return {
             "required": {
                 KEY_INFO: (["https://tikpan.com"],),
-                KEY_API: ("STRING", {"default": "sk-"}),
+                KEY_API: ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 KEY_PROMPT: (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "Create a high quality image. Use any connected reference images as visual references.",
+                        "tooltip": "描述你想生成的画面，越具体越准确，支持中英文",
                     },
                 ),
-                KEY_MODEL: (["gpt-image-2-all"], {"default": "gpt-image-2-all"}),
-                KEY_TIER: (["512", "1K", "2K", "4K"], {"default": "1K"}),
-                KEY_RATIO: (["1:1", "16:9", "9:16", "21:9", "4:3", "3:4"], {"default": "1:1"}),
-                KEY_QUALITY: (["standard", "hd"], {"default": "hd"}),
-                KEY_SEED: ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+                KEY_MODEL: (["gpt-image-2-all"], {"default": "gpt-image-2-all", "tooltip": "本节点使用的生图模型，目前仅 gpt-image-2-all"}),
+                KEY_TIER: (["512", "1K", "2K", "4K"], {"default": "1K", "tooltip": "分辨率档位：档位越高画面越清晰，但更慢更贵"}),
+                KEY_RATIO: (["1:1", "16:9", "9:16", "21:9", "4:3", "3:4"], {"default": "1:1", "tooltip": "画面比例：1:1 通用，16:9 横屏风景，9:16 竖屏短视频"}),
+                KEY_QUALITY: (["standard", "hd"], {"default": "hd", "tooltip": "standard=快且省钱；hd=细节更好但更慢更贵"}),
+                KEY_SEED: ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "tooltip": "同种子+同提示词可复现画面；改种子可换不同结果"}),
             },
             "optional": {
-                KEY_HOST: (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                **{f"{KEY_REF_PREFIX}{i}": ("IMAGE",) for i in range(1, 6)},
+                KEY_HOST: (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                **{f"{KEY_REF_PREFIX}{i}": ("IMAGE", {"tooltip": f"参考图 {i}：模型会基于这些图片做参考创作"}) for i in range(1, 6)},
             },
         }
 
@@ -64,6 +65,7 @@ class TikpanGptImage2GenNode:
     RETURN_NAMES = (RET_IMAGE, RET_LOG)
     FUNCTION = "generate"
     CATEGORY = "\U0001f451 Tikpan \u5b98\u65b9\u72ec\u5bb6\u8282\u70b9/01 \u56fe\u7247 Image"
+    DESCRIPTION = "\ud83d\udcdd GPT-Image-2-all \u8fdb\u9636\u751f\u56fe\uff1a\u652f\u6301 1K/2K/4K \u5206\u8fa8\u7387\u3001\u591a\u79cd\u6bd4\u4f8b\u3001\u6700\u591a 5 \u5f20\u53c2\u8003\u56fe\u3002\u9002\u5408\u5546\u4e1a\u6d77\u62a5\u3001\u4ea7\u54c1\u56fe\u3001\u6982\u5ff5\u8bbe\u8ba1\u3002"
 
     def generate(self, **kwargs):
         pbar = comfy.utils.ProgressBar(100)

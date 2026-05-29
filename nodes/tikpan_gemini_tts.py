@@ -92,20 +92,21 @@ class TikpanGemini31FlashTTSNode:
                 "获取密钥请访问": (
                     ["👉 https://tikpan.com (官方授权 Key 获取入口)"],
                 ),
-                "API_密钥": ("STRING", {"default": "sk-"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "合成文本": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "Say warmly: Welcome to Tikpan Gemini 3.1 Flash TTS preview. This voice is generated for a commercial-ready workflow.",
+                        "tooltip": "需要被合成为语音的文本，支持中英文及多语种混合",
                     },
                 ),
-                "模型": ([MODEL_NAME], {"default": MODEL_NAME}),
+                "模型": ([MODEL_NAME], {"default": MODEL_NAME, "tooltip": "本节点使用的 TTS 模型"}),
                 "调用方式": (
                     ["geminitts 原生", "gemini 原生", "openai 兼容"],
-                    {"default": "geminitts 原生"},
+                    {"default": "geminitts 原生", "tooltip": "走哪个接口协议：geminitts 原生最稳；OpenAI 兼容更通用"},
                 ),
-                "音色": (GEMINI_VOICE_OPTIONS, {"default": gemini_voice_label(GEMINI_TTS_VOICES[0])}),
+                "音色": (GEMINI_VOICE_OPTIONS, {"default": gemini_voice_label(GEMINI_TTS_VOICES[0]), "tooltip": "选择说话音色：每个音色对应不同的性别/语种/风格"}),
                 "语气指令": (
                     "STRING",
                     {
@@ -113,13 +114,13 @@ class TikpanGemini31FlashTTSNode:
                         "tooltip": "会作为自然语言指令合并到文本前面，例如：欢快地说、低声说、像纪录片旁白一样说。",
                     },
                 ),
-                "语言代码": (["自动", "zh-CN", "en-US", "ja-JP", "ko-KR", "yue-HK", "fr-FR", "de-DE", "es-ES"], {"default": "自动"}),
-                "采样率": (["24000"], {"default": "24000"}),
-                "POST重试策略": (["幂等键轻重试", "保守不重试POST"], {"default": "幂等键轻重试"}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
+                "语言代码": (["自动", "zh-CN", "en-US", "ja-JP", "ko-KR", "yue-HK", "fr-FR", "de-DE", "es-ES"], {"default": "自动", "tooltip": "强制指定发音语言；自动=由模型识别"}),
+                "采样率": (["24000"], {"default": "24000", "tooltip": "输出音频采样率（Hz）"}),
+                "POST重试策略": (["幂等键轻重试", "保守不重试POST"], {"default": "幂等键轻重试", "tooltip": "网络异常重试方式；带幂等键更安全"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
                 "自定义voice_name": (
                     "STRING",
                     {
@@ -173,6 +174,7 @@ class TikpanGemini31FlashTTSNode:
     OUTPUT_NODE = True
     FUNCTION = "generate_tts"
     CATEGORY = '👑 Tikpan 官方独家节点/03 音频 Audio'
+    DESCRIPTION = "📝 Gemini 3.1 Flash TTS：Google 多语种语音合成，支持自然语言『语气指令』（欢快地说/纪录片旁白等）。适合多语种 + 富情感的口播。"
 
     def empty_audio(self):
         try:

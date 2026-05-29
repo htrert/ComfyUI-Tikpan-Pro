@@ -285,40 +285,42 @@ class TikpanVidu3ReferenceVideoNode(_TikpanViduBase):
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "API_密钥": ("STRING", {"default": "sk-"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "生成指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "@1 appears in a cinematic commercial video, natural motion, stable identity, high quality.",
+                        "tooltip": "用 @1/@2/... 引用对应序号的参考图；越具体的画面/动作描述效果越好，推荐英文",
                     },
                 ),
-                "参考图1": ("IMAGE",),
-                "视频时长": ("INT", {"default": 5, "min": 3, "max": 16, "step": 1}),
-                "清晰度": (VIDU_RESOLUTION_OPTIONS, {"default": "720p"}),
-                "画面比例": (VIDU_ASPECT_OPTIONS, {"default": "16:9"}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+                "参考图1": ("IMAGE", {"tooltip": "必填的主参考图，对应提示词中的 @1"}),
+                "视频时长": ("INT", {"default": 5, "min": 3, "max": 16, "step": 1, "tooltip": "生成视频秒数，越长越慢越贵"}),
+                "清晰度": (VIDU_RESOLUTION_OPTIONS, {"default": "720p", "tooltip": "视频分辨率：越高越清晰但更慢更贵"}),
+                "画面比例": (VIDU_ASPECT_OPTIONS, {"default": "16:9", "tooltip": "视频比例：16:9 横屏，9:16 竖屏短视频，1:1 方屏"}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"}),
             },
             "optional": {
-                "参考图2": ("IMAGE",),
-                "参考图3": ("IMAGE",),
-                "参考图4": ("IMAGE",),
-                "参考图5": ("IMAGE",),
-                "参考图6": ("IMAGE",),
-                "参考图7": ("IMAGE",),
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "智能主体库": ("BOOLEAN", {"default": False}),
-                "音画同步": ("BOOLEAN", {"default": True}),
-                "音频类型": (VIDU_AUDIO_TYPE_OPTIONS, {"default": "All"}),
-                "错峰生成": ("BOOLEAN", {"default": False}),
-                "最长等待秒数": ("INT", {"default": 1200, "min": 60, "max": 7200, "step": 30}),
-                "查询间隔秒数": ("INT", {"default": 8, "min": 5, "max": 60, "step": 1}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": False}),
-                "跳过错误": ("BOOLEAN", {"default": False}),
+                "参考图2": ("IMAGE", {"tooltip": "可选第 2 张参考图，对应 @2"}),
+                "参考图3": ("IMAGE", {"tooltip": "可选第 3 张参考图，对应 @3"}),
+                "参考图4": ("IMAGE", {"tooltip": "可选第 4 张参考图，对应 @4"}),
+                "参考图5": ("IMAGE", {"tooltip": "可选第 5 张参考图，对应 @5"}),
+                "参考图6": ("IMAGE", {"tooltip": "可选第 6 张参考图，对应 @6"}),
+                "参考图7": ("IMAGE", {"tooltip": "可选第 7 张参考图，对应 @7"}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "智能主体库": ("BOOLEAN", {"default": False, "tooltip": "开启后让模型自动识别参考图中的主体并复用"}),
+                "音画同步": ("BOOLEAN", {"default": True, "tooltip": "是否生成与画面匹配的环境音/配乐"}),
+                "音频类型": (VIDU_AUDIO_TYPE_OPTIONS, {"default": "All", "tooltip": "限定生成的音频类型（环境音/对白/全部）"}),
+                "错峰生成": ("BOOLEAN", {"default": False, "tooltip": "开启后任务可能延迟出片，但费用更低"}),
+                "最长等待秒数": ("INT", {"default": 1200, "min": 60, "max": 7200, "step": 30, "tooltip": "等待视频生成完成的最长秒数；长视频/高清建议加大"}),
+                "查询间隔秒数": ("INT", {"default": 8, "min": 5, "max": 60, "step": 1, "tooltip": "轮询任务状态的间隔秒数"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": False, "tooltip": "默认关闭以兼容部分网络；遇到 SSL 问题可保持关闭"}),
+                "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回空，不打断后续工作流"}),
             },
         }
 
     FUNCTION = "generate_reference_video"
+    DESCRIPTION = "📝 Vidu3 参考生视频：最多 7 张参考图（@1-@7 锚点语法），生成 3-16 秒视频，720P/1080P，支持音画同步。适合多主体复杂场景、角色一致性视频。"
 
     def generate_reference_video(self, **kwargs):
         pbar = comfy.utils.ProgressBar(100)
@@ -390,36 +392,38 @@ class TikpanVidu3TurboVideoNode(_TikpanViduBase):
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "API_密钥": ("STRING", {"default": "sk-"}),
-                "生成模式": (["文生视频｜text2video", "图生视频｜img2video", "首尾帧｜start-end2video"], {"default": "文生视频｜text2video"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "生成模式": (["文生视频｜text2video", "图生视频｜img2video", "首尾帧｜start-end2video"], {"default": "文生视频｜text2video", "tooltip": "三种模式：纯文字、首帧图驱动、首尾帧双图驱动"}),
                 "生成指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "A cinematic product video with stable camera movement, realistic lighting, and smooth motion.",
+                        "tooltip": "描述视频画面/动作/氛围，推荐英文",
                     },
                 ),
-                "视频时长": ("INT", {"default": 5, "min": 1, "max": 16, "step": 1}),
-                "清晰度": (VIDU_RESOLUTION_OPTIONS, {"default": "720p"}),
-                "画面比例": (VIDU_ASPECT_OPTIONS, {"default": "16:9"}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+                "视频时长": ("INT", {"default": 5, "min": 1, "max": 16, "step": 1, "tooltip": "生成视频秒数；越长越慢越贵"}),
+                "清晰度": (VIDU_RESOLUTION_OPTIONS, {"default": "720p", "tooltip": "视频分辨率：越高越清晰但更慢更贵"}),
+                "画面比例": (VIDU_ASPECT_OPTIONS, {"default": "16:9", "tooltip": "视频比例：16:9 横屏，9:16 竖屏短视频，1:1 方屏"}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"}),
             },
             "optional": {
-                "首帧图": ("IMAGE",),
-                "尾帧图": ("IMAGE",),
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "运动幅度": (VIDU_MOVEMENT_OPTIONS, {"default": "auto"}),
-                "音画同步": ("BOOLEAN", {"default": True}),
-                "音频类型": (VIDU_AUDIO_TYPE_OPTIONS, {"default": "All"}),
-                "错峰生成": ("BOOLEAN", {"default": False}),
-                "最长等待秒数": ("INT", {"default": 1200, "min": 60, "max": 7200, "step": 30}),
-                "查询间隔秒数": ("INT", {"default": 8, "min": 5, "max": 60, "step": 1}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": False}),
-                "跳过错误": ("BOOLEAN", {"default": False}),
+                "首帧图": ("IMAGE", {"tooltip": "图生视频/首尾帧模式必填：视频的第一帧"}),
+                "尾帧图": ("IMAGE", {"tooltip": "首尾帧模式必填：视频的最后一帧"}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "运动幅度": (VIDU_MOVEMENT_OPTIONS, {"default": "auto", "tooltip": "画面运动强度：auto 自动；small 微动；large 大幅运动"}),
+                "音画同步": ("BOOLEAN", {"default": True, "tooltip": "是否生成与画面匹配的环境音/配乐"}),
+                "音频类型": (VIDU_AUDIO_TYPE_OPTIONS, {"default": "All", "tooltip": "限定生成的音频类型（环境音/对白/全部）"}),
+                "错峰生成": ("BOOLEAN", {"default": False, "tooltip": "开启后任务可能延迟出片，但费用更低"}),
+                "最长等待秒数": ("INT", {"default": 1200, "min": 60, "max": 7200, "step": 30, "tooltip": "等待视频生成完成的最长秒数"}),
+                "查询间隔秒数": ("INT", {"default": 8, "min": 5, "max": 60, "step": 1, "tooltip": "轮询任务状态的间隔秒数"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": False, "tooltip": "默认关闭以兼容部分网络；遇到 SSL 问题可保持关闭"}),
+                "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回空，不打断后续工作流"}),
             },
         }
 
     FUNCTION = "generate_turbo_video"
+    DESCRIPTION = "📝 Vidu3 Turbo 视频：极速版视频模型，支持文生视频/图生视频/首尾帧三种模式，1-16 秒，运动幅度可调。适合快速出片、批量短视频。"
 
     def generate_turbo_video(self, **kwargs):
         pbar = comfy.utils.ProgressBar(100)

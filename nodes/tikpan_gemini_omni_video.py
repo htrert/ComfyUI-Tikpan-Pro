@@ -93,7 +93,7 @@ class TikpanGeminiOmniVideoNode:
         }
         # 参考图（仅 omni-flash-components 有效）
         for i in range(1, MAX_REFERENCE_IMAGES + 1):
-            optional[f"参考图{i}"] = ("IMAGE",)
+            optional[f"参考图{i}"] = ("IMAGE", {"tooltip": f"参考图 {i}：作为视觉参考输入，仅 omni-flash-components 模型有效"})
 
         optional["视频URL"] = (
             "STRING",
@@ -127,7 +127,7 @@ class TikpanGeminiOmniVideoNode:
                 "tooltip": "如果 Tikpan/上游已返回音色 ID，可填入这里；会透传为 voice_id/reference_voice_id。",
             },
         )
-        optional["保留原视频声音"] = ("BOOLEAN", {"default": True})
+        optional["保留原视频声音"] = ("BOOLEAN", {"default": True, "tooltip": "做视频编辑时是否保留原视频音轨"})
 
         optional["高级自定义JSON"] = (
             "STRING",
@@ -137,16 +137,16 @@ class TikpanGeminiOmniVideoNode:
                 "tooltip": "深度合并到 POST /v1/video/create payload，用于 Tikpan 后续新增参数或临时调试。",
             },
         )
-        optional["最长等待秒数"] = ("INT", {"default": 1200, "min": 60, "max": 7200, "step": 30})
-        optional["查询间隔秒数"] = ("INT", {"default": 8, "min": 3, "max": 60, "step": 1})
-        optional["校验HTTPS证书"] = ("BOOLEAN", {"default": False})
-        optional["跳过错误"] = ("BOOLEAN", {"default": False})
+        optional["最长等待秒数"] = ("INT", {"default": 1200, "min": 60, "max": 7200, "step": 30, "tooltip": "等待视频生成完成的最长时间；长视频/高清建议加大"})
+        optional["查询间隔秒数"] = ("INT", {"default": 8, "min": 3, "max": 60, "step": 1, "tooltip": "轮询任务状态的间隔；过小会浪费请求，过大响应慢"})
+        optional["校验HTTPS证书"] = ("BOOLEAN", {"default": False, "tooltip": "默认关闭以兼容部分网络；遇到 SSL 问题可保持关闭"})
+        optional["跳过错误"] = ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回空，不打断后续工作流"})
 
         return {
             "required": {
                 "💰_福利_💰": (["🔥 0.6元≈1美金余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权 Key 获取地址)"],),
-                "API_密钥": ("STRING", {"default": "sk-"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "生成指令": (
                     "STRING",
                     {
@@ -155,14 +155,15 @@ class TikpanGeminiOmniVideoNode:
                             "A cinematic commercial video. Natural lighting, smooth camera motion, "
                             "high quality, subject remains consistent throughout."
                         ),
+                        "tooltip": "描述你想生成的视频画面/动作/氛围，越具体越准确",
                     },
                 ),
-                "模型": (MODEL_OPTIONS, {"default": "omni-flash"}),
-                "视频时长": (DURATION_OPTIONS, {"default": "8 秒｜8"}),
-                "画面比例": (ASPECT_OPTIONS, {"default": "16:9 横屏｜16:9"}),
-                "清晰度": (RESOLUTION_OPTIONS, {"default": "720p｜720p"}),
-                "生成原生音频": ("BOOLEAN", {"default": True}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+                "模型": (MODEL_OPTIONS, {"default": "omni-flash", "tooltip": "选择 omni 视频模型：flash 快，components 支持参考图"}),
+                "视频时长": (DURATION_OPTIONS, {"default": "8 秒｜8", "tooltip": "生成视频的秒数；越长越慢越贵"}),
+                "画面比例": (ASPECT_OPTIONS, {"default": "16:9 横屏｜16:9", "tooltip": "视频比例：16:9 横屏，9:16 竖屏短视频，1:1 方屏"}),
+                "清晰度": (RESOLUTION_OPTIONS, {"default": "720p｜720p", "tooltip": "视频分辨率：1080p 更清晰但更贵更慢"}),
+                "生成原生音频": ("BOOLEAN", {"default": True, "tooltip": "是否同步生成对白/环境音"}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"}),
             },
             "optional": optional,
         }
@@ -172,6 +173,7 @@ class TikpanGeminiOmniVideoNode:
     OUTPUT_NODE = True
     FUNCTION = "generate"
     CATEGORY = "👑 Tikpan 官方独家节点/02 视频 Video"
+    DESCRIPTION = "📝 Gemini Omni Flash 视频：Google Gemini 视频模型，支持 720P/1080P、原生音频生成、视频编辑、参考音色驱动。适合带原生对白/音效的视频。"
 
     # ─── Session ────────────────────────────────────────────────────────────────
     def _create_session(self):

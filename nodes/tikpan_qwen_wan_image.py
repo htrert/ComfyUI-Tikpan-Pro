@@ -44,9 +44,9 @@ class _TikpanOpenImageBase:
     @classmethod
     def INPUT_TYPES(cls):
         optional = {
-            "兼容尺寸": (SIZE_OPTIONS, {"default": "Auto"}),
-            "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-            "返回方式": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0]}),
+            "兼容尺寸": (SIZE_OPTIONS, {"default": "Auto", "tooltip": "兼容老工作流的尺寸字段；Auto 由上面的比例+清晰度决定"}),
+            "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+            "返回方式": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0], "tooltip": "url=返回云端链接（推荐）；b64_json=直接返回 Base64"}),
             "跳过错误": (
                 "BOOLEAN",
                 {
@@ -64,7 +64,7 @@ class _TikpanOpenImageBase:
             ),
         }
         for index in range(1, cls.MAX_REFERENCE_IMAGES + 1):
-            optional[f"参考图{index}"] = ("IMAGE",)
+            optional[f"参考图{index}"] = ("IMAGE", {"tooltip": f"参考图 {index}：图生图/编辑模式时作为视觉参考"})
         return {
             "required": {
                 "💰_福利_💰": (
@@ -74,21 +74,22 @@ class _TikpanOpenImageBase:
                     ["👉 https://tikpan.com (官方授权 Key 获取地址)"],
                 ),
                 "节点说明": ([f"{cls.MODEL_NAME} | /v1/images/generations | {cls.PRICE_TEXT}"],),
-                "API_密钥": ("STRING", {"default": "sk-"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "生成指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": cls.DEFAULT_PROMPT,
+                        "tooltip": "描述你想生成/编辑的画面，越具体越准确，推荐英文",
                     },
                 ),
-                "模型": ([cls.MODEL_ID], {"default": cls.MODEL_ID}),
-                "生成张数": ("INT", {"default": 1, "min": 1, "max": 4, "step": 1}),
-                "生成模式": (TASK_MODE_OPTIONS, {"default": TASK_MODE_OPTIONS[0]}),
-                "画面比例": (ASPECT_RATIO_OPTIONS, {"default": "auto"}),
-                "清晰度": (cls.RESOLUTION_OPTIONS, {"default": "auto"}),
-                "画质策略": (QUALITY_OPTIONS, {"default": QUALITY_OPTIONS[0]}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF}),
+                "模型": ([cls.MODEL_ID], {"default": cls.MODEL_ID, "tooltip": "本节点使用的生图模型"}),
+                "生成张数": ("INT", {"default": 1, "min": 1, "max": 4, "step": 1, "tooltip": "一次生成几张结果；张数越多越慢越贵"}),
+                "生成模式": (TASK_MODE_OPTIONS, {"default": TASK_MODE_OPTIONS[0], "tooltip": "auto=由模型决定；text2image=纯文生图；image2image/edit=带参考图"}),
+                "画面比例": (ASPECT_RATIO_OPTIONS, {"default": "auto", "tooltip": "画面比例：auto 让模型决定；常用 1:1、16:9、9:16"}),
+                "清晰度": (cls.RESOLUTION_OPTIONS, {"default": "auto", "tooltip": "分辨率档位：越高越清晰但更慢更贵"}),
+                "画质策略": (QUALITY_OPTIONS, {"default": QUALITY_OPTIONS[0], "tooltip": "low=快且省钱；medium=日常推荐；high=精细但更慢更贵"}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "tooltip": "同种子+同提示词可复现画面；改种子可换不同结果"}),
             },
             "optional": optional,
         }
@@ -515,6 +516,7 @@ class TikpanQwenImage20Node(_TikpanOpenImageBase):
     RESOLUTION_OPTIONS = QWEN_RESOLUTION_OPTIONS
     MAX_REFERENCE_IMAGES = 4
     DEFAULT_PROMPT = "一张高端商业海报，包含清晰准确的中文标题文字，真实材质，细腻光影，专业排版。"
+    DESCRIPTION = "📝 Qwen-Image-2.0：通义千问图像 2.0 模型，最大特点是『中英文字渲染准确』，最多 4 张参考图。适合海报、标题图、带文字的商业素材。"
 
     def build_payload(self, model, prompt, count, mode, aspect_ratio, resolution, quality, size, seed, response_format, reference_images, kwargs):
         payload = super().build_payload(model, prompt, count, mode, aspect_ratio, resolution, quality, size, seed, response_format, reference_images, kwargs)
@@ -530,14 +532,15 @@ class TikpanWan27ImageProNode(_TikpanOpenImageBase):
     RESOLUTION_OPTIONS = WAN_RESOLUTION_OPTIONS
     MAX_REFERENCE_IMAGES = 8
     DEFAULT_PROMPT = "生成一张高端商业产品图，主体一致，真实材质，复杂场景自然融合，4K级细节。"
+    DESCRIPTION = "📝 Wan 2.7 Image Pro：阿里万相 2.7 专业版，支持 4K、最多 8 张参考图、成套图、主体一致性、品牌色板、局部编辑。适合电商/产品/IP 商业项目。"
 
     @classmethod
     def INPUT_TYPES(cls):
         schema = super().INPUT_TYPES()
-        schema["required"]["清晰度"] = (cls.RESOLUTION_OPTIONS, {"default": "2k"})
-        schema["optional"]["思考模式"] = (WAN_THINKING_OPTIONS, {"default": WAN_THINKING_OPTIONS[0]})
-        schema["optional"]["成套图数量"] = ("INT", {"default": 1, "min": 1, "max": 9, "step": 1})
-        schema["optional"]["主体保持"] = ("BOOLEAN", {"default": True})
+        schema["required"]["清晰度"] = (cls.RESOLUTION_OPTIONS, {"default": "2k", "tooltip": "分辨率档位：2k 默认；越高越清晰但更慢更贵"})
+        schema["optional"]["思考模式"] = (WAN_THINKING_OPTIONS, {"default": WAN_THINKING_OPTIONS[0], "tooltip": "开启后模型会先做推理再出图，质量更稳但更慢"})
+        schema["optional"]["成套图数量"] = ("INT", {"default": 1, "min": 1, "max": 9, "step": 1, "tooltip": "成套图模式：一次生成多张风格一致的图"})
+        schema["optional"]["主体保持"] = ("BOOLEAN", {"default": True, "tooltip": "开启后跨多张图保持主体一致；做产品图/IP 时推荐"})
         schema["optional"]["品牌色/色板"] = ("STRING", {"default": "", "tooltip": "例如 #FF6600, black, gold。会透传为 palette。"})
         schema["optional"]["编辑区域BBOX"] = (
             "STRING",

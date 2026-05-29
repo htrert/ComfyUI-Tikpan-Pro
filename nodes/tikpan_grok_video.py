@@ -24,24 +24,24 @@ class TikpanExclusiveVideoNode:
         inputs = {
             "required": {
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"], ),
-                "Tikpan_API密钥": ("STRING", {"default": "sk-"}),
+                "Tikpan_API密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 # 名字已同步为你画布上的输入名，强制连线防呆
-                "Grok3专属提示词": ("STRING", {"multiline": True, "forceInput": True}),
+                "Grok3专属提示词": ("STRING", {"multiline": True, "forceInput": True, "tooltip": "Grok3 视频提示词；建议接 Grok 提示词优化节点输出"}),
                 # 🚀 10s 选项藏在这里！下拉选择它就是 10s 长视频！
-                "模型选择": (["grok-video-3", "grok-video-3-10s"], {"default": "grok-video-3"}),
-                "比例": (["9:16", "16:9", "1:1", "4:3", "3:4", "21:9", "9:21"], {"default": "9:16"}),
-                "分辨率": (["1080P", "720P", "480P"], {"default": "720P"}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
+                "模型选择": (["grok-video-3", "grok-video-3-10s"], {"default": "grok-video-3", "tooltip": "grok-video-3 默认 6 秒；grok-video-3-10s 输出 10 秒长视频"}),
+                "比例": (["9:16", "16:9", "1:1", "4:3", "3:4", "21:9", "9:21"], {"default": "9:16", "tooltip": "视频比例：9:16 竖屏短视频，16:9 横屏，1:1 方屏"}),
+                "分辨率": (["1080P", "720P", "480P"], {"default": "720P", "tooltip": "视频分辨率：1080P 最清晰但更慢更贵；480P 最省"}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             }
         }
 
         # 支持 7 张参考图
         for i in range(1, 8):
-            inputs["optional"][f"参考图_{i}"] = ("IMAGE",)
+            inputs["optional"][f"参考图_{i}"] = ("IMAGE", {"tooltip": f"参考图 {i}：作为视觉参考，最多 7 张"})
 
         return inputs
 
@@ -51,6 +51,7 @@ class TikpanExclusiveVideoNode:
     OUTPUT_NODE = True
     FUNCTION = "execute"
     CATEGORY = '👑 Tikpan 官方独家节点/02 视频 Video'
+    DESCRIPTION = "📝 Grok3 直出视频生成：xAI Grok-Video-3，支持 6 秒/10 秒、1080P/720P/480P、最多 7 张参考图 + @img 锚点语法。配合 Grok 提示词优化节点效果更佳。"
 
     def execute(self, 获取密钥请访问, Tikpan_API密钥, Grok3专属提示词, 模型选择, 比例, 分辨率, 随机种子=888888, **kwargs):
         comfy.model_management.throw_exception_if_processing_interrupted()

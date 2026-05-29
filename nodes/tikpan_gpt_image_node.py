@@ -17,16 +17,16 @@ class TikpanGptImage2Node:
         return {
             "required": {
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"], ),
-                "API_密钥": ("STRING", {"default": "sk-"}),
-                "提示词": ("STRING", {"multiline": True, "default": "一位穿着赛博朋克装甲的极客，正在操作复杂的全息工作流，4k，大师级画质..."}),
-                "模型": (["gpt-image-2-all"], {"default": "gpt-image-2-all"}),
-                "尺寸": (["1:1 方图｜1024x1024", "16:9 横图｜1792x1024", "9:16 竖图｜1024x1792"], {"default": "1:1 方图｜1024x1024"}),
-                "品质": (["标准｜standard", "高清｜hd"], {"default": "高清｜hd"}),
-                "风格": (["鲜艳创意｜vivid", "自然真实｜natural"], {"default": "鲜艳创意｜vivid"}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "提示词": ("STRING", {"multiline": True, "default": "一位穿着赛博朋克装甲的极客，正在操作复杂的全息工作流，4k，大师级画质...", "tooltip": "描述你想生成的画面，越具体越准确，支持中英文"}),
+                "模型": (["gpt-image-2-all"], {"default": "gpt-image-2-all", "tooltip": "本节点使用的生图模型，目前仅 gpt-image-2-all"}),
+                "尺寸": (["1:1 方图｜1024x1024", "16:9 横图｜1792x1024", "9:16 竖图｜1024x1792"], {"default": "1:1 方图｜1024x1024", "tooltip": "出图尺寸/比例：方图通用、横图适合风景、竖图适合人物或短视频"}),
+                "品质": (["标准｜standard", "高清｜hd"], {"default": "高清｜hd", "tooltip": "standard=快且省钱；hd=细节更好但更慢更贵"}),
+                "风格": (["鲜艳创意｜vivid", "自然真实｜natural"], {"default": "鲜艳创意｜vivid", "tooltip": "vivid=色彩浓烈有想象力；natural=偏写实自然"}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff, "tooltip": "同种子+同提示词可复现画面；改种子可换不同结果"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
             },
         }
 
@@ -34,6 +34,7 @@ class TikpanGptImage2Node:
     RETURN_NAMES = ("🖼️_生成图像", "📄_完整日志")
     FUNCTION = "generate_image"
     CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    DESCRIPTION = "📝 GPT-Image-2-all 简易生图：单张文生图，支持 1024/1792 尺寸、HD 高清画质、vivid/natural 两种风格。适合快速出图测试。"
 
     def generate_image(self, 获取密钥请访问, API_密钥, 提示词, 模型, 尺寸, 品质, 风格, 随机种子, **kwargs):
         # 1. 进度条初始化

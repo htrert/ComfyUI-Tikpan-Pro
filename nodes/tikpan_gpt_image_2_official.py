@@ -53,18 +53,19 @@ class TikpanGptImage2OfficialNode:
                 "获取密钥请访问": (
                     ["👉 https://tikpan.com (官方授权Key获取点)"],
                 ),
-                "API_密钥": ("STRING", {"default": "sk-"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
 
                 "生成指令": ("STRING", {
                     "multiline": True,
-                    "default": "一幅写实的极地极光景观，巨大的冰川倒映在平静的海面上，8k超清，电影感。"
+                    "default": "一幅写实的极地极光景观，巨大的冰川倒映在平静的海面上，8k超清，电影感。",
+                    "tooltip": "描述你想生成的画面，越具体越准确，支持中英文"
                 }),
 
-                "模型": (["gpt-image-2"], {"default": "gpt-image-2"}),
+                "模型": (["gpt-image-2"], {"default": "gpt-image-2", "tooltip": "本节点使用的官方生图模型，目前仅 gpt-image-2"}),
 
                 "分辨率档位": (
                     ["512", "1K (1024)", "2K (2048)", "4K (官方极限 3840)"],
-                    {"default": "1K (1024)"}
+                    {"default": "1K (1024)", "tooltip": "分辨率档位：档位越高画面越清晰，但更慢更贵；4K 接近官方极限"}
                 ),
 
                 "画面比例": (
@@ -79,7 +80,7 @@ class TikpanGptImage2OfficialNode:
                         "21:9",
                         "9:21"
                     ],
-                    {"default": "1:1"}
+                    {"default": "1:1", "tooltip": "画面比例：1:1 通用，16:9 横屏风景，9:16 竖屏短视频"}
                 ),
 
                 "画质与推理强度": (
@@ -101,12 +102,13 @@ class TikpanGptImage2OfficialNode:
                 "随机种子": ("INT", {
                     "default": 888888,
                     "min": 0,
-                    "max": 0xffffffffffffffff
+                    "max": 0xffffffffffffffff,
+                    "tooltip": "同种子+同提示词可复现画面；改种子可换不同结果"
                 }),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "返回格式": (IMAGE_FORMAT_OPTIONS, {"default": "PNG｜png"}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "返回格式": (IMAGE_FORMAT_OPTIONS, {"default": "PNG｜png", "tooltip": "图像编码：PNG 无损画质好，JPEG/WEBP 体积小"}),
                 "跳过错误": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "开启后，网络异常、余额不足或接口异常时返回黑图，避免工作流中断。"
@@ -118,6 +120,7 @@ class TikpanGptImage2OfficialNode:
     RETURN_NAMES = ("🖼️_生成结果图", "📄_渲染日志")
     FUNCTION = "generate"
     CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    DESCRIPTION = "📝 GPT-Image-2 官方原版生图：直连官方 /v1/images/generations 接口，支持 4K、9 种比例、quality/moderation 全参数控制。适合追求官方原生效果。"
 
     def generate(self, **kwargs):
         start_time = time.time()

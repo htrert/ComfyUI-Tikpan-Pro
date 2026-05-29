@@ -115,45 +115,46 @@ class TikpanHappyHorseI2VNode:
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1虚拟美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-")}),
+                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-"), "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "生成指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "一只猫在草地上奔跑，阳光洒在身上，尾巴轻轻摇晃",
+                        "tooltip": "描述图片要怎么动起来；越具体越准确",
                     },
                 ),
                 "执行方式": (
                     ["同步 (等待生成并下载)", "异步 (仅提交任务)"],
-                    {"default": "同步 (等待生成并下载)"},
+                    {"default": "同步 (等待生成并下载)", "tooltip": "同步=直接等到出片；异步=只提交任务，配合『异步任务查询』节点取结果"},
                 ),
                 "清晰度": (
                     ["720P", "1080P"],
-                    {"default": "1080P"},
+                    {"default": "1080P", "tooltip": "视频分辨率：1080P 更清晰但更慢更贵"},
                 ),
                 "视频时长": (
                     VIDEO_DURATION_OPTIONS,
-                    {"default": "5秒｜5"},
+                    {"default": "5秒｜5", "tooltip": "生成视频的秒数；越长越慢越贵"},
                 ),
                 "水印": (
                     WATERMARK_OPTIONS,
-                    {"default": "无水印"},
+                    {"default": "无水印", "tooltip": "是否在视频右下角加官方水印"},
                 ),
                 "随机种子": (
                     "INT",
-                    {"default": 888888, "min": 0, "max": 2147483647},
+                    {"default": 888888, "min": 0, "max": 2147483647, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"},
                 ),
                 "最长等待秒数": (
                     "INT",
-                    {"default": 600, "min": 30, "max": 3600, "step": 10},
+                    {"default": 600, "min": 30, "max": 3600, "step": 10, "tooltip": "等待视频生成完成的最长秒数；1080P/长视频建议加大"},
                 ),
                 "查询间隔秒数": (
                     "INT",
-                    {"default": 10, "min": 5, "max": 60, "step": 5},
+                    {"default": 10, "min": 5, "max": 60, "step": 5, "tooltip": "轮询任务状态的间隔秒数"},
                 ),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
                 "首帧图片": ("IMAGE", {"tooltip": "首帧图片，将作为视频的第一帧（优先级低于手动 URL）"}),
                 "图片URL": (
                     "STRING",
@@ -171,6 +172,7 @@ class TikpanHappyHorseI2VNode:
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
     CATEGORY = '👑 Tikpan 官方独家节点/02 视频 Video'
+    DESCRIPTION = "📝 HappyHorse 1.0 图生视频 I2V：以静态图为首帧生成 3-15 秒动态视频，720P/1080P。适合让产品图/插画/截图动起来。"
 
     # ------------------------------------------------------------------
     # 图片处理

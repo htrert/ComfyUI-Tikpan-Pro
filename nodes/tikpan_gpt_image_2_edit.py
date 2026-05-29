@@ -19,18 +19,18 @@ class TikpanGptImage2EditNode:
         return {
             "required": {
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"], ),
-                "API_密钥": ("STRING", {"default": "sk-"}),
-                "底图": ("IMAGE",), # 需要修改的原图
-                "修改指令": ("STRING", {"multiline": True, "default": "请把图中的人物换成一位穿着西装的男士，背景保持不变..."}),
-                "模型": (["gpt-image-2-all"], {"default": "gpt-image-2-all"}),
-                "输出尺寸": (["沿用底图尺寸", "512", "1K", "2K", "4K"], {"default": "沿用底图尺寸"}),
-                "画面比例": (["沿用底图比例", "1:1", "16:9", "9:16", "21:9", "4:3", "3:4"], {"default": "沿用底图比例"}),
-                "品质": (["标准｜standard", "高清｜hd"], {"default": "高清｜hd"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "底图": ("IMAGE", {"tooltip": "需要被修改/重绘的原始图像"}),
+                "修改指令": ("STRING", {"multiline": True, "default": "请把图中的人物换成一位穿着西装的男士，背景保持不变...", "tooltip": "告诉 AI 怎么改这张图，例如『把背景换成海边』『去掉左侧的杯子』"}),
+                "模型": (["gpt-image-2-all"], {"default": "gpt-image-2-all", "tooltip": "本节点使用的修图模型，目前仅 gpt-image-2-all"}),
+                "输出尺寸": (["沿用底图尺寸", "512", "1K", "2K", "4K"], {"default": "沿用底图尺寸", "tooltip": "结果图分辨率：沿用底图最稳；档位越高越清晰但更慢更贵"}),
+                "画面比例": (["沿用底图比例", "1:1", "16:9", "9:16", "21:9", "4:3", "3:4"], {"default": "沿用底图比例", "tooltip": "结果图比例：沿用底图最不容易变形"}),
+                "品质": (["标准｜standard", "高清｜hd"], {"default": "高清｜hd", "tooltip": "standard=快且省钱；hd=细节更好但更慢更贵"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "遮罩_Mask": ("MASK",), # 告诉 AI 哪里需要动手术（可选）
-                "产品参考图": ("IMAGE",), # 如果要把某个具体产品放进去
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "遮罩_Mask": ("MASK", {"tooltip": "可选遮罩：白色区域=要重绘，黑色区域=保持不变"}),
+                "产品参考图": ("IMAGE", {"tooltip": "可选参考图：让 AI 把这张图里的物体/风格融入结果"}),
             }
         }
 
@@ -38,6 +38,7 @@ class TikpanGptImage2EditNode:
     RETURN_NAMES = ("🖼️_重绘结果图", "📄_渲染日志")
     FUNCTION = "edit"
     CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    DESCRIPTION = "📝 GPT-Image-2-all 修图节点：基于底图做指令式重绘，支持遮罩局部修改、参考图融合。适合换背景/换主体/产品融入。"
 
     def edit(self, 获取密钥请访问, API_密钥, 底图, 修改指令, 模型, 输出尺寸="沿用底图尺寸", 画面比例="沿用底图比例", 品质="高清｜hd", 遮罩_Mask=None, 产品参考图=None, **kwargs):
         pbar = comfy.utils.ProgressBar(100)

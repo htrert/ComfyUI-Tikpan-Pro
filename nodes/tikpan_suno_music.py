@@ -36,30 +36,31 @@ class TikpanSunoMusicNode:
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1虚拟美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "API_密钥": ("STRING", {"default": "sk-"}),
-                "🎵_生成模式": (["灵感模式", "自定义模式", "续写模式", "歌手风格"], {"default": "自定义模式"}),
-                "歌曲标题": ("STRING", {"default": "命中注定"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "🎵_生成模式": (["灵感模式", "自定义模式", "续写模式", "歌手风格"], {"default": "自定义模式", "tooltip": "灵感=AI 全自动；自定义=自己写歌词；续写=接已有歌曲；歌手风格=模仿特定歌手"}),
+                "歌曲标题": ("STRING", {"default": "命中注定", "tooltip": "歌曲标题，会显示在结果元数据中"}),
                 "创作提示词": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "写一首伤感的粤语情歌",
+                        "tooltip": "灵感模式=写创作思路；自定义模式=直接写完整歌词",
                     },
                 ),
                 "风格预设": (
                     SUNO_STYLE_OPTIONS,
-                    {"default": "流行｜Pop｜pop"},
+                    {"default": "流行｜Pop｜pop", "tooltip": "选择曲风预设；选『自定义』则只用下方风格标签"},
                 ),
-                "风格标签": ("STRING", {"default": "pop, romantic"}),
+                "风格标签": ("STRING", {"default": "pop, romantic", "tooltip": "英文风格关键词，逗号分隔，例如 pop, romantic, soft vocal"}),
                 "模型版本": (
                     SUNO_MODEL_OPTIONS,
-                    {"default": "Fenix 高质量实验｜chirp-fenix"},
+                    {"default": "Fenix 高质量实验｜chirp-fenix", "tooltip": "Suno 模型版本：V5/Fenix 最新效果好；V4 稳定；V3 兼容旧作品"},
                 ),
-                "生成纯音乐": ("BOOLEAN", {"default": False}),
+                "生成纯音乐": ("BOOLEAN", {"default": False, "tooltip": "开启后不生成人声，只输出纯器乐"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "负面风格标签": ("STRING", {"default": ""}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "负面风格标签": ("STRING", {"default": "", "tooltip": "不想要的风格关键词，例如 metal, heavy distortion"}),
                 "发送高级Suno参数": (
                     "BOOLEAN",
                     {
@@ -67,14 +68,14 @@ class TikpanSunoMusicNode:
                         "tooltip": "开启后才透传人声性别、自动歌词、风格权重、创意随机度等高级字段；关闭时保持旧版稳定载荷。",
                     },
                 ),
-                "人声性别": (SUNO_VOCAL_GENDER_OPTIONS, {"default": "默认不传｜"}),
-                "自动生成歌词": ("BOOLEAN", {"default": False}),
-                "风格权重": ("FLOAT", {"default": 0.65, "min": 0.0, "max": 1.0, "step": 0.05}),
-                "创意随机度": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.05}),
-                "🎤_续写_歌曲ID": ("STRING", {"default": ""}),
-                "⏱️_续写起始秒数": ("FLOAT", {"default": 0.0, "min": 0, "max": 600}),
-                "🎭_歌手风格_PersonaID": ("STRING", {"default": ""}),
-                "🎙️_歌手风格_参考音频ID": ("STRING", {"default": ""}),
+                "人声性别": (SUNO_VOCAL_GENDER_OPTIONS, {"default": "默认不传｜", "tooltip": "人声倾向：女声/男声/不指定"}),
+                "自动生成歌词": ("BOOLEAN", {"default": False, "tooltip": "开启后由 Suno 自动写词，提示词只作为灵感"}),
+                "风格权重": ("FLOAT", {"default": 0.65, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "风格强度：越高越贴近所选曲风"}),
+                "创意随机度": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "越高越大胆/随机；越低越保守"}),
+                "🎤_续写_歌曲ID": ("STRING", {"default": "", "tooltip": "续写模式必填：要续写的歌曲 ID"}),
+                "⏱️_续写起始秒数": ("FLOAT", {"default": 0.0, "min": 0, "max": 600, "tooltip": "续写模式：从原曲第几秒开始续写"}),
+                "🎭_歌手风格_PersonaID": ("STRING", {"default": "", "tooltip": "歌手风格模式：Persona ID"}),
+                "🎙️_歌手风格_参考音频ID": ("STRING", {"default": "", "tooltip": "歌手风格模式：参考音频 ID"}),
             },
         }
 
@@ -97,6 +98,7 @@ class TikpanSunoMusicNode:
     OUTPUT_NODE = True
     FUNCTION = "generate_music"
     CATEGORY = '👑 Tikpan 官方独家节点/03 音频 Audio'
+    DESCRIPTION = "📝 Suno 音乐生成：业界顶级 AI 作曲，支持灵感/自定义/续写/歌手风格 4 种模式，多种风格预设和模型版本（V5/Fenix/V4 等）。一次返回 2 个版本可选。"
 
     def safe_json_text(self, obj, max_len=800):
         try:

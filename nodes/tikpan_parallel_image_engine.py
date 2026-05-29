@@ -51,12 +51,13 @@ class TikpanParallelImageEngineNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "API_Key": ("STRING", {"default": "sk-"}),
+                "API_Key": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "Prompt": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "A cinematic commercial product image, precise details, realistic lighting.",
+                        "tooltip": "对所有模型/中转站同时下发的提示词",
                     },
                 ),
                 "Models": (
@@ -64,7 +65,7 @@ class TikpanParallelImageEngineNode:
                     {
                         "multiline": True,
                         "default": "grok-imagine-image\ngrok-imagine-image-pro",
-                        "tooltip": "One model per line. Lines starting with # are ignored.",
+                        "tooltip": "每行一个模型 ID；以 # 开头的行会被忽略",
                     },
                 ),
                 "Relay_Hosts": (
@@ -72,18 +73,18 @@ class TikpanParallelImageEngineNode:
                     {
                         "multiline": True,
                         "default": "\n".join(API_HOST_OPTIONS),
-                        "tooltip": "One relay host per line. The engine will try selected hosts with each model.",
+                        "tooltip": "每行一个中转站地址；引擎会用每个模型轮流尝试每个中转站",
                     },
                 ),
-                "Size": (SIZE_OPTIONS, {"default": "1024x1024"}),
-                "Images_Per_Model": ("INT", {"default": 1, "min": 1, "max": 4}),
-                "Max_Concurrency": ("INT", {"default": 3, "min": 1, "max": 12}),
-                "Strategy": (STRATEGY_OPTIONS, {"default": "failover"}),
+                "Size": (SIZE_OPTIONS, {"default": "1024x1024", "tooltip": "出图尺寸（统一应用到所有模型）"}),
+                "Images_Per_Model": ("INT", {"default": 1, "min": 1, "max": 4, "tooltip": "每个模型在每个中转站生成几张"}),
+                "Max_Concurrency": ("INT", {"default": 3, "min": 1, "max": 12, "tooltip": "最大并发请求数；越大越快但更容易触发限流"}),
+                "Strategy": (STRATEGY_OPTIONS, {"default": "failover", "tooltip": "failover=失败再轮下一个；parallel_all=全部一起跑；race_first_success=谁先成功用谁"}),
             },
             "optional": {
-                "Response_Format": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0]}),
-                "Timeout_Seconds": ("INT", {"default": 240, "min": 30, "max": 1800}),
-                "Skip_Error": ("BOOLEAN", {"default": True}),
+                "Response_Format": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0], "tooltip": "url=返回云端链接（推荐）；b64_json=返回 Base64"}),
+                "Timeout_Seconds": ("INT", {"default": 240, "min": 30, "max": 1800, "tooltip": "单个请求等待上限秒数"}),
+                "Skip_Error": ("BOOLEAN", {"default": True, "tooltip": "开启后异常时跳过坏任务，不打断整批"}),
             },
         }
 
@@ -91,6 +92,7 @@ class TikpanParallelImageEngineNode:
     RETURN_NAMES = ("Images", "Stage_Log", "Result_JSON")
     FUNCTION = "run"
     CATEGORY = '👑 Tikpan 官方独家节点/06 任务与并发 Tools/并发引擎 Parallel Engine'
+    DESCRIPTION = "📝 API 多模型并发生图引擎：一次任务跨多个模型 + 多个中转站并发出图，支持 failover/race/parallel_all 三种策略。适合 A/B 测试、批量出图、容灾备份。"
 
     def run(self, **kwargs):
         start_time = time.time()

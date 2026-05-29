@@ -88,30 +88,31 @@ class TikpanDoubaoTTS20Node:
                 "获取密钥请访问": (
                     ["👉 https://tikpan.com (官方授权 Key 获取入口)"],
                 ),
-                "API_密钥": ("STRING", {"default": "sk-"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "合成文本": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "欢迎使用 Tikpan 豆包语音合成 2.0。现在音色已经整理成下拉框，普通用户不用再手动查 voice_type。",
+                        "tooltip": "需要被合成为语音的文本，按字符计费",
                     },
                 ),
-                "模型": (["doubao-tts-2.0"], {"default": "doubao-tts-2.0"}),
-                "音色": (VOICE_OPTIONS, {"default": voice_label(DOUBAO_VOICES_2_0[0])}),
-                "语速": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.05}),
-                "音量": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 3.0, "step": 0.05}),
-                "音调": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.05}),
+                "模型": (["doubao-tts-2.0"], {"default": "doubao-tts-2.0", "tooltip": "本节点使用的豆包 TTS 模型版本"}),
+                "音色": (VOICE_OPTIONS, {"default": voice_label(DOUBAO_VOICES_2_0[0]), "tooltip": "选择说话音色：每个对应不同性别/年龄/方言/情感风格"}),
+                "语速": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.05, "tooltip": "语速倍率：1.0 标准，>1 更快，<1 更慢"}),
+                "音量": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 3.0, "step": 0.05, "tooltip": "音量倍率：1.0 标准；过高可能爆音"}),
+                "音调": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.05, "tooltip": "音调倍率：>1 变尖，<1 变沉"}),
                 "情感": (
                     ["默认不传", "happy", "sad", "angry", "fearful", "surprised", "neutral"],
-                    {"default": "默认不传"},
+                    {"default": "默认不传", "tooltip": "情感标签：happy 欢快 / sad 悲伤 / angry 愤怒 等"},
                 ),
-                "音频格式": (["mp3", "wav", "pcm"], {"default": "mp3"}),
-                "采样率": (["24000", "16000", "22050", "32000", "44100", "48000"], {"default": "24000"}),
-                "POST重试策略": (["幂等键轻重试", "保守不重试POST"], {"default": "幂等键轻重试"}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
+                "音频格式": (["mp3", "wav", "pcm"], {"default": "mp3", "tooltip": "音频编码：mp3 通用，wav 无损未压缩，pcm 原始流"}),
+                "采样率": (["24000", "16000", "22050", "32000", "44100", "48000"], {"default": "24000", "tooltip": "输出音频采样率（Hz）；越高越清晰但文件越大"}),
+                "POST重试策略": (["幂等键轻重试", "保守不重试POST"], {"default": "幂等键轻重试", "tooltip": "网络异常重试方式；带幂等键更安全"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
                 "自定义voice_type": (
                     "STRING",
                     {
@@ -128,7 +129,7 @@ class TikpanDoubaoTTS20Node:
                 ),
                 "资源ID": (
                     ["seed-tts-2.0", "seed-tts-1.0", "volc.service_type.10029", "seed-icl-2.0", "seed-icl-1.0"],
-                    {"default": "seed-tts-2.0"},
+                    {"default": "seed-tts-2.0", "tooltip": "上游火山资源 ID，一般保持默认；ICL 系列用于复刻音色"},
                 ),
                 "接口路径": (
                     "STRING",
@@ -137,9 +138,9 @@ class TikpanDoubaoTTS20Node:
                         "tooltip": "默认绑定 Tikpan 中转站的豆包 V3 单向 SSE 路径；一般不要改。",
                     },
                 ),
-                "用户ID": ("STRING", {"default": "tikpan_comfyui_user"}),
-                "复用本地缓存": ("BOOLEAN", {"default": True}),
-                "跳过错误": ("BOOLEAN", {"default": False}),
+                "用户ID": ("STRING", {"default": "tikpan_comfyui_user", "tooltip": "调用方标识，便于上游做用量统计；保持默认即可"}),
+                "复用本地缓存": ("BOOLEAN", {"default": True, "tooltip": "开启后同一文本同一参数命中缓存时复用，避免重复扣费"}),
+                "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回空音频，不打断后续工作流"}),
                 "高级自定义_JSON": (
                     "STRING",
                     {
@@ -156,6 +157,7 @@ class TikpanDoubaoTTS20Node:
     OUTPUT_NODE = True
     FUNCTION = "generate_tts"
     CATEGORY = '👑 Tikpan 官方独家节点/03 音频 Audio'
+    DESCRIPTION = "📝 豆包语音合成 2.0：火山引擎 Seed-TTS 2.0 模型，丰富中文音色（含方言/年龄/角色），按字符计费。适合中文广告口播、有声书、短视频配音。"
 
     DEFAULT_OPTIONAL_VALUES = {
         "自定义voice_type": "",

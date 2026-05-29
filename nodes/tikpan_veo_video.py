@@ -46,22 +46,22 @@ class TikpanVeoVideoNode:
         inputs = {
             "required": {
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"], ),
-                "API_密钥": ("STRING", {"default": "sk-"}),
-                "Veo专属提示词": ("STRING", {"multiline": True, "default": "请在此直接输入您的视频提示词..."}),
-                "模型选择": (VEO_MODEL_OPTIONS, {"default": "veo_3_1-lite"}),
-                "比例": (["16:9", "9:16"], {"default": "16:9"}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "Veo专属提示词": ("STRING", {"multiline": True, "default": "请在此直接输入您的视频提示词...", "tooltip": "Veo 视频提示词，推荐英文；描述画面/动作/运镜越具体越好"}),
+                "模型选择": (VEO_MODEL_OPTIONS, {"default": "veo_3_1-lite", "tooltip": "选择 Veo 模型：lite 便宜快，components 支持垫图，4K 更清晰但更贵"}),
+                "比例": (["16:9", "9:16"], {"default": "16:9", "tooltip": "视频比例：16:9 横屏，9:16 竖屏短视频"}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
             },
         }
 
-        inputs["optional"]["参考图_首帧"] = ("IMAGE",)
-        inputs["optional"]["参考图_尾帧"] = ("IMAGE",)
+        inputs["optional"]["参考图_首帧"] = ("IMAGE", {"tooltip": "可选首帧图：作为视频的第一帧"})
+        inputs["optional"]["参考图_尾帧"] = ("IMAGE", {"tooltip": "可选尾帧图：作为视频的最后一帧"})
         for i in range(1, 4):
-            inputs["optional"][f"垫图_{i}"] = ("IMAGE",)
-        inputs["optional"]["校验HTTPS证书"] = ("BOOLEAN", {"default": True})
+            inputs["optional"][f"垫图_{i}"] = ("IMAGE", {"tooltip": f"垫图 {i}：作为视觉参考；仅 components 系列模型支持"})
+        inputs["optional"]["校验HTTPS证书"] = ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"})
 
         return inputs
 
@@ -70,6 +70,7 @@ class TikpanVeoVideoNode:
     OUTPUT_NODE = True
     FUNCTION = "execute"
     CATEGORY = '👑 Tikpan 官方独家节点/02 视频 Video'
+    DESCRIPTION = "📝 Veo 3.1 视频生成：Google Veo 多模型聚合（lite/pro/4K/components 等），支持首帧、尾帧、3 张垫图。物理规律和运镜真实感强，适合电影级短片。"
 
     def execute(self, 获取密钥请访问, API_密钥, Veo专属提示词, 模型选择, 比例, 随机种子=888888, **kwargs):
         comfy.model_management.throw_exception_if_processing_interrupted()

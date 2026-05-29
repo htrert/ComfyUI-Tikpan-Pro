@@ -57,8 +57,8 @@ class TikpanGPT5MiniResponsesNode:
                 "获取密钥地址": (
                     ["👉 https://tikpan.com 获取 Tikpan API Key"],
                 ),
-                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-")}),
-                "模型": (MODEL_OPTIONS, {"default": MODEL_NAME}),
+                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-"), "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "模型": (MODEL_OPTIONS, {"default": MODEL_NAME, "tooltip": "选择 GPT-5 系列模型"}),
                 "任务类型": (
                     [
                         "通用问答",
@@ -71,13 +71,14 @@ class TikpanGPT5MiniResponsesNode:
                         "安全合规检查",
                         "自定义",
                     ],
-                    {"default": "通用问答"},
+                    {"default": "通用问答", "tooltip": "预设场景，会自动调整 system prompt 模板"},
                 ),
                 "用户问题": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "请分析输入内容，给出清晰、可执行、适合商业使用的中文结论。",
+                        "tooltip": "本次对话的提问内容；可结合下方的图片/视频/文件输入",
                     },
                 ),
                 "系统指令": (
@@ -85,42 +86,43 @@ class TikpanGPT5MiniResponsesNode:
                     {
                         "multiline": True,
                         "default": "你是 Tikpan 的商业级 AI 助手，回答要准确、结构化、可执行。信息不足时说明不确定性，不要编造。",
+                        "tooltip": "system prompt：约束 AI 的角色、口吻和回答风格",
                     },
                 ),
                 "输出格式": (
                     ["中文报告", "Markdown结构化", "JSON结构化", "提示词优化"],
-                    {"default": "Markdown结构化"},
+                    {"default": "Markdown结构化", "tooltip": "回答形式：报告 / Markdown / JSON / 直接产出提示词"},
                 ),
                 "推理强度": (
                     ["最省｜minimal", "低｜low", "中｜medium", "高｜high"],
-                    {"default": "低｜low"},
+                    {"default": "低｜low", "tooltip": "思考链长度：越高越擅长复杂推理但更慢更贵"},
                 ),
                 "回答详细度": (
                     ["简洁｜low", "适中｜medium", "详细｜high"],
-                    {"default": "适中｜medium"},
+                    {"default": "适中｜medium", "tooltip": "控制最终回答的长度与展开程度"},
                 ),
-                "最大输出Token": ("INT", {"default": 4096, "min": 256, "max": 32768, "step": 256}),
-                "创意温度": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05}),
-                "图片细节": (["自动｜auto", "低清省费用｜low", "高清细节｜high"], {"default": "自动｜auto"}),
+                "最大输出Token": ("INT", {"default": 4096, "min": 256, "max": 32768, "step": 256, "tooltip": "回答最长字数上限"}),
+                "创意温度": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 2.0, "step": 0.05, "tooltip": "0=最稳，1=均衡，>1=更发散"}),
+                "图片细节": (["自动｜auto", "低清省费用｜low", "高清细节｜high"], {"default": "自动｜auto", "tooltip": "图片解析清晰度：高清更准但 token 消耗大"}),
                 "抽帧策略": (
                     ["均匀覆盖", "按秒抽帧", "首尾加密", "运动变化优先", "混合智能"],
-                    {"default": "混合智能"},
+                    {"default": "混合智能", "tooltip": "视频抽帧算法：混合智能=综合最佳"},
                 ),
-                "视频帧率FPS": ("INT", {"default": 24, "min": 1, "max": 120, "step": 1}),
-                "最大抽帧数": ("INT", {"default": 12, "min": 1, "max": MAX_FRAME_PARTS, "step": 1}),
-                "启用联网搜索": ("BOOLEAN", {"default": False}),
-                "URL错误处理": (["严格报错", "跳过坏链接并写日志"], {"default": "严格报错"}),
-                "POST重试策略": (["幂等键轻重试", "保守不重试POST"], {"default": "幂等键轻重试"}),
-                "复用本地缓存": ("BOOLEAN", {"default": True}),
-                "跳过错误": ("BOOLEAN", {"default": False}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
+                "视频帧率FPS": ("INT", {"default": 24, "min": 1, "max": 120, "step": 1, "tooltip": "源视频帧率"}),
+                "最大抽帧数": ("INT", {"default": 12, "min": 1, "max": MAX_FRAME_PARTS, "step": 1, "tooltip": "最多抽几帧用于分析；越多越准但更贵"}),
+                "启用联网搜索": ("BOOLEAN", {"default": False, "tooltip": "开启后允许模型联网检索最新信息"}),
+                "URL错误处理": (["严格报错", "跳过坏链接并写日志"], {"default": "严格报错", "tooltip": "URL 拉取失败时的策略"}),
+                "POST重试策略": (["幂等键轻重试", "保守不重试POST"], {"default": "幂等键轻重试", "tooltip": "网络异常重试方式；带幂等键更安全"}),
+                "复用本地缓存": ("BOOLEAN", {"default": True, "tooltip": "开启后同一文件复用本地缓存，省带宽和时间"}),
+                "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回空，不打断后续工作流"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "图片1": ("IMAGE",),
-                "图片2": ("IMAGE",),
-                "图片3": ("IMAGE",),
-                "图片4": ("IMAGE",),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "图片1": ("IMAGE", {"tooltip": "可选输入图 1，用于图文混合提问（最多 16 张）"}),
+                "图片2": ("IMAGE", {"tooltip": "可选输入图 2"}),
+                "图片3": ("IMAGE", {"tooltip": "可选输入图 3"}),
+                "图片4": ("IMAGE", {"tooltip": "可选输入图 4"}),
                 "图片URL列表": (
                     "STRING",
                     {
@@ -167,6 +169,7 @@ class TikpanGPT5MiniResponsesNode:
     OUTPUT_NODE = True
     FUNCTION = "run_responses"
     CATEGORY = '👑 Tikpan 官方独家节点/04 文字与多模态 Text & Multimodal'
+    DESCRIPTION = "📝 GPT-5.4 Mini 多模态推理：走 /v1/responses 接口，性价比极高，推理强度可调，支持图/视频/文件/联网。适合通用问答、文案优化、数据分析。"
 
     def make_return(self, answer="", prompt="", structured="", usage="", log=""):
         return (str(answer or ""), str(prompt or ""), str(structured or ""), str(usage or ""), str(log or ""))

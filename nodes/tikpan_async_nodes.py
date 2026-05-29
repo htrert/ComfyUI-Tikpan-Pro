@@ -45,22 +45,23 @@ class TikpanAsyncImageSubmitNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "API_Key": ("STRING", {"default": "sk-"}),
+                "API_Key": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "Prompt": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "A cinematic commercial product image, precise details, realistic lighting.",
+                        "tooltip": "提交给异步任务池的提示词",
                     },
                 ),
-                "Model": (MODEL_OPTIONS, {"default": "grok-imagine-image"}),
-                "Relay_Host": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "Size": (SIZE_OPTIONS, {"default": "1024x1024"}),
-                "Images": ("INT", {"default": 1, "min": 1, "max": 4}),
+                "Model": (MODEL_OPTIONS, {"default": "grok-imagine-image", "tooltip": "选择要异步出图的模型"}),
+                "Relay_Host": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "Size": (SIZE_OPTIONS, {"default": "1024x1024", "tooltip": "出图尺寸"}),
+                "Images": ("INT", {"default": 1, "min": 1, "max": 4, "tooltip": "本次任务生成几张"}),
             },
             "optional": {
-                "Response_Format": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0]}),
-                "Timeout_Seconds": ("INT", {"default": 240, "min": 30, "max": 1800}),
+                "Response_Format": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0], "tooltip": "url=云端链接（推荐）；b64_json=直接返回 Base64"}),
+                "Timeout_Seconds": ("INT", {"default": 240, "min": 30, "max": 1800, "tooltip": "单任务超时秒数"}),
             },
         }
 
@@ -68,6 +69,7 @@ class TikpanAsyncImageSubmitNode:
     RETURN_NAMES = ("Task_ID", "Stage_Log", "Task_JSON")
     FUNCTION = "submit"
     CATEGORY = '👑 Tikpan 官方独家节点/06 任务与并发 Tools/异步任务池 Async Engine'
+    DESCRIPTION = "📝 异步提交图片任务：把生图请求推到本地任务池后立刻返回 Task_ID，不阻塞工作流。配合『异步查询』节点取结果。适合长时间任务、批量并行。"
 
     def submit(self, **kwargs):
         api_key = str(pick(kwargs, "API_Key", "api_key", default="") or "").strip()
@@ -105,10 +107,10 @@ class TikpanAsyncImageResultNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "Task_ID": ("STRING", {"default": ""}),
-                "Wait_Mode": (WAIT_MODE_OPTIONS, {"default": "return_now"}),
-                "Max_Wait_Seconds": ("INT", {"default": 600, "min": 0, "max": 3600}),
-                "Poll_Interval_Seconds": ("INT", {"default": 3, "min": 1, "max": 60}),
+                "Task_ID": ("STRING", {"default": "", "tooltip": "上一步『异步提交』返回的任务 ID"}),
+                "Wait_Mode": (WAIT_MODE_OPTIONS, {"default": "return_now", "tooltip": "return_now=立刻返回当前状态；wait_until_done=阻塞等待出片"}),
+                "Max_Wait_Seconds": ("INT", {"default": 600, "min": 0, "max": 3600, "tooltip": "wait_until_done 模式的最长等待秒数"}),
+                "Poll_Interval_Seconds": ("INT", {"default": 3, "min": 1, "max": 60, "tooltip": "轮询任务状态的间隔秒数"}),
             },
         }
 
@@ -116,6 +118,7 @@ class TikpanAsyncImageResultNode:
     RETURN_NAMES = ("Images", "Stage_Log", "Task_JSON", "Image_Paths")
     FUNCTION = "query"
     CATEGORY = "👑 Tikpan 官方独家节点/异步任务池 Async Engine"
+    DESCRIPTION = "📝 异步查询图片结果：根据 Task_ID 查询出图状态。可选立刻返回当前状态，或阻塞等待出图完成。"
 
     def query(self, **kwargs):
         task_id = str(pick(kwargs, "Task_ID", "task_id", default="") or "").strip()
@@ -152,19 +155,19 @@ class TikpanAsyncImageJoinNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "Task_ID_1": ("STRING", {"default": ""}),
-                "Wait_All": ("BOOLEAN", {"default": True}),
-                "Max_Wait_Seconds": ("INT", {"default": 900, "min": 0, "max": 7200}),
-                "Poll_Interval_Seconds": ("INT", {"default": 3, "min": 1, "max": 60}),
+                "Task_ID_1": ("STRING", {"default": "", "tooltip": "必填的第 1 个任务 ID"}),
+                "Wait_All": ("BOOLEAN", {"default": True, "tooltip": "True=等所有任务结束；False=任一成功即返回"}),
+                "Max_Wait_Seconds": ("INT", {"default": 900, "min": 0, "max": 7200, "tooltip": "全部任务的最长等待秒数"}),
+                "Poll_Interval_Seconds": ("INT", {"default": 3, "min": 1, "max": 60, "tooltip": "轮询任务状态的间隔秒数"}),
             },
             "optional": {
-                "Task_ID_2": ("STRING", {"default": ""}),
-                "Task_ID_3": ("STRING", {"default": ""}),
-                "Task_ID_4": ("STRING", {"default": ""}),
-                "Task_ID_5": ("STRING", {"default": ""}),
-                "Task_ID_6": ("STRING", {"default": ""}),
-                "Task_ID_7": ("STRING", {"default": ""}),
-                "Task_ID_8": ("STRING", {"default": ""}),
+                "Task_ID_2": ("STRING", {"default": "", "tooltip": "可选第 2 个任务 ID"}),
+                "Task_ID_3": ("STRING", {"default": "", "tooltip": "可选第 3 个任务 ID"}),
+                "Task_ID_4": ("STRING", {"default": "", "tooltip": "可选第 4 个任务 ID"}),
+                "Task_ID_5": ("STRING", {"default": "", "tooltip": "可选第 5 个任务 ID"}),
+                "Task_ID_6": ("STRING", {"default": "", "tooltip": "可选第 6 个任务 ID"}),
+                "Task_ID_7": ("STRING", {"default": "", "tooltip": "可选第 7 个任务 ID"}),
+                "Task_ID_8": ("STRING", {"default": "", "tooltip": "可选第 8 个任务 ID"}),
             },
         }
 
@@ -172,6 +175,7 @@ class TikpanAsyncImageJoinNode:
     RETURN_NAMES = ("Images", "Stage_Log", "Tasks_JSON", "Image_Paths")
     FUNCTION = "join"
     CATEGORY = "👑 Tikpan 官方独家节点/异步任务池 Async Engine"
+    DESCRIPTION = "📝 合并异步图片任务：最多输入 8 个 Task_ID，等待全部完成（或任一成功）后合并所有图片到一个 IMAGE 批次。适合多任务并行后汇总。"
 
     def join(self, **kwargs):
         task_ids = []
@@ -227,7 +231,7 @@ class TikpanAsyncTaskListNode:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "Limit": ("INT", {"default": 20, "min": 1, "max": 200}),
+                "Limit": ("INT", {"default": 20, "min": 1, "max": 200, "tooltip": "返回最近 N 个任务"}),
             },
         }
 
@@ -235,6 +239,7 @@ class TikpanAsyncTaskListNode:
     RETURN_NAMES = ("Tasks_JSON",)
     FUNCTION = "list_recent"
     CATEGORY = "👑 Tikpan 官方独家节点/异步任务池 Async Engine"
+    DESCRIPTION = "📝 最近异步任务列表：返回最近 N 个异步任务的元数据 JSON（状态/参数/结果）。用于查看历史、断线恢复、调试。"
 
     def list_recent(self, **kwargs):
         limit = int(pick(kwargs, "Limit", "limit", default=20) or 20)

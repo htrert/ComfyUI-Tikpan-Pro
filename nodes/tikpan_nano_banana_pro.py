@@ -30,22 +30,23 @@ class TikpanNanoBananaProNode:
         return {
             "required": {
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "API_密钥": ("STRING", {"default": "sk-"}),
-                "调用方式": (["gemini原生", "openai兼容"], {"default": "gemini原生"}),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "调用方式": (["gemini原生", "openai兼容"], {"default": "gemini原生", "tooltip": "走 Gemini 原生接口最稳，OpenAI 兼容方便接入旧工作流"}),
                 "模型": (
                     ["gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview"],
-                    {"default": "gemini-3-pro-image-preview"},
+                    {"default": "gemini-3-pro-image-preview", "tooltip": "pro=质量更高更慢；flash=快速便宜"},
                 ),
                 "修改指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "请生成一张高质量图像，增强细节与质感，输出高分辨率结果。",
+                        "tooltip": "描述你想生成/修改的画面，越具体越准确",
                     },
                 ),
                 "分辨率": (
                     ["2K", "4K", "1K", "none"],
-                    {"default": "2K"},
+                    {"default": "2K", "tooltip": "档位越高越清晰，但更慢更贵；none=由模型自由决定"},
                 ),
                 "画面比例": (
                     [
@@ -59,10 +60,10 @@ class TikpanNanoBananaProNode:
                         "3:2 | 3:2摄影",
                         "2:3 | 2:3人像",
                     ],
-                    {"default": "1:1 | 1:1正方形"},
+                    {"default": "1:1 | 1:1正方形", "tooltip": "画面比例：选择合适的画幅"},
                 ),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff}),
-                "温度": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 2.0, "step": 0.1}),
+                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff, "tooltip": "同种子+同提示词可复现画面；改种子可换不同结果"}),
+                "温度": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 2.0, "step": 0.1, "tooltip": "创意度：0=最稳，1=均衡，>1=更发散"}),
                 "最大输出Token数": (
                     "INT",
                     {
@@ -81,8 +82,8 @@ class TikpanNanoBananaProNode:
                 ),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                **{f"参考图_{i}": ("IMAGE",) for i in range(1, 15)},
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                **{f"参考图_{i}": ("IMAGE", {"tooltip": f"参考图 {i}：作为视觉参考输入；最多 14 张"}) for i in range(1, 15)},
             },
         }
 
@@ -90,6 +91,7 @@ class TikpanNanoBananaProNode:
     RETURN_NAMES = ("🖼️_生成结果图", "📄_渲染日志")
     FUNCTION = "execute"
     CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    DESCRIPTION = "📝 Nano Banana Pro：Gemini-3-Pro-Image-Preview 模型生图节点，支持 1K/2K/4K、Gemini 原生或 OpenAI 兼容协议、最多 14 张参考图。适合多图融合、IP 衍生。"
 
     def parse_aspect_ratio(self, ratio_str):
         return str(ratio_str).split(" | ")[0].strip()

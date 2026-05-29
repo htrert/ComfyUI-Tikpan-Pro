@@ -99,8 +99,8 @@ class TikpanTaskFetcherNode:
         return {
             "required": {
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-")}),
-                "任务ID": ("STRING", {"default": ""}),
+                "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-"), "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "任务ID": ("STRING", {"default": "", "tooltip": "异步生成节点返回的任务 ID"}),
                 "文件名前缀": (
                     "STRING",
                     {
@@ -110,15 +110,15 @@ class TikpanTaskFetcherNode:
                 ),
                 "最长等待秒数": (
                     "INT",
-                    {"default": 600, "min": 30, "max": 3600, "step": 10},
+                    {"default": 600, "min": 30, "max": 3600, "step": 10, "tooltip": "等待任务完成的最长秒数；长视频/高清建议加大"},
                 ),
                 "查询间隔秒数": (
                     "INT",
-                    {"default": 10, "min": 5, "max": 60, "step": 5},
+                    {"default": 10, "min": 5, "max": 60, "step": 5, "tooltip": "轮询任务状态的间隔秒数"},
                 ),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
             },
         }
 
@@ -127,6 +127,7 @@ class TikpanTaskFetcherNode:
     OUTPUT_NODE = True
     FUNCTION = "fetch_and_download"
     CATEGORY = '👑 Tikpan 官方独家节点/06 任务与并发 Tools'
+    DESCRIPTION = "📝 异步任务查询与下载：通用任务轮询节点，输入任意 Tikpan 异步任务 ID，自动等待完成并下载视频/图片到本地。HappyHorse/Veo/Grok 等异步任务通用。"
 
     def fetch_and_download(self, **kwargs):
         try:

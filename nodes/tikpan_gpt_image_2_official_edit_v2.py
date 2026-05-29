@@ -3,6 +3,8 @@ import base64
 import hashlib
 import json
 import re
+import socket
+import sys
 import traceback
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -17,6 +19,77 @@ import folder_paths
 from PIL import Image, ImageOps
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+try:
+    from urllib3.connection import HTTPConnection as _Urllib3HTTPConnection, HTTPSConnection as _Urllib3HTTPSConnection
+    from urllib3.connectionpool import HTTPConnectionPool as _Urllib3HTTPConnectionPool, HTTPSConnectionPool as _Urllib3HTTPSConnectionPool
+    _URLLIB3_OK = True
+except Exception:
+    _URLLIB3_OK = False
+
+
+_KEEPALIVE_SOCKET_OPTIONS = [
+    (socket.IPPROTO_TCP, socket.TCP_NODELAY, 1),
+    (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+]
+for _kn, _kv in (("TCP_KEEPIDLE", 30), ("TCP_KEEPINTVL", 30), ("TCP_KEEPCNT", 4)):
+    _kc = getattr(socket, _kn, None)
+    if _kc is not None:
+        _KEEPALIVE_SOCKET_OPTIONS.append((socket.IPPROTO_TCP, _kc, _kv))
+
+
+def _apply_win_keepalive(sock):
+    if sys.platform != "win32" or sock is None:
+        return
+    sio = getattr(socket, "SIO_KEEPALIVE_VALS", None)
+    if sio is None:
+        return
+    try:
+        sock.ioctl(sio, (1, 30000, 30000))
+    except OSError:
+        pass
+
+
+if _URLLIB3_OK:
+    class _KeepaliveHTTPConnection(_Urllib3HTTPConnection):
+        def connect(self):
+            super().connect()
+            _apply_win_keepalive(self.sock)
+
+    class _KeepaliveHTTPSConnection(_Urllib3HTTPSConnection):
+        def connect(self):
+            super().connect()
+            _apply_win_keepalive(self.sock)
+
+    class _KeepaliveHTTPConnectionPool(_Urllib3HTTPConnectionPool):
+        ConnectionCls = _KeepaliveHTTPConnection
+
+    class _KeepaliveHTTPSConnectionPool(_Urllib3HTTPSConnectionPool):
+        ConnectionCls = _KeepaliveHTTPSConnection
+
+
+class KeepaliveHTTPAdapter(HTTPAdapter):
+    """长任务防 NAT 中断：开启 TCP keepalive。
+
+    Why: gpt-image-2 单次绘图常需 5 分钟以上，TCP 在此期间无数据流动，
+    国内 NAT/CGNAT 表项 5–10 分钟无活动会被清掉；本地不开 keepalive 时
+    系统不会探测，requests 会一直等到 read timeout 才报错，表现为
+    「中转站后台已出图但本地没收到」。开 keepalive 后内核每 30s 探测一次，
+    既保活又能在被掐断时立刻抛 ConnectionError 而不是傻等到 600s。
+    """
+
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs["socket_options"] = list(_KEEPALIVE_SOCKET_OPTIONS)
+        super().init_poolmanager(*args, **kwargs)
+        if not _URLLIB3_OK:
+            return
+        try:
+            self.poolmanager.pool_classes_by_scheme = {
+                "http": _KeepaliveHTTPConnectionPool,
+                "https": _KeepaliveHTTPSConnectionPool,
+            }
+        except Exception:
+            pass
 
 from .tikpan_gpt_image_recovery import (
     get_with_retry,
@@ -54,36 +127,37 @@ class TikpanGptImage2OfficialEditV2:
             "required": {
                 "💎_源头拿货价福利_💎": (["🔥 0.6元RMB兑1美元余额全网底价"],),
                 "获取密钥请访问": (["👉 https://tikpan.com 官方授权获取Key"],),
-                "API_密钥": ("STRING", {"default": "sk-"}),
-                "主图像": ("IMAGE",),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "主图像": ("IMAGE", {"tooltip": "要被编辑的原始图像（必填）"}),
                 "编辑指令": (
                     "STRING",
                     {
                         "multiline": True,
                         "default": "请根据要求编辑图像；如果提供了遮罩，仅修改遮罩区域并尽量保持未遮罩区域不变。",
+                        "tooltip": "告诉 AI 怎么改图，例如『把背景换成海边』『增加一只猫』。如果上传了遮罩，仅修改遮罩区域。",
                     },
                 ),
-                "生成张数": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1}),
-                "分辨率档位": (["Auto", "1K", "2K", "4K"], {"default": "2K"}),
+                "生成张数": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1, "tooltip": "一次生成几张结果；张数越多越慢越贵"}),
+                "分辨率档位": (["Auto", "1K", "2K", "4K"], {"default": "2K", "tooltip": "结果分辨率：Auto 跟随主图；档位越高越清晰但更慢更贵"}),
                 "画面比例": (
                     ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "21:9", "9:21"],
-                    {"default": "Auto"},
+                    {"default": "Auto", "tooltip": "结果比例：Auto 跟随主图；选定后会缩放/补边到目标比例"},
                 ),
-                "尺寸": (SIZE_OPTIONS, {"default": "Auto"}),
-                "画质": (QUALITY_OPTIONS, {"default": "均衡质量｜medium"}),
-                "背景模式": (BACKGROUND_OPTIONS, {"default": "自动背景｜auto"}),
-                "审核等级": (MODERATION_OPTIONS, {"default": "auto"}),
-                "遮罩反相": ("BOOLEAN", {"default": False}),
-                "提示增强": ("BOOLEAN", {"default": True}),
-                "并发请求数": ("INT", {"default": 2, "min": 1, "max": 4, "step": 1}),
-                "超时秒数": ("INT", {"default": 600, "min": 30, "max": 1800, "step": 10}),
+                "尺寸": (SIZE_OPTIONS, {"default": "Auto", "tooltip": "强制指定输出尺寸（覆盖档位+比例）；一般选 Auto 由前两项决定"}),
+                "画质": (QUALITY_OPTIONS, {"default": "均衡质量｜medium", "tooltip": "low=快且省钱；medium=日常推荐；high=精细但更慢更贵"}),
+                "背景模式": (BACKGROUND_OPTIONS, {"default": "自动背景｜auto", "tooltip": "auto=由模型决定；opaque=不透明；transparent=透明背景（PNG）"}),
+                "审核等级": (MODERATION_OPTIONS, {"default": "auto", "tooltip": "内容审核严格度：auto=默认；low=宽松"}),
+                "遮罩反相": ("BOOLEAN", {"default": False, "tooltip": "开启后把遮罩的黑白对调（让原本要保留的变成要编辑的）"}),
+                "提示增强": ("BOOLEAN", {"default": True, "tooltip": "开启后会自动给指令加补充描述，提升画面质量"}),
+                "并发请求数": ("INT", {"default": 2, "min": 1, "max": 4, "step": 1, "tooltip": "同时发起的请求数；越大越快但更容易触发频率限制"}),
+                "超时秒数": ("INT", {"default": 600, "min": 30, "max": 1800, "step": 10, "tooltip": "等待单次出图的最长秒数；4K/复杂场景建议加大"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                **{f"参考图{i}": ("IMAGE",) for i in range(1, 16)},
-                "参考流": ("IMAGE",),
-                "遮罩掩码": ("MASK",),
-                "跳过错误": ("BOOLEAN", {"default": False}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                **{f"参考图{i}": ("IMAGE", {"tooltip": f"参考图 {i}：模型会基于这些图片作为视觉参考"}) for i in range(1, 16)},
+                "参考流": ("IMAGE", {"tooltip": "批量参考图（接入一个 IMAGE 批次即可）"}),
+                "遮罩掩码": ("MASK", {"tooltip": "可选遮罩：白色区域=要重绘，黑色区域=保持不变"}),
+                "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回黑图，不打断后续工作流"}),
             },
         }
 
@@ -91,6 +165,7 @@ class TikpanGptImage2OfficialEditV2:
     RETURN_NAMES = ("编辑结果", "渲染日志")
     FUNCTION = "edit_image"
     CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    DESCRIPTION = "📝 GPT-Image-2 官方修图 V2：批量并发修图引擎，最多 15 张参考图 + 主图 + 遮罩，支持 4K、断线保活、幂等键、错误恢复。商业项目首选。"
 
     def edit_image(self, **kwargs):
         start_time = time.time()
@@ -214,7 +289,7 @@ class TikpanGptImage2OfficialEditV2:
                     allowed_methods=frozenset(["GET"]),
                     raise_on_status=False,
                 )
-                adapter = HTTPAdapter(max_retries=get_retry)
+                adapter = KeepaliveHTTPAdapter(max_retries=get_retry)
                 sess.mount("https://", adapter)
                 sess.mount("http://", adapter)
 
@@ -725,7 +800,7 @@ class TikpanGptImage2OfficialEditV2:
             allowed_methods=frozenset(["GET"]),
             raise_on_status=False,
         )
-        adapter = HTTPAdapter(max_retries=get_retry)
+        adapter = KeepaliveHTTPAdapter(max_retries=get_retry)
         session.mount("https://", adapter)
         session.mount("http://", adapter)
         return session

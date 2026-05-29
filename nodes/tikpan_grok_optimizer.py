@@ -17,22 +17,24 @@ class TikpanGrokPromptOptimizerNode:
         inputs = {
             "required": {
                 "获取密钥地址": (["👉 https://tikpan.com (官方授权Key获取点)"], ),
-                "Tikpan_API密钥": ("STRING", {"default": "sk-"}),
-                "文本处理模型": (["gpt-5.4-mini", "gpt-4o", "gpt-4-turbo", "claude-3.5-sonnet"], {"default": "gpt-5.4-mini"}),
+                "Tikpan_API密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "文本处理模型": (["gpt-5.4-mini", "gpt-4o", "gpt-4-turbo", "claude-3.5-sonnet"], {"default": "gpt-5.4-mini", "tooltip": "用于重写提示词的语言模型；gpt-5.4-mini 性价比最高"}),
                 "Gemini原片拆解报告": ("STRING", {"forceInput": True, "multiline": True, "tooltip": "连接Gemini视频分析节点的输出"}),
 
                 "核心产品与植入场景": ("STRING", {
                     "multiline": True,
-                    "default": "【产品名称】：\n【核心功能/卖点】：\n【期望植入的场景或动作】：\n(例如：将原片中主角手里拿的水杯，替换成我的 @img1 某某香水，喷洒时要有闪耀的光影)"
+                    "default": "【产品名称】：\n【核心功能/卖点】：\n【期望植入的场景或动作】：\n(例如：将原片中主角手里拿的水杯，替换成我的 @img1 某某香水，喷洒时要有闪耀的光影)",
+                    "tooltip": "你想要植入到原视频中的新产品/新主体描述，越具体越好"
                 }),
                 "氛围与运镜微调": ("STRING", {
                     "multiline": True,
-                    "default": "保留原片的丝滑运镜，将背景的色调改为具有未来科技感的赛博朋克风。"
+                    "default": "保留原片的丝滑运镜，将背景的色调改为具有未来科技感的赛博朋克风。",
+                    "tooltip": "想要调整的氛围、色调、运镜等额外要求（可选）"
                 }),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0]}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": True}),
+                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             }
         }
 
@@ -46,6 +48,7 @@ class TikpanGrokPromptOptimizerNode:
     RETURN_NAMES = ("🎯_Grok3专属提示词", "🧠_GPT重构思考日志")
     FUNCTION = "optimize_prompt"
     CATEGORY = '👑 Tikpan 官方独家节点/05 提示词与分析 Prompt & Analysis'
+    DESCRIPTION = "📝 Grok 多图剧本重构：接收视频分镜报告 + 新产品信息，自动重写为 Grok-3 视频提示词，支持 @img1-@img7 多图锚点语法。视频二创神器。"
 
     def optimize_prompt(self, 获取密钥地址, Tikpan_API密钥, 文本处理模型, Gemini原片拆解报告, 核心产品与植入场景, 氛围与运镜微调, **kwargs):
         comfy.model_management.throw_exception_if_processing_interrupted()
