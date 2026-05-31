@@ -63,32 +63,63 @@ class TikpanPSDDependencyDownloaderNode:
         if include_inpaint or CHOICE_PREMIUM in tier or CHOICE_ALL in tier:
             packages.append("simple-lama-inpainting")
 
-        log_lines.append(f"\n📦 步骤1: 安装 {len(packages)} 个 pip 依赖")
+        # 步骤1: 安装依赖
+        log_lines.append(f"\n📦 步骤1/2: 安装 {len(packages)} 个 pip 依赖")
         ok, pip_log = self._install_packages(packages)
         log_lines.append(pip_log)
         if not ok:
+            log_lines.append("\n" + "=" * 50)
+            log_lines.append("❌ 依赖安装失败，请检查网络或手动安装")
             return ("\n".join(log_lines), self._render_status_image(log_lines, success=False))
 
-        log_lines.append("\n🤖 步骤2: 下载 AI 模型")
+        # 步骤2: 下载模型
+        log_lines.append("\n🤖 步骤2/2: 下载 AI 模型")
+        model_success = []
+        model_failed = []
 
         if CHOICE_ECONOMY in tier or CHOICE_ALL in tier:
             ok, msg = self._prefetch_rembg_model()
             log_lines.append(msg)
+            if ok:
+                model_success.append("rembg")
+            else:
+                model_failed.append("rembg")
 
         if CHOICE_STANDARD in tier or CHOICE_PREMIUM in tier or CHOICE_ALL in tier:
             ok, msg = self._prefetch_sam2_model()
             log_lines.append(msg)
+            if ok:
+                model_success.append("SAM2")
+            else:
+                model_failed.append("SAM2")
+
             ok, msg = self._prefetch_easyocr_model()
             log_lines.append(msg)
+            if ok:
+                model_success.append("EasyOCR")
+            else:
+                model_failed.append("EasyOCR")
 
         if include_inpaint or CHOICE_PREMIUM in tier or CHOICE_ALL in tier:
             ok, msg = self._prefetch_lama_model()
             log_lines.append(msg)
+            if ok:
+                model_success.append("LaMa")
+            else:
+                model_failed.append("LaMa")
 
+        # 总结
         log_lines.append("\n" + "=" * 50)
-        log_lines.append("✅ 全部下载完成，可以使用智能分层节点了")
-
-        return ("\n".join(log_lines), self._render_status_image(log_lines, success=True))
+        if model_failed:
+            log_lines.append(f"⚠️ 部分模型下载失败: {', '.join(model_failed)}")
+            log_lines.append(f"✅ 成功下载: {', '.join(model_success)}")
+            log_lines.append("\n提示: 失败的模型会在首次使用时自动重试")
+            return ("\n".join(log_lines), self._render_status_image(log_lines, success=False))
+        else:
+            log_lines.append(f"✅ 全部下载完成！共 {len(model_success)} 个模型")
+            log_lines.append(f"   成功: {', '.join(model_success)}")
+            log_lines.append("\n🎉 现在可以使用智能分层节点了")
+            return ("\n".join(log_lines), self._render_status_image(log_lines, success=True))
 
     def _install_packages(self, packages):
         python_exe = sys.executable
@@ -114,17 +145,18 @@ class TikpanPSDDependencyDownloaderNode:
         try:
             from rembg import new_session
             print("[Tikpan PSD] 预加载 rembg ISNet 模型...")
-            new_session("isnet-general-use")
+            session = new_session("isnet-general-use")
+            print("[Tikpan PSD] rembg 模型加载成功")
             return True, "  • rembg ISNet 模型 ✓"
         except Exception as e:
-            return False, f"  • rembg 模型下载失败: {e}"
+            print(f"[Tikpan PSD] rembg 模型加载失败: {e}")
+            return False, f"  • rembg 模型 ✗ (失败: {str(e)[:50]})"
 
     def _prefetch_sam2_model(self):
         try:
             from sam2.build_sam import build_sam2
             import folder_paths
             import os
-            print("[Tikpan PSD] 预加载 SAM2 模型...")
 
             models_dir = os.path.join(folder_paths.models_dir, "sam2")
             os.makedirs(models_dir, exist_ok=True)
@@ -132,34 +164,57 @@ class TikpanPSDDependencyDownloaderNode:
             ckpt_name = "sam2.1_hiera_small.pt"
             ckpt_path = os.path.join(models_dir, ckpt_name)
 
-            if not os.path.exists(ckpt_path):
+            if os.path.exists(ckpt_path):
+                file_size = os.path.getsize(ckpt_path) / (1024 * 1024)
+                print(f"[Tikpan PSD] SAM2 模型已存在 ({file_size:.1f}MB)")
+                return True, f"  • SAM2 模型 ✓ (已存在 {file_size:.1f}MB)"
+            else:
                 import urllib.request
                 url = f"https://dl.fbaipublicfiles.com/segment_anything_2/092824/{ckpt_name}"
-                print(f"[Tikpan PSD] 下载 SAM2 模型 (~180MB)...")
-                urllib.request.urlretrieve(url, ckpt_path)
+                print(f"[Tikpan PSD] 正在下载 SAM2 模型 (~180MB)...")
+                print(f"[Tikpan PSD] 下载地址: {url}")
 
-            return True, "  • SAM2 模型 ✓"
+                # 下载并显示进度
+                def reporthook(count, block_size, total_size):
+                    if total_size > 0:
+                        percent = int(count * block_size * 100 / total_size)
+                        mb_downloaded = count * block_size / (1024 * 1024)
+                        mb_total = total_size / (1024 * 1024)
+                        if count % 50 == 0:  # 每50个块打印一次
+                            print(f"[Tikpan PSD] 下载进度: {percent}% ({mb_downloaded:.1f}/{mb_total:.1f}MB)")
+
+                urllib.request.urlretrieve(url, ckpt_path, reporthook)
+                file_size = os.path.getsize(ckpt_path) / (1024 * 1024)
+                print(f"[Tikpan PSD] SAM2 模型下载完成 ({file_size:.1f}MB)")
+                return True, f"  • SAM2 模型 ✓ (已下载 {file_size:.1f}MB)"
+
         except Exception as e:
-            return False, f"  • SAM2 模型下载失败: {e}"
+            print(f"[Tikpan PSD] SAM2 模型下载失败: {e}")
+            return False, f"  • SAM2 模型 ✗ (失败: {str(e)[:50]})"
 
     def _prefetch_easyocr_model(self):
         try:
             import torch
             import easyocr
             print("[Tikpan PSD] 预加载 EasyOCR 中英文模型...")
-            easyocr.Reader(['ch_sim', 'en'], gpu=torch.cuda.is_available())
+            print("[Tikpan PSD] 首次运行会下载检测模型和识别模型，请耐心等待...")
+            reader = easyocr.Reader(['ch_sim', 'en'], gpu=torch.cuda.is_available())
+            print("[Tikpan PSD] EasyOCR 模型加载成功")
             return True, "  • EasyOCR 中英文模型 ✓"
         except Exception as e:
-            return False, f"  • EasyOCR 模型下载失败: {e}"
+            print(f"[Tikpan PSD] EasyOCR 模型加载失败: {e}")
+            return False, f"  • EasyOCR 模型 ✗ (失败: {str(e)[:50]})"
 
     def _prefetch_lama_model(self):
         try:
             from simple_lama_inpainting import SimpleLama
             print("[Tikpan PSD] 预加载 LaMa Inpainting 模型...")
             SimpleLama()
+            print("[Tikpan PSD] LaMa 模型加载成功")
             return True, "  • LaMa Inpainting 模型 ✓"
         except Exception as e:
-            return False, f"  • LaMa 模型下载失败: {e}"
+            print(f"[Tikpan PSD] LaMa 模型加载失败: {e}")
+            return False, f"  • LaMa 模型 ✗ (失败: {str(e)[:50]})"
 
     def _render_status_image(self, log_lines, success=True):
         img = Image.new("RGB", (900, 600), (30, 32, 38))
