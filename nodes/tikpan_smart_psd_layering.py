@@ -253,54 +253,24 @@ class TikpanSmartPSDLayeringNode:
         return missing
 
     def _create_error_image(self, error_msg=""):
+        """生成错误提示图 - 使用默认字体避免崩溃"""
         img = Image.new("RGB", (768, 512), (45, 45, 50))
         draw = ImageDraw.Draw(img)
 
-        # 尝试加载中文字体
-        font = None
+        # 不使用自定义字体，避免 PIL ImageFont 的内存访问冲突
         try:
-            from PIL import ImageFont
-            font_paths = [
-                "C:/Windows/Fonts/msyh.ttc",
-                "C:/Windows/Fonts/simhei.ttf",
-                "C:/Windows/Fonts/simsun.ttc",
-            ]
-            for font_path in font_paths:
+            draw.text((20, 20), "ERROR:", fill=(255, 100, 100))
+            lines = error_msg.split("\n")[:18]
+            y = 60
+            for line in lines:
                 try:
-                    font = ImageFont.truetype(font_path, 11)
-                    # 测试字体
-                    test_bbox = font.getbbox("测试")
-                    break
+                    # 只显示 ASCII 字符
+                    ascii_line = line.encode('ascii', 'ignore').decode('ascii')
+                    if ascii_line.strip():
+                        draw.text((20, y), ascii_line[:90], fill=(220, 220, 220))
+                        y += 22
                 except:
-                    font = None
-                    continue
-        except:
-            font = None
-
-        try:
-            if font:
-                draw.text((20, 20), "⚠ Error:", fill=(255, 100, 100), font=font)
-                lines = error_msg.split("\n")[:18]
-                y = 60
-                for line in lines:
-                    try:
-                        draw.text((20, y), line[:90], fill=(220, 220, 220), font=font)
-                    except:
-                        pass
-                    y += 22
-            else:
-                # 降级到 ASCII
-                draw.text((20, 20), "ERROR:", fill=(255, 100, 100))
-                lines = error_msg.split("\n")[:18]
-                y = 60
-                for line in lines:
-                    try:
-                        ascii_line = line.encode('ascii', 'ignore').decode('ascii')
-                        if ascii_line.strip():
-                            draw.text((20, y), ascii_line[:90], fill=(220, 220, 220))
-                    except:
-                        pass
-                    y += 22
+                    pass
         except Exception as e:
             print(f"[Tikpan PSD] 错误图生成失败: {e}")
             draw.text((20, 20), "ERROR", fill=(255, 100, 100))

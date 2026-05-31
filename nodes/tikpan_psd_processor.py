@@ -497,7 +497,7 @@ class PSDLayerProcessor:
         return psd_layer
 
     def create_preview(self, layers, image_size):
-        """生成图层信息预览图（带缩略图）"""
+        """生成图层信息预览图（带缩略图）- 使用默认字体避免崩溃"""
         width, height = image_size
 
         # 计算预览图尺寸
@@ -507,35 +507,11 @@ class PSDLayerProcessor:
         preview = Image.new("RGB", (preview_width, preview_height), (45, 47, 52))
         draw = ImageDraw.Draw(preview)
 
-        # 尝试加载中文字体
-        font = None
-        try:
-            from PIL import ImageFont
-            font_paths = [
-                "C:/Windows/Fonts/msyh.ttc",
-                "C:/Windows/Fonts/simhei.ttf",
-                "C:/Windows/Fonts/simsun.ttc",
-            ]
-            for font_path in font_paths:
-                try:
-                    font = ImageFont.truetype(font_path, 12)
-                    # 测试字体
-                    test_bbox = font.getbbox("测试")
-                    break
-                except:
-                    font = None
-                    continue
-        except:
-            font = None
-
+        # 不使用自定义字体，避免 PIL ImageFont 的内存访问冲突
         # 标题
         try:
-            if font:
-                draw.text((20, 15), "PSD 图层预览", fill=(255, 255, 255), font=font)
-                draw.text((20, 35), "=" * 80, fill=(100, 100, 100), font=font)
-            else:
-                draw.text((20, 15), "PSD Layer Preview", fill=(255, 255, 255))
-                draw.text((20, 35), "=" * 80, fill=(100, 100, 100))
+            draw.text((20, 15), "PSD Layer Preview", fill=(255, 255, 255))
+            draw.text((20, 35), "=" * 80, fill=(100, 100, 100))
         except Exception as e:
             print(f"[Tikpan PSD] 预览图标题绘制失败: {e}")
 
@@ -574,29 +550,19 @@ class PSDLayerProcessor:
                 color = colors[i % len(colors)]
                 draw.rectangle([15, y, 15+thumb_size, y+thumb_size], fill=color)
 
-            # 图层信息
-            color = colors[i % len(colors)]
+            # 图层信息 - 只使用 ASCII
             x_text = 90
-
-            # 图层名称
             layer_name = layer['name']
             layer_type = layer.get('type', '-')
-            layer_group = layer.get('group', '未分组')
-            visible = "✓ 可见" if layer.get('visible', True) else "✗ 隐藏"
+            layer_group = layer.get('group', 'ungrouped')
 
             try:
-                if font:
-                    draw.text((x_text, y+5), f"L{i}: {layer_name}", fill=(255, 255, 255), font=font)
-                    info_text = f"类型: {layer_type} | 分组: {layer_group}"
-                    draw.text((x_text, y+25), info_text, fill=(180, 180, 180), font=font)
-                    draw.text((x_text, y+45), visible, fill=(100, 255, 100) if layer.get('visible', True) else (255, 100, 100), font=font)
-                else:
-                    # ASCII 降级
-                    ascii_name = layer_name.encode('ascii', 'ignore').decode('ascii') or f"Layer_{i}"
-                    draw.text((x_text, y+5), f"L{i}: {ascii_name}", fill=(255, 255, 255))
-                    draw.text((x_text, y+25), f"Type: {layer_type}", fill=(180, 180, 180))
-                    vis_text = "Visible" if layer.get('visible', True) else "Hidden"
-                    draw.text((x_text, y+45), vis_text, fill=(100, 255, 100) if layer.get('visible', True) else (255, 100, 100))
+                # ASCII 显示
+                ascii_name = layer_name.encode('ascii', 'ignore').decode('ascii') or f"Layer_{i}"
+                draw.text((x_text, y+5), f"L{i}: {ascii_name}", fill=(255, 255, 255))
+                draw.text((x_text, y+25), f"Type: {layer_type}", fill=(180, 180, 180))
+                vis_text = "Visible" if layer.get('visible', True) else "Hidden"
+                draw.text((x_text, y+45), vis_text, fill=(100, 255, 100) if layer.get('visible', True) else (255, 100, 100))
             except Exception as e:
                 # 如果文字绘制失败，跳过
                 pass
