@@ -1,16 +1,31 @@
 # nodes/tikpan_prompts_manager.py - 提示词库管理器节点
 
 import sys
+import os
 from pathlib import Path
 
 # 添加父目录到路径以导入 utils
-sys.path.insert(0, str(Path(__file__).parent.parent))
+parent_dir = Path(__file__).parent.parent
+if str(parent_dir) not in sys.path:
+    sys.path.insert(0, str(parent_dir))
 
-from utils.prompts_library import (
-    PROMPT_REPOS,
-    sync_prompt_repo,
-    read_all_prompt_cards
-)
+try:
+    from utils.prompts_library import (
+        PROMPT_REPOS,
+        sync_prompt_repo,
+        read_all_prompt_cards
+    )
+except ImportError:
+    # 如果相对导入失败，尝试绝对导入
+    import importlib.util
+    utils_path = parent_dir / "utils" / "prompts_library.py"
+    spec = importlib.util.spec_from_file_location("prompts_library", utils_path)
+    prompts_library = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(prompts_library)
+
+    PROMPT_REPOS = prompts_library.PROMPT_REPOS
+    sync_prompt_repo = prompts_library.sync_prompt_repo
+    read_all_prompt_cards = prompts_library.read_all_prompt_cards
 
 
 class TikpanPromptsManagerNode:
