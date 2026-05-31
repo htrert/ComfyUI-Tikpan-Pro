@@ -1,10 +1,10 @@
 """
-Tikpan 智能分层 PSD 节点 - 简化稳定方案
+Tikpan 智能分层 PSD 节点 - 三档可选
 
 档位说明：
 - 经济档 (Economy): rembg 快速分层，~300MB，5-10秒
-- 标准档 (Standard): rembg + EasyOCR 文字识别，~300MB，10-20秒
-- 极致档 (Premium): rembg + EasyOCR + LaMa 背景补全，~500MB，30-60秒
+- 标准档 (Standard): SAM2 高精度分割 + EasyOCR 文字识别，~500MB，15-30秒
+- 极致档 (Premium): SAM2 + EasyOCR + LaMa 背景补全，~700MB，40-90秒
 """
 import os
 import sys
@@ -30,8 +30,8 @@ RET_LOG = "分层日志"
 RET_PREVIEW = "预览图"
 
 TIER_ECONOMY = "经济档 (300MB) - 快速分层"
-TIER_STANDARD = "标准档 (300MB) - 智能分层 推荐"
-TIER_PREMIUM = "极致档 (500MB) - 补全背景"
+TIER_STANDARD = "标准档 (500MB) - SAM2 高精度 推荐"
+TIER_PREMIUM = "极致档 (700MB) - 补全背景"
 
 
 class TikpanSmartPSDLayeringNode:
@@ -48,6 +48,7 @@ class TikpanSmartPSDLayeringNode:
             "pytoshop": False,
             "cv2": False,
             "rembg": False,
+            "sam2": False,
             "easyocr": False,
             "lama": False,
         }
@@ -67,6 +68,12 @@ class TikpanSmartPSDLayeringNode:
         try:
             from rembg import remove
             deps["rembg"] = True
+        except ImportError:
+            pass
+
+        try:
+            from sam2.build_sam import build_sam2
+            deps["sam2"] = True
         except ImportError:
             pass
 
@@ -98,8 +105,8 @@ class TikpanSmartPSDLayeringNode:
             if not self.deps_status["rembg"]:
                 packages.append("rembg")
         elif TIER_STANDARD in tier or TIER_PREMIUM in tier:
-            if not self.deps_status["rembg"]:
-                packages.append("rembg")
+            if not self.deps_status["sam2"]:
+                packages.append("git+https://github.com/facebookresearch/sam2.git")
             if not self.deps_status["easyocr"]:
                 packages.append("easyocr")
 
@@ -135,7 +142,7 @@ class TikpanSmartPSDLayeringNode:
                     [TIER_ECONOMY, TIER_STANDARD, TIER_PREMIUM],
                     {
                         "default": TIER_STANDARD,
-                        "tooltip": "经济档：快速分层；标准档：文字识别；极致档：背景补全"
+                        "tooltip": "经济档：rembg 快速；标准档：SAM2 高精度；极致档：背景补全"
                     }
                 ),
                 KEY_INPAINT: (
@@ -239,6 +246,7 @@ class TikpanSmartPSDLayeringNode:
         if TIER_ECONOMY in tier and not self.deps_status["rembg"]:
             missing.append("rembg")
         if (TIER_STANDARD in tier or TIER_PREMIUM in tier):
+            if not self.deps_status["sam2"]: missing.append("sam2")
             if not self.deps_status["easyocr"]: missing.append("easyocr")
         if (TIER_PREMIUM in tier or do_inpaint) and not self.deps_status["lama"]:
             missing.append("simple-lama-inpainting")

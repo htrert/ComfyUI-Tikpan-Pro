@@ -15,8 +15,8 @@ RET_LOG = "下载日志"
 RET_STATUS = "状态预览"
 
 CHOICE_ECONOMY = "经济档 (300MB)"
-CHOICE_STANDARD = "标准档 (300MB)"
-CHOICE_PREMIUM = "极致档 (500MB)"
+CHOICE_STANDARD = "标准档 (500MB)"
+CHOICE_PREMIUM = "极致档 (700MB)"
 CHOICE_ALL = "全部档位"
 
 
@@ -58,6 +58,7 @@ class TikpanPSDDependencyDownloaderNode:
         if CHOICE_ECONOMY in tier or CHOICE_ALL in tier:
             packages.append("rembg")
         if CHOICE_STANDARD in tier or CHOICE_PREMIUM in tier or CHOICE_ALL in tier:
+            packages.append("git+https://github.com/facebookresearch/sam2.git")
             packages.append("easyocr")
         if include_inpaint or CHOICE_PREMIUM in tier or CHOICE_ALL in tier:
             packages.append("simple-lama-inpainting")
@@ -75,6 +76,8 @@ class TikpanPSDDependencyDownloaderNode:
             log_lines.append(msg)
 
         if CHOICE_STANDARD in tier or CHOICE_PREMIUM in tier or CHOICE_ALL in tier:
+            ok, msg = self._prefetch_sam2_model()
+            log_lines.append(msg)
             ok, msg = self._prefetch_easyocr_model()
             log_lines.append(msg)
 
@@ -115,6 +118,29 @@ class TikpanPSDDependencyDownloaderNode:
             return True, "  • rembg ISNet 模型 ✓"
         except Exception as e:
             return False, f"  • rembg 模型下载失败: {e}"
+
+    def _prefetch_sam2_model(self):
+        try:
+            from sam2.build_sam import build_sam2
+            import folder_paths
+            import os
+            print("[Tikpan PSD] 预加载 SAM2 模型...")
+
+            models_dir = os.path.join(folder_paths.models_dir, "sam2")
+            os.makedirs(models_dir, exist_ok=True)
+
+            ckpt_name = "sam2.1_hiera_small.pt"
+            ckpt_path = os.path.join(models_dir, ckpt_name)
+
+            if not os.path.exists(ckpt_path):
+                import urllib.request
+                url = f"https://dl.fbaipublicfiles.com/segment_anything_2/092824/{ckpt_name}"
+                print(f"[Tikpan PSD] 下载 SAM2 模型 (~180MB)...")
+                urllib.request.urlretrieve(url, ckpt_path)
+
+            return True, "  • SAM2 模型 ✓"
+        except Exception as e:
+            return False, f"  • SAM2 模型下载失败: {e}"
 
     def _prefetch_easyocr_model(self):
         try:

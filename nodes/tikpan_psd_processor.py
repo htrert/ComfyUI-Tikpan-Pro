@@ -1,6 +1,6 @@
 """
 Tikpan PSD 分层处理器
-封装三档分层逻辑：经济档（rembg 快速）/ 标准档（rembg + OCR）/ 极致档（rembg + OCR + Inpainting）
+封装三档分层逻辑：经济档（rembg 快速）/ 标准档（SAM2 高精度）/ 极致档（SAM2 + Inpainting）
 """
 import os
 import re
@@ -37,8 +37,8 @@ class PSDLayerProcessor:
         return self._build_layer_list(pil_image, bg, subject_rgba, elements, text_layers)
 
     def process_standard(self, pil_image, min_area, blur, detect_text, do_inpaint, pbar):
-        """标准档：rembg 智能分割 + OCR 文字识别"""
-        print("[Tikpan PSD] 标准档（智能分割）处理中...")
+        """标准档：SAM2 高精度分割 + OCR 文字识别"""
+        print("[Tikpan PSD] 标准档（SAM2 高精度分割）处理中...")
         pbar.update(15)
 
         masks = self._rembg_auto_mask(pil_image, min_area)
@@ -92,13 +92,75 @@ class PSDLayerProcessor:
         return self._build_layer_list(pil_image, bg_layer, None, elements, text_layers)
 
     def process_premium(self, pil_image, min_area, blur, detect_text, pbar):
-        """极致档：智能分割 + OCR + 背景补全（Inpainting）"""
-        print("[Tikpan PSD] 极致档（智能分割 + 背景补全）处理中...")
+        """极致档：SAM2 高精度分割 + OCR + 背景补全（Inpainting）"""
+        print("[Tikpan PSD] 极致档（SAM2 + 背景补全）处理中...")
         return self.process_standard(pil_image, min_area, blur, detect_text, True, pbar)
 
     def _rembg_auto_mask(self, pil_image, min_area):
-        """使用 rembg 进行智能分割（稳定高效方案）"""
-        print("[Tikpan PSD] 使用 rembg 进行智能分割")
+        """使用 SAM2 进行高精度智能分割，失败时降级到 rembg"""
+        # 优先尝试 SAM2
+        try:
+            return self._sam2_segment(pil_image, min_area)
+        except Exception as e:
+            print(f"[Tikpan PSD] SAM2 不可用 ({e})，降级到 rembg")
+            return self._rembg_segment(pil_image, min_area)
+
+    def _sam2_segment(self, pil_image, min_area):
+        """SAM2 自动分割（高精度）"""
+        try:
+            from sam2.build_sam import build_sam2
+            from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
+            import folder_paths
+        except ImportError as e:
+            raise ImportError(f"SAM2 未安装: {e}")
+
+        print("[Tikpan PSD] 使用 SAM2 进行高精度分割...")
+
+        # 准备模型路径
+        models_dir = os.path.join(folder_paths.models_dir, "sam2")
+        os.makedirs(models_dir, exist_ok=True)
+
+        ckpt_name = "sam2.1_hiera_small.pt"
+        ckpt_path = os.path.join(models_dir, ckpt_name)
+
+        # 下载模型（如果不存在）
+        if not os.path.exists(ckpt_path):
+            print(f"[Tikpan PSD] 下载 SAM2 模型 (~180MB)...")
+            self._download_sam2_model(ckpt_path, ckpt_name)
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # 使用内联配置而不是 yaml 文件
+        model_cfg = "sam2.1_hiera_s.yaml"
+        sam2_model = build_sam2(model_cfg, ckpt_path, device=device)
+
+        generator = SAM2AutomaticMaskGenerator(
+            model=sam2_model,
+            points_per_side=24,
+            pred_iou_thresh=0.85,
+            stability_score_thresh=0.92,
+            min_mask_region_area=min_area,
+        )
+
+        img_array = np.array(pil_image.convert("RGB"))
+        masks = generator.generate(img_array)
+
+        # 按面积排序，取前20个最大的
+        masks.sort(key=lambda m: m["area"], reverse=True)
+        print(f"[Tikpan PSD] SAM2 检测到 {len(masks)} 个物体，保留前 20 个")
+        return masks[:20]
+
+    def _download_sam2_model(self, ckpt_path, ckpt_name):
+        """下载 SAM2 模型"""
+        import urllib.request
+        url = f"https://dl.fbaipublicfiles.com/segment_anything_2/092824/{ckpt_name}"
+        print(f"[Tikpan PSD] 从 {url} 下载...")
+        urllib.request.urlretrieve(url, ckpt_path)
+        print(f"[Tikpan PSD] 下载完成: {ckpt_path}")
+
+    def _rembg_segment(self, pil_image, min_area):
+        """rembg 分割（稳定方案）"""
+        print("[Tikpan PSD] 使用 rembg 进行分割")
         from rembg import remove, new_session
         import cv2
 
