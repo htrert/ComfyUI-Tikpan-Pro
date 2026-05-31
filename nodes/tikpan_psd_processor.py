@@ -102,15 +102,14 @@ class PSDLayerProcessor:
             from sam2.build_sam import build_sam2
             from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
             import folder_paths
-        except ImportError:
-            print("[Tikpan PSD] SAM2 未安装，降级到 rembg")
+        except ImportError as e:
+            print(f"[Tikpan PSD] SAM2 未安装: {e}，降级到 rembg")
             return self._fallback_to_rembg_masks(pil_image, min_area)
 
         models_dir = os.path.join(folder_paths.models_dir, "sam2")
         os.makedirs(models_dir, exist_ok=True)
 
         ckpt_name = "sam2.1_hiera_small.pt"
-        cfg_name = "sam2.1_hiera_s.yaml"
         ckpt_path = os.path.join(models_dir, ckpt_name)
 
         if not os.path.exists(ckpt_path):
@@ -118,7 +117,18 @@ class PSDLayerProcessor:
 
         try:
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            sam2_model = build_sam2(cfg_name, ckpt_path, device=device)
+
+            # 使用配置字典而不是 yaml 文件
+            from sam2.sam2_image_predictor import SAM2ImagePredictor
+
+            # 直接使用检查点，不依赖配置文件
+            sam2_model = build_sam2(
+                config_file=None,  # 不使用配置文件
+                ckpt_path=ckpt_path,
+                device=device,
+                apply_postprocessing=False
+            )
+
             generator = SAM2AutomaticMaskGenerator(
                 model=sam2_model,
                 points_per_side=24,
@@ -133,6 +143,8 @@ class PSDLayerProcessor:
             return masks[:20]
         except Exception as e:
             print(f"[Tikpan PSD] SAM2 推理失败: {e}，降级到 rembg")
+            import traceback
+            traceback.print_exc()
             return self._fallback_to_rembg_masks(pil_image, min_area)
 
     def _download_sam2_model(self, ckpt_path, ckpt_name):
