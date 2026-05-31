@@ -10,7 +10,6 @@ import os
 import sys
 import subprocess
 import numpy as np
-import torch
 from PIL import Image, ImageDraw, ImageFilter
 from io import BytesIO
 import folder_paths
@@ -263,6 +262,7 @@ class TikpanSmartPSDLayeringNode:
             draw.text((20, y), line[:90], fill=(220, 220, 220))
             y += 22
         arr = np.array(img).astype(np.float32) / 255.0
+        import torch
         return torch.from_numpy(arr).unsqueeze(0)
 
 

@@ -2,7 +2,6 @@ import os
 import sys
 import subprocess
 import numpy as np
-import torch
 from PIL import Image
 from io import BytesIO
 import folder_paths

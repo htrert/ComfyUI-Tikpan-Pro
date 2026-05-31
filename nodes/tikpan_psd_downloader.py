@@ -5,7 +5,6 @@ Tikpan PSD 模型预下载器
 import os
 import sys
 import subprocess
-import torch
 from PIL import Image, ImageDraw
 import numpy as np
 
@@ -139,6 +138,7 @@ class TikpanPSDDependencyDownloaderNode:
 
     def _prefetch_easyocr_model(self):
         try:
+            import torch
             import easyocr
             print("[Tikpan PSD] 预加载 EasyOCR 中英文模型...")
             easyocr.Reader(['ch_sim', 'en'], gpu=torch.cuda.is_available())
@@ -175,6 +175,7 @@ class TikpanPSDDependencyDownloaderNode:
             y += 22
 
         arr = np.array(img).astype(np.float32) / 255.0
+        import torch
         return torch.from_numpy(arr).unsqueeze(0)
 
 
