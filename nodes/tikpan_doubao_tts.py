@@ -156,7 +156,7 @@ class TikpanDoubaoTTS20Node:
     RETURN_NAMES = ("📁_音频路径", "🔗_音频链接", "🎙️_voice_type", "💰_计费字符数", "📋_状态日志", "🎧_音频流")
     OUTPUT_NODE = True
     FUNCTION = "generate_tts"
-    CATEGORY = '👑 Tikpan 官方独家节点/03 音频 Audio'
+    CATEGORY = "🎵 Tikpan 云端模型/03 云端音频"
     DESCRIPTION = "📝 豆包语音合成 2.0：火山引擎 Seed-TTS 2.0 模型，丰富中文音色（含方言/年龄/角色），按字符计费。适合中文广告口播、有声书、短视频配音。"
 
     DEFAULT_OPTIONAL_VALUES = {

@@ -119,7 +119,7 @@ class TikpanGptImage2OfficialNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成结果图", "📄_渲染日志")
     FUNCTION = "generate"
-    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
     DESCRIPTION = "📝 GPT-Image-2 官方原版生图：直连官方 /v1/images/generations 接口，支持 4K、9 种比例、quality/moderation 全参数控制。适合追求官方原生效果。"
 
     def generate(self, **kwargs):

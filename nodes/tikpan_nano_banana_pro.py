@@ -90,7 +90,7 @@ class TikpanNanoBananaProNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成结果图", "📄_渲染日志")
     FUNCTION = "execute"
-    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
     DESCRIPTION = "📝 Nano Banana Pro：Gemini-3-Pro-Image-Preview 模型生图节点，支持 1K/2K/4K、Gemini 原生或 OpenAI 兼容协议、最多 14 张参考图。适合多图融合、IP 衍生。"
 
     def parse_aspect_ratio(self, ratio_str):

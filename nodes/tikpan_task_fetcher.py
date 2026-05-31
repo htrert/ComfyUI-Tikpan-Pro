@@ -126,7 +126,7 @@ class TikpanTaskFetcherNode:
     RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_云端链接", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "fetch_and_download"
-    CATEGORY = '👑 Tikpan 官方独家节点/06 任务与并发 Tools'
+    CATEGORY = "🛠️ Tikpan 本地工具/03 任务管理"
     DESCRIPTION = "📝 异步任务查询与下载：通用任务轮询节点，输入任意 Tikpan 异步任务 ID，自动等待完成并下载视频/图片到本地。HappyHorse/Veo/Grok 等异步任务通用。"
 
     def fetch_and_download(self, **kwargs):

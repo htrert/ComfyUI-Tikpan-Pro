@@ -91,7 +91,7 @@ class TikpanParallelImageEngineNode:
     RETURN_TYPES = ("IMAGE", "STRING", "STRING")
     RETURN_NAMES = ("Images", "Stage_Log", "Result_JSON")
     FUNCTION = "run"
-    CATEGORY = '👑 Tikpan 官方独家节点/06 任务与并发 Tools/并发引擎 Parallel Engine'
+    CATEGORY = "⚡ Tikpan 本地工具/04 并发引擎"
     DESCRIPTION = "📝 API 多模型并发生图引擎：一次任务跨多个模型 + 多个中转站并发出图，支持 failover/race/parallel_all 三种策略。适合 A/B 测试、批量出图、容灾备份。"
 
     def run(self, **kwargs):

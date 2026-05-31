@@ -163,7 +163,7 @@ class TikpanDoubaoImageNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成图像Batch", "📄_渲染日志")
     FUNCTION = "generate_image"
-    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
     DESCRIPTION = "📝 豆包 Seedream 图像生成：火山引擎旗舰生图模型，支持 2K/3K、8 种比例、多图生成、联网搜索增强。中文理解强，适合本土化创意。"
 
     def looks_like_base64(self, s):

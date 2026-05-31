@@ -61,7 +61,7 @@ class TikpanGeminiVideoAnalystNode:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("📄_专业分镜与脚本报告",)
     FUNCTION = "analyze_video"
-    CATEGORY = '👑 Tikpan 官方独家节点/05 提示词与分析 Prompt & Analysis'
+    CATEGORY = "💬 Tikpan 云端模型/04 AI 对话分析"
     DESCRIPTION = "📝 AI 音视频双轨解析：自动抽帧 + 8MB 智能熔断 + 音频同步解析，生成好莱坞级分镜报告（机位/动作/光影/场景）。配合 Grok 重构节点可一键改片。"
 
     def analyze_video(

@@ -81,7 +81,7 @@ class TikpanPromptsSelectorNode:
     RETURN_TYPES = ("STRING", "STRING", "STRING")
     RETURN_NAMES = ("提示词文本", "卡片标题", "卡片详情")
     FUNCTION = "execute"
-    CATEGORY = "Tikpan Pro/工具"
+    CATEGORY = "📝 Tikpan 本地工具/01 提示词工具"
 
     def execute(self, 选择提示词, 过滤_仓库="全部", 过滤_标签="全部", 搜索关键词="", 显示详情=True):
         """执行提示词选择"""
@@ -227,7 +227,7 @@ class TikpanPromptsSearchNode:
     RETURN_TYPES = ("STRING", "STRING", "STRING", "INT")
     RETURN_NAMES = ("提示词文本", "卡片标题", "搜索结果列表", "结果总数")
     FUNCTION = "execute"
-    CATEGORY = "Tikpan Pro/工具"
+    CATEGORY = "📝 Tikpan 本地工具/01 提示词工具"
 
     def execute(self, 搜索关键词, 过滤_仓库="全部", 过滤_标签="全部", 最多返回数量=10, 结果索引=0):
         """执行提示词搜索"""

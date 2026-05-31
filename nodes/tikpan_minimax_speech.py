@@ -282,7 +282,7 @@ class TikpanMiniMaxSpeech28BaseNode:
     )
     OUTPUT_NODE = True
     FUNCTION = "generate_speech"
-    CATEGORY = '👑 Tikpan 官方独家节点/03 音频 Audio'
+    CATEGORY = "🎵 Tikpan 云端模型/03 云端音频"
 
     def empty_audio(self):
         try:

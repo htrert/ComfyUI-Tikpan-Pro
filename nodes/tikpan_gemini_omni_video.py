@@ -172,7 +172,7 @@ class TikpanGeminiOmniVideoNode:
     RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_视频云端直链", "📋_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "generate"
-    CATEGORY = "👑 Tikpan 官方独家节点/02 视频 Video"
+    CATEGORY = "🎬 Tikpan 云端模型/02 云端视频"
     DESCRIPTION = "📝 Gemini Omni Flash 视频：Google Gemini 视频模型，支持 720P/1080P、原生音频生成、视频编辑、参考音色驱动。适合带原生对白/音效的视频。"
 
     # ─── Session ────────────────────────────────────────────────────────────────

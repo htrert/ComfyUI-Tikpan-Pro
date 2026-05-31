@@ -68,7 +68,7 @@ class TikpanGeminiImageMaxNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成结果图", "📄_渲染日志")
     FUNCTION = "execute"
-    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
     DESCRIPTION = "📝 Gemini 14 图极限生图：支持 Gemini-3-Pro / Flash / Nano-Banana 等多模型，最多 14 张参考图融合，2K/4K 输出。适合主体一致性、多图合成、IP 衍生。"
 
     def black_image(self):

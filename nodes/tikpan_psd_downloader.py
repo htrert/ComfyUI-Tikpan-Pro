@@ -41,7 +41,7 @@ class TikpanPSDDependencyDownloaderNode:
     RETURN_TYPES = ("STRING", "IMAGE")
     RETURN_NAMES = (RET_LOG, RET_STATUS)
     FUNCTION = "download"
-    CATEGORY = "🏆 Tikpan 官方独家节点/03 工具 Tools"
+    CATEGORY = "🛠️ Tikpan 本地工具/02 PSD 智能分层"
     OUTPUT_NODE = True
     DESCRIPTION = "📦 PSD 模型预下载器：提前下载分层节点所需的所有依赖和 AI 模型，避免首次使用时等待"
 

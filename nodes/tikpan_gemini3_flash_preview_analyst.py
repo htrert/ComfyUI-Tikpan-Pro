@@ -147,7 +147,7 @@ class TikpanGemini3FlashPreviewAnalystNode:
     RETURN_NAMES = ("分析报告", "反推提示词", "结构化JSON", "用量", "状态日志")
     OUTPUT_NODE = True
     FUNCTION = "analyze_media"
-    CATEGORY = '👑 Tikpan 官方独家节点/04 文字与多模态 Text & Multimodal'
+    CATEGORY = "💬 Tikpan 云端模型/04 AI 对话分析"
     DESCRIPTION = "📝 Gemini 3 Flash 图片/视频分析：专业级图像和视频理解节点，支持视频抽帧（多种策略）、商品/广告诊断、提示词反推、合规检查。"
 
     def make_return(self, report="", prompt="", structured="", usage="", log=""):

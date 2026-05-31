@@ -168,7 +168,7 @@ class TikpanGPT5MiniResponsesNode:
     RETURN_NAMES = ("回答文本", "优化提示词", "结构化JSON", "用量", "状态日志")
     OUTPUT_NODE = True
     FUNCTION = "run_responses"
-    CATEGORY = '👑 Tikpan 官方独家节点/04 文字与多模态 Text & Multimodal'
+    CATEGORY = "💬 Tikpan 云端模型/04 AI 对话分析"
     DESCRIPTION = "📝 GPT-5.4 Mini 多模态推理：走 /v1/responses 接口，性价比极高，推理强度可调，支持图/视频/文件/联网。适合通用问答、文案优化、数据分析。"
 
     def make_return(self, answer="", prompt="", structured="", usage="", log=""):

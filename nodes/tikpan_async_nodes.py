@@ -68,7 +68,7 @@ class TikpanAsyncImageSubmitNode:
     RETURN_TYPES = ("STRING", "STRING", "STRING")
     RETURN_NAMES = ("Task_ID", "Stage_Log", "Task_JSON")
     FUNCTION = "submit"
-    CATEGORY = '👑 Tikpan 官方独家节点/06 任务与并发 Tools/异步任务池 Async Engine'
+    CATEGORY = "⚡ Tikpan 本地工具/04 并发引擎"
     DESCRIPTION = "📝 异步提交图片任务：把生图请求推到本地任务池后立刻返回 Task_ID，不阻塞工作流。配合『异步查询』节点取结果。适合长时间任务、批量并行。"
 
     def submit(self, **kwargs):
@@ -117,7 +117,7 @@ class TikpanAsyncImageResultNode:
     RETURN_TYPES = ("IMAGE", "STRING", "STRING", "STRING")
     RETURN_NAMES = ("Images", "Stage_Log", "Task_JSON", "Image_Paths")
     FUNCTION = "query"
-    CATEGORY = "👑 Tikpan 官方独家节点/异步任务池 Async Engine"
+    CATEGORY = "⚡ Tikpan 本地工具/04 并发引擎"
     DESCRIPTION = "📝 异步查询图片结果：根据 Task_ID 查询出图状态。可选立刻返回当前状态，或阻塞等待出图完成。"
 
     def query(self, **kwargs):
@@ -174,7 +174,7 @@ class TikpanAsyncImageJoinNode:
     RETURN_TYPES = ("IMAGE", "STRING", "STRING", "STRING")
     RETURN_NAMES = ("Images", "Stage_Log", "Tasks_JSON", "Image_Paths")
     FUNCTION = "join"
-    CATEGORY = "👑 Tikpan 官方独家节点/异步任务池 Async Engine"
+    CATEGORY = "⚡ Tikpan 本地工具/04 并发引擎"
     DESCRIPTION = "📝 合并异步图片任务：最多输入 8 个 Task_ID，等待全部完成（或任一成功）后合并所有图片到一个 IMAGE 批次。适合多任务并行后汇总。"
 
     def join(self, **kwargs):
@@ -238,7 +238,7 @@ class TikpanAsyncTaskListNode:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("Tasks_JSON",)
     FUNCTION = "list_recent"
-    CATEGORY = "👑 Tikpan 官方独家节点/异步任务池 Async Engine"
+    CATEGORY = "⚡ Tikpan 本地工具/04 并发引擎"
     DESCRIPTION = "📝 最近异步任务列表：返回最近 N 个异步任务的元数据 JSON（状态/参数/结果）。用于查看历史、断线恢复、调试。"
 
     def list_recent(self, **kwargs):

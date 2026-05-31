@@ -173,7 +173,7 @@ class TikpanGemini31FlashTTSNode:
     )
     OUTPUT_NODE = True
     FUNCTION = "generate_tts"
-    CATEGORY = '👑 Tikpan 官方独家节点/03 音频 Audio'
+    CATEGORY = "🎵 Tikpan 云端模型/03 云端音频"
     DESCRIPTION = "📝 Gemini 3.1 Flash TTS：Google 多语种语音合成，支持自然语言『语气指令』（欢快地说/纪录片旁白等）。适合多语种 + 富情感的口播。"
 
     def empty_audio(self):

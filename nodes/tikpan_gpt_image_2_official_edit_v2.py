@@ -164,7 +164,7 @@ class TikpanGptImage2OfficialEditV2:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("编辑结果", "渲染日志")
     FUNCTION = "edit_image"
-    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
     DESCRIPTION = "📝 GPT-Image-2 官方修图 V2：批量并发修图引擎，最多 15 张参考图 + 主图 + 遮罩，支持 4K、断线保活、幂等键、错误恢复。商业项目首选。"
 
     def edit_image(self, **kwargs):

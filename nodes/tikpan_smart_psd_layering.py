@@ -174,7 +174,7 @@ class TikpanSmartPSDLayeringNode:
     RETURN_TYPES = ("STRING", "STRING", "IMAGE")
     RETURN_NAMES = (RET_PATH, RET_LOG, RET_PREVIEW)
     FUNCTION = "smart_layer"
-    CATEGORY = "🏆 Tikpan 官方独家节点/03 工具 Tools"
+    CATEGORY = "🛠️ Tikpan 本地工具/02 PSD 智能分层"
     OUTPUT_NODE = True
     DESCRIPTION = "🤖 智能分层 PSD：三档可选（经济/标准/极致），自动识别产品、背景、文字并保存为分层 PSD"
 

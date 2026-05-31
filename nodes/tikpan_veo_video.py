@@ -69,7 +69,7 @@ class TikpanVeoVideoNode:
     RETURN_NAMES = ("📁_本地保存路径", "🏷️_任务ID", "🔗_视频云端直链", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "execute"
-    CATEGORY = '👑 Tikpan 官方独家节点/02 视频 Video'
+    CATEGORY = "🎬 Tikpan 云端模型/02 云端视频"
     DESCRIPTION = "📝 Veo 3.1 视频生成：Google Veo 多模型聚合（lite/pro/4K/components 等），支持首帧、尾帧、3 张垫图。物理规律和运镜真实感强，适合电影级短片。"
 
     def execute(self, 获取密钥请访问, API_密钥, Veo专属提示词, 模型选择, 比例, 随机种子=888888, **kwargs):

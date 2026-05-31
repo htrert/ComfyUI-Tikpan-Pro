@@ -63,7 +63,7 @@ class TikpanPromptsManagerNode:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("状态报告",)
     FUNCTION = "execute"
-    CATEGORY = "Tikpan Pro/工具"
+    CATEGORY = "📝 Tikpan 本地工具/01 提示词工具"
     OUTPUT_NODE = True
 
     def execute(self, 操作, 同步单个仓库="全部"):

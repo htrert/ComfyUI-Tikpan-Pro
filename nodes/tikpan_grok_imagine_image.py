@@ -70,7 +70,7 @@ class _TikpanGrokImagineBase:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("Image", "Log")
     FUNCTION = "generate"
-    CATEGORY = '👑 Tikpan 官方独家节点/01 图片 Image'
+    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
 
     def generate(self, **kwargs):
         start_time = time.time()

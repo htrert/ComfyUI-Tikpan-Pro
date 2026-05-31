@@ -64,7 +64,7 @@ class TikpanGptImage2GenNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = (RET_IMAGE, RET_LOG)
     FUNCTION = "generate"
-    CATEGORY = "\U0001f451 Tikpan \u5b98\u65b9\u72ec\u5bb6\u8282\u70b9/01 \u56fe\u7247 Image"
+    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
     DESCRIPTION = "\ud83d\udcdd GPT-Image-2-all \u8fdb\u9636\u751f\u56fe\uff1a\u652f\u6301 1K/2K/4K \u5206\u8fa8\u7387\u3001\u591a\u79cd\u6bd4\u4f8b\u3001\u6700\u591a 5 \u5f20\u53c2\u8003\u56fe\u3002\u9002\u5408\u5546\u4e1a\u6d77\u62a5\u3001\u4ea7\u54c1\u56fe\u3001\u6982\u5ff5\u8bbe\u8ba1\u3002"
 
     def generate(self, **kwargs):

@@ -30,7 +30,7 @@ VIDU_AUDIO_TYPE_OPTIONS = ["All", "Speech_only", "Sound-effect_only"]
 
 
 class _TikpanViduBase:
-    CATEGORY = "👑 Tikpan 官方独家节点/02 视频 Video"
+    CATEGORY = "🎬 Tikpan 云端模型/02 云端视频"
     RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "VIDEO")
     RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_视频云端直链", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
