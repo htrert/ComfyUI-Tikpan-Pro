@@ -221,6 +221,7 @@ class TikpanPSDDependencyDownloaderNode:
         draw = ImageDraw.Draw(img)
 
         # 尝试加载中文字体，失败则使用英文
+        font = None
         try:
             from PIL import ImageFont
             # 尝试常见的中文字体路径
@@ -229,14 +230,20 @@ class TikpanPSDDependencyDownloaderNode:
                 "C:/Windows/Fonts/simhei.ttf",  # 黑体
                 "C:/Windows/Fonts/simsun.ttc",  # 宋体
             ]
-            font = None
             for font_path in font_paths:
                 try:
-                    font = ImageFont.truetype(font_path, 14)
+                    # 使用较小的字体大小，避免内存问题
+                    font = ImageFont.truetype(font_path, 12)
+                    # 测试字体是否可用
+                    test_bbox = font.getbbox("测试")
                     break
-                except:
+                except Exception as e:
+                    font = None
                     continue
+        except Exception as e:
+            font = None
 
+        try:
             if font:
                 title_color = (100, 220, 100) if success else (255, 100, 100)
                 draw.text((20, 20), "Tikpan PSD 预下载状态", fill=title_color, font=font)
@@ -251,10 +258,14 @@ class TikpanPSDDependencyDownloaderNode:
                         color = (255, 130, 130)
                     elif line.startswith("📦") or line.startswith("🤖"):
                         color = (255, 200, 100)
-                    draw.text((20, y), line[:100], fill=color, font=font)
+                    try:
+                        draw.text((20, y), line[:100], fill=color, font=font)
+                    except:
+                        # 如果某行绘制失败，跳过
+                        pass
                     y += 22
             else:
-                # 降级到英文
+                # 降级到英文（不使用字体）
                 title_color = (100, 220, 100) if success else (255, 100, 100)
                 draw.text((20, 20), "Tikpan PSD Download Status", fill=title_color)
                 draw.text((20, 45), "=" * 60, fill=(100, 100, 100))
@@ -267,15 +278,21 @@ class TikpanPSDDependencyDownloaderNode:
                     elif "✗" in line or "❌" in line or "failed" in line.lower():
                         color = (255, 130, 130)
                     # 只显示 ASCII 字符
-                    ascii_line = line.encode('ascii', 'ignore').decode('ascii')
-                    if ascii_line.strip():
-                        draw.text((20, y), ascii_line[:100], fill=color)
-                        y += 22
+                    try:
+                        ascii_line = line.encode('ascii', 'ignore').decode('ascii')
+                        if ascii_line.strip():
+                            draw.text((20, y), ascii_line[:100], fill=color)
+                    except:
+                        pass
+                    y += 22
         except Exception as e:
             # 完全降级：纯色块显示状态
-            title_color = (100, 220, 100) if success else (255, 100, 100)
-            draw.rectangle([20, 20, 880, 80], fill=title_color)
-            draw.text((30, 35), "Status: " + ("OK" if success else "ERROR"), fill=(255, 255, 255))
+            print(f"[Tikpan PSD] 预览图生成失败，使用简化版本: {e}")
+            draw.rectangle([20, 20, 880, 80], fill=(100, 220, 100) if success else (255, 100, 100))
+            try:
+                draw.text((30, 35), "Status: " + ("OK" if success else "ERROR"), fill=(255, 255, 255))
+            except:
+                pass
 
         arr = np.array(img).astype(np.float32) / 255.0
         import torch

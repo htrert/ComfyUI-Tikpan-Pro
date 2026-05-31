@@ -257,6 +257,7 @@ class TikpanSmartPSDLayeringNode:
         draw = ImageDraw.Draw(img)
 
         # 尝试加载中文字体
+        font = None
         try:
             from PIL import ImageFont
             font_paths = [
@@ -264,20 +265,28 @@ class TikpanSmartPSDLayeringNode:
                 "C:/Windows/Fonts/simhei.ttf",
                 "C:/Windows/Fonts/simsun.ttc",
             ]
-            font = None
             for font_path in font_paths:
                 try:
-                    font = ImageFont.truetype(font_path, 12)
+                    font = ImageFont.truetype(font_path, 11)
+                    # 测试字体
+                    test_bbox = font.getbbox("测试")
                     break
                 except:
+                    font = None
                     continue
+        except:
+            font = None
 
+        try:
             if font:
                 draw.text((20, 20), "⚠ Error:", fill=(255, 100, 100), font=font)
                 lines = error_msg.split("\n")[:18]
                 y = 60
                 for line in lines:
-                    draw.text((20, y), line[:90], fill=(220, 220, 220), font=font)
+                    try:
+                        draw.text((20, y), line[:90], fill=(220, 220, 220), font=font)
+                    except:
+                        pass
                     y += 22
             else:
                 # 降级到 ASCII
@@ -285,11 +294,15 @@ class TikpanSmartPSDLayeringNode:
                 lines = error_msg.split("\n")[:18]
                 y = 60
                 for line in lines:
-                    ascii_line = line.encode('ascii', 'ignore').decode('ascii')
-                    if ascii_line.strip():
-                        draw.text((20, y), ascii_line[:90], fill=(220, 220, 220))
-                        y += 22
-        except:
+                    try:
+                        ascii_line = line.encode('ascii', 'ignore').decode('ascii')
+                        if ascii_line.strip():
+                            draw.text((20, y), ascii_line[:90], fill=(220, 220, 220))
+                    except:
+                        pass
+                    y += 22
+        except Exception as e:
+            print(f"[Tikpan PSD] 错误图生成失败: {e}")
             draw.text((20, 20), "ERROR", fill=(255, 100, 100))
 
         arr = np.array(img).astype(np.float32) / 255.0
