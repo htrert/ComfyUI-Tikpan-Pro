@@ -386,6 +386,7 @@ class PSDLayerProcessor:
         """使用 pytoshop 保存为分层 PSD（支持图层分组）"""
         from pytoshop import enums
         from pytoshop.user import nested_layers
+        import pytoshop.packbits  # 确保 packbits 模块被导入
 
         counter = 1
         base = self._sanitize_filename(filename)
