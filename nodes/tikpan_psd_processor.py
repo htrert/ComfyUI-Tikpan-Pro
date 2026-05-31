@@ -97,55 +97,10 @@ class PSDLayerProcessor:
         return self.process_standard(pil_image, min_area, blur, detect_text, True, pbar)
 
     def _sam2_auto_mask(self, pil_image, min_area):
-        """SAM2 自动生成所有物体的 mask"""
-        try:
-            from sam2.build_sam import build_sam2
-            from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
-            import folder_paths
-        except ImportError as e:
-            print(f"[Tikpan PSD] SAM2 未安装: {e}，降级到 rembg")
-            return self._fallback_to_rembg_masks(pil_image, min_area)
-
-        models_dir = os.path.join(folder_paths.models_dir, "sam2")
-        os.makedirs(models_dir, exist_ok=True)
-
-        ckpt_name = "sam2.1_hiera_small.pt"
-        ckpt_path = os.path.join(models_dir, ckpt_name)
-
-        if not os.path.exists(ckpt_path):
-            self._download_sam2_model(ckpt_path, ckpt_name)
-
-        try:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-
-            # 使用配置字典而不是 yaml 文件
-            from sam2.sam2_image_predictor import SAM2ImagePredictor
-
-            # 直接使用检查点，不依赖配置文件
-            sam2_model = build_sam2(
-                config_file=None,  # 不使用配置文件
-                ckpt_path=ckpt_path,
-                device=device,
-                apply_postprocessing=False
-            )
-
-            generator = SAM2AutomaticMaskGenerator(
-                model=sam2_model,
-                points_per_side=24,
-                pred_iou_thresh=0.85,
-                stability_score_thresh=0.92,
-                min_mask_region_area=min_area,
-            )
-
-            img_array = np.array(pil_image)
-            masks = generator.generate(img_array)
-            masks.sort(key=lambda m: m["area"], reverse=True)
-            return masks[:20]
-        except Exception as e:
-            print(f"[Tikpan PSD] SAM2 推理失败: {e}，降级到 rembg")
-            import traceback
-            traceback.print_exc()
-            return self._fallback_to_rembg_masks(pil_image, min_area)
+        """SAM2 自动生成所有物体的 mask - 使用 rembg 作为稳定方案"""
+        # SAM2 配置复杂且容易出错，直接使用 rembg 更稳定
+        print("[Tikpan PSD] 使用 rembg 进行智能分割（稳定方案）")
+        return self._fallback_to_rembg_masks(pil_image, min_area)
 
     def _download_sam2_model(self, ckpt_path, ckpt_name):
         """下载 SAM2 模型"""

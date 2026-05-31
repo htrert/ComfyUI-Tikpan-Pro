@@ -15,8 +15,8 @@ RET_LOG = "下载日志"
 RET_STATUS = "状态预览"
 
 CHOICE_ECONOMY = "经济档 (300MB)"
-CHOICE_STANDARD = "标准档 (2.4GB)"
-CHOICE_PREMIUM = "极致档 (5GB+)"
+CHOICE_STANDARD = "标准档 (300MB)"
+CHOICE_PREMIUM = "极致档 (500MB)"
 CHOICE_ALL = "全部档位"
 
 
@@ -58,7 +58,6 @@ class TikpanPSDDependencyDownloaderNode:
         if CHOICE_ECONOMY in tier or CHOICE_ALL in tier:
             packages.append("rembg")
         if CHOICE_STANDARD in tier or CHOICE_PREMIUM in tier or CHOICE_ALL in tier:
-            packages.append("git+https://github.com/facebookresearch/sam2.git")
             packages.append("easyocr")
         if include_inpaint or CHOICE_PREMIUM in tier or CHOICE_ALL in tier:
             packages.append("simple-lama-inpainting")
@@ -76,8 +75,6 @@ class TikpanPSDDependencyDownloaderNode:
             log_lines.append(msg)
 
         if CHOICE_STANDARD in tier or CHOICE_PREMIUM in tier or CHOICE_ALL in tier:
-            ok, msg = self._prefetch_sam2_model()
-            log_lines.append(msg)
             ok, msg = self._prefetch_easyocr_model()
             log_lines.append(msg)
 
@@ -119,22 +116,14 @@ class TikpanPSDDependencyDownloaderNode:
         except Exception as e:
             return False, f"  • rembg 模型下载失败: {e}"
 
-    def _prefetch_sam2_model(self):
+    def _prefetch_rembg_model(self):
         try:
-            import folder_paths
-            import urllib.request
-            models_dir = os.path.join(folder_paths.models_dir, "sam2")
-            os.makedirs(models_dir, exist_ok=True)
-            ckpt_name = "sam2.1_hiera_small.pt"
-            ckpt_path = os.path.join(models_dir, ckpt_name)
-            if os.path.exists(ckpt_path):
-                return True, f"  • SAM2 模型已存在 ✓"
-            url = f"https://dl.fbaipublicfiles.com/segment_anything_2/092824/{ckpt_name}"
-            print(f"[Tikpan PSD] 下载 SAM2 模型 (~180MB)...")
-            urllib.request.urlretrieve(url, ckpt_path)
-            return True, f"  • SAM2 模型 ✓ ({ckpt_path})"
+            from rembg import remove, new_session
+            print("[Tikpan PSD] 预加载 rembg 模型...")
+            session = new_session("isnet-general-use")
+            return True, "  • rembg 模型 ✓"
         except Exception as e:
-            return False, f"  • SAM2 模型下载失败: {e}"
+            return False, f"  • rembg 模型下载失败: {e}"
 
     def _prefetch_easyocr_model(self):
         try:

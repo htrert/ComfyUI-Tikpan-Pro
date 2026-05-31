@@ -1,10 +1,10 @@
 """
-Tikpan 智能分层 PSD 节点 - 三档分级方案
+Tikpan 智能分层 PSD 节点 - 简化稳定方案
 
 档位说明：
-- 经济档 (Economy): rembg + OpenCV 连通域检测，~300MB，5-10秒
-- 标准档 (Standard): SAM2 + EasyOCR，~2.4GB，15-30秒，识别复杂场景
-- 极致档 (Premium): SAM2 + LaMa Inpainting 补全，~5GB+，60-120秒，被遮挡区域智能补全
+- 经济档 (Economy): rembg 快速分层，~300MB，5-10秒
+- 标准档 (Standard): rembg + EasyOCR 文字识别，~300MB，10-20秒
+- 极致档 (Premium): rembg + EasyOCR + LaMa 背景补全，~500MB，30-60秒
 """
 import os
 import sys
@@ -29,9 +29,9 @@ RET_PATH = "PSD文件路径"
 RET_LOG = "分层日志"
 RET_PREVIEW = "预览图"
 
-TIER_ECONOMY = "经济档 (300MB) - 简单商品图"
-TIER_STANDARD = "标准档 (2.4GB) - 复杂场景 推荐"
-TIER_PREMIUM = "极致档 (5GB+) - 商业级分层"
+TIER_ECONOMY = "经济档 (300MB) - 快速分层"
+TIER_STANDARD = "标准档 (300MB) - 智能分层 推荐"
+TIER_PREMIUM = "极致档 (500MB) - 补全背景"
 
 
 class TikpanSmartPSDLayeringNode:
@@ -49,7 +49,6 @@ class TikpanSmartPSDLayeringNode:
             "cv2": False,
             "rembg": False,
             "easyocr": False,
-            "sam2": False,
             "lama": False,
         }
 
@@ -78,8 +77,6 @@ class TikpanSmartPSDLayeringNode:
             pass
 
         try:
-            from sam2.build_sam import build_sam2
-            deps["sam2"] = True
         except ImportError:
             pass
 
@@ -105,8 +102,6 @@ class TikpanSmartPSDLayeringNode:
             if not self.deps_status["rembg"]:
                 packages.append("rembg")
         elif TIER_STANDARD in tier or TIER_PREMIUM in tier:
-            if not self.deps_status["sam2"]:
-                packages.append("git+https://github.com/facebookresearch/sam2.git")
             if not self.deps_status["easyocr"]:
                 packages.append("easyocr")
 
@@ -246,7 +241,6 @@ class TikpanSmartPSDLayeringNode:
         if TIER_ECONOMY in tier and not self.deps_status["rembg"]:
             missing.append("rembg")
         if (TIER_STANDARD in tier or TIER_PREMIUM in tier):
-            if not self.deps_status["sam2"]: missing.append("sam2")
             if not self.deps_status["easyocr"]: missing.append("easyocr")
         if (TIER_PREMIUM in tier or do_inpaint) and not self.deps_status["lama"]:
             missing.append("simple-lama-inpainting")
