@@ -507,9 +507,31 @@ class PSDLayerProcessor:
         preview = Image.new("RGB", (preview_width, preview_height), (45, 47, 52))
         draw = ImageDraw.Draw(preview)
 
+        # 尝试加载中文字体
+        font = None
+        try:
+            from PIL import ImageFont
+            font_paths = [
+                "C:/Windows/Fonts/msyh.ttc",
+                "C:/Windows/Fonts/simhei.ttf",
+                "C:/Windows/Fonts/simsun.ttc",
+            ]
+            for font_path in font_paths:
+                try:
+                    font = ImageFont.truetype(font_path, 14)
+                    break
+                except:
+                    continue
+        except:
+            pass
+
         # 标题
-        draw.text((20, 15), "PSD 图层预览", fill=(255, 255, 255))
-        draw.text((20, 35), "=" * 80, fill=(100, 100, 100))
+        if font:
+            draw.text((20, 15), "PSD 图层预览", fill=(255, 255, 255), font=font)
+            draw.text((20, 35), "=" * 80, fill=(100, 100, 100), font=font)
+        else:
+            draw.text((20, 15), "PSD Layer Preview", fill=(255, 255, 255))
+            draw.text((20, 35), "=" * 80, fill=(100, 100, 100))
 
         y = 60
         colors = [(255,100,100),(100,255,100),(100,200,255),(255,200,50),(200,100,255),(100,220,200)]
@@ -552,17 +574,22 @@ class PSDLayerProcessor:
 
             # 图层名称
             layer_name = layer['name']
-            draw.text((x_text, y+5), f"L{i}: {layer_name}", fill=(255, 255, 255))
-
-            # 图层类型和分组
             layer_type = layer.get('type', '-')
             layer_group = layer.get('group', '未分组')
-            info_text = f"类型: {layer_type} | 分组: {layer_group}"
-            draw.text((x_text, y+25), info_text, fill=(180, 180, 180))
-
-            # 可见性
             visible = "✓ 可见" if layer.get('visible', True) else "✗ 隐藏"
-            draw.text((x_text, y+45), visible, fill=(100, 255, 100) if layer.get('visible', True) else (255, 100, 100))
+
+            if font:
+                draw.text((x_text, y+5), f"L{i}: {layer_name}", fill=(255, 255, 255), font=font)
+                info_text = f"类型: {layer_type} | 分组: {layer_group}"
+                draw.text((x_text, y+25), info_text, fill=(180, 180, 180), font=font)
+                draw.text((x_text, y+45), visible, fill=(100, 255, 100) if layer.get('visible', True) else (255, 100, 100), font=font)
+            else:
+                # ASCII 降级
+                ascii_name = layer_name.encode('ascii', 'ignore').decode('ascii') or f"Layer_{i}"
+                draw.text((x_text, y+5), f"L{i}: {ascii_name}", fill=(255, 255, 255))
+                draw.text((x_text, y+25), f"Type: {layer_type}", fill=(180, 180, 180))
+                vis_text = "Visible" if layer.get('visible', True) else "Hidden"
+                draw.text((x_text, y+45), vis_text, fill=(100, 255, 100) if layer.get('visible', True) else (255, 100, 100))
 
             y += 75
 

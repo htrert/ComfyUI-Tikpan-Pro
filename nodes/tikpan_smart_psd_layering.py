@@ -255,12 +255,43 @@ class TikpanSmartPSDLayeringNode:
     def _create_error_image(self, error_msg=""):
         img = Image.new("RGB", (768, 512), (45, 45, 50))
         draw = ImageDraw.Draw(img)
-        draw.text((20, 20), "⚠ Error:", fill=(255, 100, 100))
-        lines = error_msg.split("\n")[:18]
-        y = 60
-        for line in lines:
-            draw.text((20, y), line[:90], fill=(220, 220, 220))
-            y += 22
+
+        # 尝试加载中文字体
+        try:
+            from PIL import ImageFont
+            font_paths = [
+                "C:/Windows/Fonts/msyh.ttc",
+                "C:/Windows/Fonts/simhei.ttf",
+                "C:/Windows/Fonts/simsun.ttc",
+            ]
+            font = None
+            for font_path in font_paths:
+                try:
+                    font = ImageFont.truetype(font_path, 12)
+                    break
+                except:
+                    continue
+
+            if font:
+                draw.text((20, 20), "⚠ Error:", fill=(255, 100, 100), font=font)
+                lines = error_msg.split("\n")[:18]
+                y = 60
+                for line in lines:
+                    draw.text((20, y), line[:90], fill=(220, 220, 220), font=font)
+                    y += 22
+            else:
+                # 降级到 ASCII
+                draw.text((20, 20), "ERROR:", fill=(255, 100, 100))
+                lines = error_msg.split("\n")[:18]
+                y = 60
+                for line in lines:
+                    ascii_line = line.encode('ascii', 'ignore').decode('ascii')
+                    if ascii_line.strip():
+                        draw.text((20, y), ascii_line[:90], fill=(220, 220, 220))
+                        y += 22
+        except:
+            draw.text((20, 20), "ERROR", fill=(255, 100, 100))
+
         arr = np.array(img).astype(np.float32) / 255.0
         import torch
         return torch.from_numpy(arr).unsqueeze(0)

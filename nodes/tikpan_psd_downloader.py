@@ -164,21 +164,63 @@ class TikpanPSDDependencyDownloaderNode:
     def _render_status_image(self, log_lines, success=True):
         img = Image.new("RGB", (900, 600), (30, 32, 38))
         draw = ImageDraw.Draw(img)
-        title_color = (100, 220, 100) if success else (255, 100, 100)
-        draw.text((20, 20), "Tikpan PSD 预下载状态", fill=title_color)
-        draw.text((20, 45), "=" * 60, fill=(100, 100, 100))
 
-        y = 75
-        for line in log_lines[-22:]:
-            color = (220, 220, 220)
-            if "✓" in line or "✅" in line:
-                color = (120, 230, 120)
-            elif "✗" in line or "❌" in line or "失败" in line:
-                color = (255, 130, 130)
-            elif line.startswith("📦") or line.startswith("🤖"):
-                color = (255, 200, 100)
-            draw.text((20, y), line[:100], fill=color)
-            y += 22
+        # 尝试加载中文字体，失败则使用英文
+        try:
+            from PIL import ImageFont
+            # 尝试常见的中文字体路径
+            font_paths = [
+                "C:/Windows/Fonts/msyh.ttc",  # 微软雅黑
+                "C:/Windows/Fonts/simhei.ttf",  # 黑体
+                "C:/Windows/Fonts/simsun.ttc",  # 宋体
+            ]
+            font = None
+            for font_path in font_paths:
+                try:
+                    font = ImageFont.truetype(font_path, 14)
+                    break
+                except:
+                    continue
+
+            if font:
+                title_color = (100, 220, 100) if success else (255, 100, 100)
+                draw.text((20, 20), "Tikpan PSD 预下载状态", fill=title_color, font=font)
+                draw.text((20, 45), "=" * 60, fill=(100, 100, 100), font=font)
+
+                y = 75
+                for line in log_lines[-22:]:
+                    color = (220, 220, 220)
+                    if "✓" in line or "✅" in line:
+                        color = (120, 230, 120)
+                    elif "✗" in line or "❌" in line or "失败" in line:
+                        color = (255, 130, 130)
+                    elif line.startswith("📦") or line.startswith("🤖"):
+                        color = (255, 200, 100)
+                    draw.text((20, y), line[:100], fill=color, font=font)
+                    y += 22
+            else:
+                # 降级到英文
+                title_color = (100, 220, 100) if success else (255, 100, 100)
+                draw.text((20, 20), "Tikpan PSD Download Status", fill=title_color)
+                draw.text((20, 45), "=" * 60, fill=(100, 100, 100))
+
+                y = 75
+                for line in log_lines[-22:]:
+                    color = (220, 220, 220)
+                    if "✓" in line or "✅" in line:
+                        color = (120, 230, 120)
+                    elif "✗" in line or "❌" in line or "failed" in line.lower():
+                        color = (255, 130, 130)
+                    # 只显示 ASCII 字符
+                    ascii_line = line.encode('ascii', 'ignore').decode('ascii')
+                    if ascii_line.strip():
+                        draw.text((20, y), ascii_line[:100], fill=color)
+                        y += 22
+        except Exception as e:
+            # 完全降级：纯色块显示状态
+            title_color = (100, 220, 100) if success else (255, 100, 100)
+            draw.rectangle([20, 20, 880, 80], fill=title_color)
+            draw.text((30, 35), "Status: " + ("OK" if success else "ERROR"), fill=(255, 255, 255))
 
         arr = np.array(img).astype(np.float32) / 255.0
         import torch
