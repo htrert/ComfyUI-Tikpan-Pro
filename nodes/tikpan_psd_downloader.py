@@ -116,15 +116,6 @@ class TikpanPSDDependencyDownloaderNode:
         except Exception as e:
             return False, f"  • rembg 模型下载失败: {e}"
 
-    def _prefetch_rembg_model(self):
-        try:
-            from rembg import remove, new_session
-            print("[Tikpan PSD] 预加载 rembg 模型...")
-            session = new_session("isnet-general-use")
-            return True, "  • rembg 模型 ✓"
-        except Exception as e:
-            return False, f"  • rembg 模型下载失败: {e}"
-
     def _prefetch_easyocr_model(self):
         try:
             import torch

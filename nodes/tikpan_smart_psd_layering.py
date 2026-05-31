@@ -77,10 +77,6 @@ class TikpanSmartPSDLayeringNode:
             pass
 
         try:
-        except ImportError:
-            pass
-
-        try:
             from simple_lama_inpainting import SimpleLama
             deps["lama"] = True
         except ImportError:
@@ -102,6 +98,8 @@ class TikpanSmartPSDLayeringNode:
             if not self.deps_status["rembg"]:
                 packages.append("rembg")
         elif TIER_STANDARD in tier or TIER_PREMIUM in tier:
+            if not self.deps_status["rembg"]:
+                packages.append("rembg")
             if not self.deps_status["easyocr"]:
                 packages.append("easyocr")
 
@@ -137,7 +135,7 @@ class TikpanSmartPSDLayeringNode:
                     [TIER_ECONOMY, TIER_STANDARD, TIER_PREMIUM],
                     {
                         "default": TIER_STANDARD,
-                        "tooltip": "经济档：快速但效果一般；标准档：SAM2 精准识别；极致档：被遮挡区域智能补全"
+                        "tooltip": "经济档：快速分层；标准档：文字识别；极致档：背景补全"
                     }
                 ),
                 KEY_INPAINT: (

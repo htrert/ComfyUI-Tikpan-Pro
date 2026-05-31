@@ -1,6 +1,6 @@
 """
 Tikpan PSD 分层处理器
-封装三档分层逻辑：经济档（rembg）/ 标准档（SAM2）/ 极致档（SAM2 + Inpainting）
+封装三档分层逻辑：经济档（rembg 快速）/ 标准档（rembg + OCR）/ 极致档（rembg + OCR + Inpainting）
 """
 import os
 import re
@@ -37,11 +37,11 @@ class PSDLayerProcessor:
         return self._build_layer_list(pil_image, bg, subject_rgba, elements, text_layers)
 
     def process_standard(self, pil_image, min_area, blur, detect_text, do_inpaint, pbar):
-        """标准档：SAM2 自动分割所有物体"""
-        print("[Tikpan PSD] 标准档（SAM2）处理中...")
+        """标准档：rembg 智能分割 + OCR 文字识别"""
+        print("[Tikpan PSD] 标准档（智能分割）处理中...")
         pbar.update(15)
 
-        masks = self._sam2_auto_mask(pil_image, min_area)
+        masks = self._rembg_auto_mask(pil_image, min_area)
         pbar.update(45)
 
         elements = []
@@ -92,26 +92,13 @@ class PSDLayerProcessor:
         return self._build_layer_list(pil_image, bg_layer, None, elements, text_layers)
 
     def process_premium(self, pil_image, min_area, blur, detect_text, pbar):
-        """极致档：标准档 + 强制 inpainting 补全"""
-        print("[Tikpan PSD] 极致档（SAM2 + Inpainting）处理中...")
+        """极致档：智能分割 + OCR + 背景补全（Inpainting）"""
+        print("[Tikpan PSD] 极致档（智能分割 + 背景补全）处理中...")
         return self.process_standard(pil_image, min_area, blur, detect_text, True, pbar)
 
-    def _sam2_auto_mask(self, pil_image, min_area):
-        """SAM2 自动生成所有物体的 mask - 使用 rembg 作为稳定方案"""
-        # SAM2 配置复杂且容易出错，直接使用 rembg 更稳定
-        print("[Tikpan PSD] 使用 rembg 进行智能分割（稳定方案）")
-        return self._fallback_to_rembg_masks(pil_image, min_area)
-
-    def _download_sam2_model(self, ckpt_path, ckpt_name):
-        """下载 SAM2 模型"""
-        import urllib.request
-        url = f"https://dl.fbaipublicfiles.com/segment_anything_2/092824/{ckpt_name}"
-        print(f"[Tikpan PSD] 首次下载 SAM2 模型 (~180MB): {url}")
-        urllib.request.urlretrieve(url, ckpt_path)
-        print(f"[Tikpan PSD] 下载完成: {ckpt_path}")
-
-    def _fallback_to_rembg_masks(self, pil_image, min_area):
-        """SAM2 不可用时降级到 rembg"""
+    def _rembg_auto_mask(self, pil_image, min_area):
+        """使用 rembg 进行智能分割（稳定高效方案）"""
+        print("[Tikpan PSD] 使用 rembg 进行智能分割")
         from rembg import remove, new_session
         import cv2
 
