@@ -1,0 +1,32 @@
+#!/bin/bash
+# Git Post-commit Hook: 提交后自动同步文档到飞书
+# 安装方法：将此文件复制到 .git/hooks/post-commit 并添加执行权限
+
+echo ""
+echo "📤 检查是否需要同步文档到飞书..."
+
+# 检查最近一次提交是否包含文档变更
+docs_changed=$(git diff --name-only HEAD~1 HEAD | grep -E '^(docs/.*\.md|CHANGELOG\.md|README\.md)$' | wc -l)
+
+if [ "$docs_changed" -gt 0 ]; then
+    echo "📄 检测到文档变更，开始同步到飞书..."
+    echo ""
+
+    # 执行同步脚本
+    python scripts/sync_to_feishu_merged.py Dkncdyrl8oo6OvxDP9KcRHnOnLg
+
+    if [ $? -eq 0 ]; then
+        echo ""
+        echo "✅ 文档已自动同步到飞书"
+        echo "🔗 查看：https://aw5zg7a9e9u.feishu.cn/docx/Dkncdyrl8oo6OvxDP9KcRHnOnLg"
+    else
+        echo ""
+        echo "⚠️ 文档同步失败，请手动执行："
+        echo "   python scripts/sync_to_feishu_merged.py Dkncdyrl8oo6OvxDP9KcRHnOnLg"
+    fi
+else
+    echo "ℹ️ 本次提交未包含文档变更，跳过同步"
+fi
+
+echo ""
+exit 0

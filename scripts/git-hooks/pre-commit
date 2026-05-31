@@ -1,0 +1,36 @@
+#!/bin/bash
+# Git Pre-commit Hook: 检查代码变更时是否更新了文档
+# 安装方法：将此文件复制到 .git/hooks/pre-commit 并添加执行权限
+
+echo "🔍 检查文档更新状态..."
+
+# 检查是否有 Python 代码变更
+python_changed=$(git diff --cached --name-only | grep -E '\.py$' | wc -l)
+
+if [ "$python_changed" -gt 0 ]; then
+    echo "📝 检测到 Python 代码变更，检查文档是否更新..."
+
+    # 检查是否有文档变更
+    docs_changed=$(git diff --cached --name-only | grep -E '^(docs/.*\.md|CHANGELOG\.md|README\.md)$' | wc -l)
+
+    if [ "$docs_changed" -eq 0 ]; then
+        echo ""
+        echo "❌ 错误：检测到代码变更但文档未更新！"
+        echo ""
+        echo "请更新以下文档之一："
+        echo "  - docs/节点使用教程.md"
+        echo "  - docs/节点速查表.md"
+        echo "  - docs/Tikpan_ComfyUI_节点功能分类.md"
+        echo "  - CHANGELOG.md"
+        echo "  - README.md"
+        echo ""
+        echo "如果确实不需要更新文档，使用 git commit --no-verify 跳过检查"
+        echo ""
+        exit 1
+    else
+        echo "✅ 文档已更新"
+    fi
+fi
+
+echo "✅ Pre-commit 检查通过"
+exit 0

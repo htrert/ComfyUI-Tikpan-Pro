@@ -43,6 +43,11 @@ from .nodes.tikpan_doubao_tts import TikpanDoubaoTTS20Node
 from .nodes.tikpan_nano_banana_pro import TikpanNanoBananaProNode
 from .nodes.tikpan_qwen_wan_image import TikpanQwenImage20Node, TikpanWan27ImageProNode
 from .nodes.tikpan_task_fetcher import TikpanTaskFetcherNode
+from .nodes.tikpan_psd_saver import TikpanPSDSaverNode
+from .nodes.tikpan_smart_psd_layering import TikpanSmartPSDLayeringNode
+from .nodes.tikpan_psd_downloader import TikpanPSDDependencyDownloaderNode
+from .nodes.tikpan_prompts_manager import TikpanPromptsManagerNode
+from .nodes.tikpan_prompts_selector import TikpanPromptsSelectorNode, TikpanPromptsSearchNode
 
 # 2. 建立内部类名映射
 NODE_CLASS_MAPPINGS = {
@@ -87,6 +92,12 @@ NODE_CLASS_MAPPINGS = {
     "TikpanQwenImage20Node": TikpanQwenImage20Node,
     "TikpanWan27ImageProNode": TikpanWan27ImageProNode,
     "TikpanTaskFetcherNode": TikpanTaskFetcherNode,
+    "TikpanPSDSaverNode": TikpanPSDSaverNode,
+    "TikpanSmartPSDLayeringNode": TikpanSmartPSDLayeringNode,
+    "TikpanPSDDependencyDownloaderNode": TikpanPSDDependencyDownloaderNode,
+    "TikpanPromptsManagerNode": TikpanPromptsManagerNode,
+    "TikpanPromptsSelectorNode": TikpanPromptsSelectorNode,
+    "TikpanPromptsSearchNode": TikpanPromptsSearchNode,
 }
 
 # 3. 设置 ComfyUI 界面显示的华丽名称
@@ -132,6 +143,12 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanWan27ImageProNode": "图片｜Wan 2.7 Image Pro 生图/编辑",
     "TikpanQwenImage20Node": "图片｜Qwen-Image-2.0 生图/编辑",
     "TikpanTaskFetcherNode": "工具｜异步任务查询与下载",
+    "TikpanPSDSaverNode": "工具｜PSD 文件保存器",
+    "TikpanSmartPSDLayeringNode": "工具｜智能分层 PSD 生成器",
+    "TikpanPSDDependencyDownloaderNode": "工具｜PSD 模型预下载器",
+    "TikpanPromptsManagerNode": "工具｜提示词库管理器",
+    "TikpanPromptsSelectorNode": "工具｜提示词选择器",
+    "TikpanPromptsSearchNode": "工具｜提示词搜索",
 }
 
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']

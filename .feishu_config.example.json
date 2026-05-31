@@ -1,0 +1,15 @@
+{
+  "_comment": "复制本文件为 .feishu_config.json 并填入真实凭证。.feishu_config.json 已加入 .gitignore，不会被提交。",
+  "app_id": "cli_xxxxxxxxxxxxxxxx",
+  "app_secret": "xxxxxxxxxxxxxxxxxxxxxxxx",
+  "files": {
+    "docs/节点使用教程.md": "在这里填飞书文档 Token（URL 中 /docx/ 后面那段）",
+    "docs/节点速查表.md": "另一份飞书文档的 Token",
+    "CHANGELOG.md": "再一份飞书文档的 Token"
+  },
+  "wiki_files": {
+    "docs/节点使用教程.md": "space_id/node_token（从 Wiki URL 中提取）",
+    "docs/节点速查表.md": "space_id/node_token",
+    "CHANGELOG.md": "space_id/node_token"
+  }
+}

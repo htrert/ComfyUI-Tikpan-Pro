@@ -6,7 +6,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Official-Tikpan.com-red?style=for-the-badge" alt="Tikpan Official">
   <img src="https://img.shields.io/badge/ComfyUI-Registry-green?style=for-the-badge" alt="Registry">
-  <img src="https://img.shields.io/badge/Version-1.3.1-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.3.6-blue?style=for-the-badge" alt="Version">
 </p>
 
 **ComfyUI-Tikpan-Pro** 是由 [攀升AI (Tikpan.com)](https://tikpan.com/) 官方发布的深度集成插件。专为 **TikTok 电商矩阵运营**、**高阶内容创作**及 **AI 工作流自动化**设计，通过接入自有的高稳定性 API 渠道，为全球创作者提供顶级的模型生成能力。
@@ -18,6 +18,7 @@
 * [节点使用教程](docs/节点使用教程.md)：从安装、选节点、连接工作流到常见问题排查，适合实际使用者照着跑通。
 * [节点速查表](docs/节点速查表.md)：按图片、视频、音频、分析工具整理关键参数和输出，适合后续做 Web 网站表单、供应商渠道和计费映射。
 * [节点功能分类](docs/Tikpan_ComfyUI_节点功能分类.md)：对齐 ComfyUI 菜单分组，适合维护新增节点时检查放置位置。
+* [提示词库使用指南](docs/提示词库使用指南.md)：⭐新增 提示词库功能详细说明，包含同步、搜索、过滤和使用技巧。
 * [更新日志](CHANGELOG.md)：记录每个版本新增节点、修复项、文档同步和验证结果。
 
 ---
@@ -67,6 +68,25 @@
 * **异步任务查询与下载**：已提交任务按 task_id 继续轮询下载。
 * **API 多模型并发生图引擎**：failover 容灾/race 抢速/parallel 全量三种策略。
 * **异步图片任务组**（Submit / Result / Join / List）：后台并行提交多个任务，统一收图。
+* **PSD 分层导出**：将生成的图片保存为 Photoshop 可编辑的分层 PSD 文件。
+* **提示词库**：从 9 个 GitHub 仓库同步优质提示词，支持搜索、过滤和快速选择。
+
+**PSD 分层导出**
+
+* **PSD 文件保存器**：将 ComfyUI 图片保存为 PSD，支持标准模式（Pillow）和高级模式（psd-tools 多图层）。
+* **智能分层 PSD 生成器**：纯本地 AI 自动识别图片元素（产品/背景/文字）并保存为分层 PSD。
+  - **经济档（~300MB / 5-10秒）**：rembg + OpenCV，适合简单商品图。
+  - **标准档（~2.4GB / 15-30秒）⭐推荐**：SAM2 + EasyOCR，适合复杂场景、海报。
+  - **极致档（~5GB+ / 60-120秒）**：SAM2 + LaMa Inpainting，商业级分层（被遮挡区域智能补全）。
+* **PSD 模型预下载器**：提前下载分层节点所需的依赖和 AI 模型，避免首次使用卡顿。
+
+**提示词库（⭐新增）**
+
+* **提示词库管理器**：从 9 个精选 GitHub 仓库同步优质提示词，支持查看状态和定期更新。
+* **提示词选择器**：从下拉列表选择提示词，支持按仓库、标签过滤和关键词搜索。
+* **提示词搜索**：高级搜索功能，支持批量查看结果和索引切换。
+
+收录仓库：Nano Banana、GPT-Image-2、Seedance、AI 混剪、高光切片、文生视频、视频搬运、AI 导演等。详见 [提示词库使用指南](docs/提示词库使用指南.md)。
 
 ---
 
@@ -81,6 +101,80 @@
 1. [点击此处下载](https://github.com/htrert/ComfyUI-Tikpan-Pro/archive/refs/heads/main.zip) 源码压缩包。
 2. 解压后将整个文件夹移动至 `ComfyUI/custom_nodes/` 目录下。
 3. 重启 ComfyUI。
+
+---
+
+## 🎨 快速开始：PSD 分层导出
+
+将 AI 生成的图片导出为 Photoshop 可编辑的分层 PSD 文件，方便后期精修。
+
+### 简单保存（单层 PSD）
+
+```text
+[任意生图节点] -> [Tikpan: PSD 文件保存器] -> output/xxx.psd
+```
+
+**用途**：快速保存为 PSD 格式，无需额外依赖。
+
+### 智能分层（自动识别元素）
+
+```text
+[任意生图节点] -> [Tikpan: 智能分层 PSD 生成器（标准档）] -> output/xxx.psd
+                                                        -> 预览图
+                                                        -> 分层日志
+```
+
+**用途**：自动识别产品、背景、文字并分离成独立图层。
+
+**三档选择**：
+- **经济档**：快速分层，适合简单商品图（5-10秒）
+- **标准档**⭐：SAM2 精准识别，适合复杂场景（15-30秒）
+- **极致档**：被遮挡区域智能补全，商业级分层（60-120秒）
+
+**首次使用提示**：
+- 节点会自动下载所需依赖和 AI 模型（根据档位不同，300MB-5GB）
+- 也可以先运行"PSD 模型预下载器"节点提前下载，避免首次卡顿
+
+**详细教程**：查看 [节点使用教程 - 第10章 PSD 分层导出](docs/节点使用教程.md#10-psd-分层导出)
+
+---
+
+## 🎨 快速开始：提示词库
+
+从 9 个精选 GitHub 仓库同步优质提示词，快速找到适合的提示词模板。
+
+### 第一步：同步提示词库
+
+```text
+[提示词库管理器]
+  操作: 同步全部仓库
+  ↓
+  (等待 10-30 秒，需要联网)
+  ↓
+  同步完成：287 张卡片
+```
+
+### 第二步：选择提示词
+
+```text
+[提示词选择器]
+  选择提示词: 1. 商品主图拍摄
+  过滤_标签: gpt-image-2
+  ↓
+  提示词文本 → [GPT Image 2 生图节点]
+```
+
+或使用搜索功能：
+
+```text
+[提示词搜索]
+  搜索关键词: 人物肖像
+  过滤_标签: image
+  ↓
+  提示词文本 → [图像生成节点]
+```
+
+**详细教程**：查看 [提示词库使用指南](docs/提示词库使用指南.md)
 
 ---
 
