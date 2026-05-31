@@ -106,10 +106,9 @@ class PSDLayerProcessor:
             return self._rembg_segment(pil_image, min_area)
 
     def _sam2_segment(self, pil_image, min_area):
-        """SAM2 自动分割（高精度）"""
+        """SAM2 自动分割（高精度）- 使用 SAM2ImagePredictor 避免配置文件问题"""
         try:
-            from sam2.build_sam import build_sam2
-            from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
+            from sam2.sam2_image_predictor import SAM2ImagePredictor
             import folder_paths
         except ImportError as e:
             raise ImportError(f"SAM2 未安装: {e}")
@@ -130,25 +129,80 @@ class PSDLayerProcessor:
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        # 使用内联配置而不是 yaml 文件
-        model_cfg = "sam2.1_hiera_s.yaml"
-        sam2_model = build_sam2(model_cfg, ckpt_path, device=device)
+        try:
+            # 使用 SAM2ImagePredictor，不需要配置文件
+            # 直接从 checkpoint 加载
+            predictor = SAM2ImagePredictor.from_pretrained(
+                "facebook/sam2.1-hiera-small",
+                local_files_only=False,
+                device=device
+            )
 
-        generator = SAM2AutomaticMaskGenerator(
-            model=sam2_model,
-            points_per_side=24,
-            pred_iou_thresh=0.85,
-            stability_score_thresh=0.92,
-            min_mask_region_area=min_area,
-        )
+            # 设置图片
+            img_array = np.array(pil_image.convert("RGB"))
+            predictor.set_image(img_array)
 
-        img_array = np.array(pil_image.convert("RGB"))
-        masks = generator.generate(img_array)
+            # 使用网格点进行自动分割
+            h, w = img_array.shape[:2]
+            points_per_side = 24
+            step = max(h, w) // points_per_side
 
-        # 按面积排序，取前20个最大的
-        masks.sort(key=lambda m: m["area"], reverse=True)
-        print(f"[Tikpan PSD] SAM2 检测到 {len(masks)} 个物体，保留前 20 个")
-        return masks[:20]
+            masks_list = []
+            for y in range(0, h, step):
+                for x in range(0, w, step):
+                    point = np.array([[x, y]])
+                    label = np.array([1])
+
+                    try:
+                        mask, score, _ = predictor.predict(
+                            point_coords=point,
+                            point_labels=label,
+                            multimask_output=False
+                        )
+
+                        if score[0] > 0.85:
+                            mask_binary = mask[0]
+                            area = int(mask_binary.sum())
+
+                            if area >= min_area:
+                                # 计算 bbox
+                                import cv2
+                                contours, _ = cv2.findContours(
+                                    mask_binary.astype(np.uint8),
+                                    cv2.RETR_EXTERNAL,
+                                    cv2.CHAIN_APPROX_SIMPLE
+                                )
+                                if contours:
+                                    x, y, w, h = cv2.boundingRect(contours[0])
+                                    masks_list.append({
+                                        "segmentation": mask_binary,
+                                        "bbox": [x, y, w, h],
+                                        "area": area,
+                                    })
+                    except:
+                        continue
+
+            # 去重和排序
+            unique_masks = []
+            for mask in masks_list:
+                is_duplicate = False
+                for existing in unique_masks:
+                    # 检查重叠度
+                    overlap = np.logical_and(mask["segmentation"], existing["segmentation"]).sum()
+                    if overlap > mask["area"] * 0.8:
+                        is_duplicate = True
+                        break
+                if not is_duplicate:
+                    unique_masks.append(mask)
+
+            unique_masks.sort(key=lambda m: m["area"], reverse=True)
+            print(f"[Tikpan PSD] SAM2 检测到 {len(unique_masks)} 个物体，保留前 20 个")
+            return unique_masks[:20]
+
+        except Exception as e:
+            print(f"[Tikpan PSD] SAM2 预测器加载失败: {e}")
+            # 降级到 rembg
+            raise
 
     def _download_sam2_model(self, ckpt_path, ckpt_name):
         """下载 SAM2 模型"""
