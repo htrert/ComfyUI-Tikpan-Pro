@@ -369,7 +369,7 @@ class TikpanGptImage2OfficialEditV2:
                                 "stage": "request_or_upstream_response",
                                 "reason": str(e),
                                 "recoverable": "maybe",
-                                "hint": "请求已送达中转站但未拿到结果；为避免重复扣费节点不会自动重发。请到中转站后台核实是否已扣费，并联系客服协助查询/补图。",
+                                "hint": "请求已送达中转站但未拿到结果；为避免重复扣费节点不会自动重发。请自行登录中转站，在「个人设置 → 使用日志」中查看本次请求的具体详情（是否扣费、上游原始返回、错误码等）。",
                             }
                             failed_items.append(failure)
                             report_paths = self.save_failure_report(failure)
@@ -423,7 +423,7 @@ class TikpanGptImage2OfficialEditV2:
                                     "stage": "request_or_upstream_response",
                                     "reason": str(e),
                                     "recoverable": "maybe",
-                                    "hint": "请求已送达中转站但未拿到结果；为避免重复扣费节点不会自动重发。请到中转站后台核实是否已扣费，并联系客服协助查询/补图。",
+                                    "hint": "请求已送达中转站但未拿到结果；为避免重复扣费节点不会自动重发。请自行登录中转站，在「个人设置 → 使用日志」中查看本次请求的具体详情（是否扣费、上游原始返回、错误码等）。",
                                 }
                                 failed_items.append(failure)
                                 report_paths = self.save_failure_report(failure)
@@ -442,7 +442,7 @@ class TikpanGptImage2OfficialEditV2:
 
             if not imgs:
                 raise Exception(
-                    "❌ 未解析到有效结果图。若中转站已扣费，请联系中转站客服协助核实/补图；"
+                    "❌ 未解析到有效结果图。请自行登录中转站，在「个人设置 → 使用日志」中查看本次请求的具体详情（是否扣费、上游原始返回、错误码等）；"
                     f"本次幂等键: {', '.join(recovery_keys)}；失败详情: {self.format_failures(failed_items[:6])}"
                 )
 
@@ -502,11 +502,11 @@ class TikpanGptImage2OfficialEditV2:
                 log += (
                     "\n\n🔁 处理说明:\n"
                     "1. 只有 TCP 连不通（请求未发出）才会自动重试，避免重复扣费。\n"
-                    "2. 请求已送达中转站后的超时/异常不会自动重发——请先到中转站后台确认是否已扣费，再决定是否重跑。\n"
-                    "3. 如果是经常超时，建议：① 排查代理是否绕路（tikpan.com 是国内中转站，最好直连）；② 把节点上「超时秒数」调大；③ 联系中转站客服核实通道速度。"
+                    "2. 请求已送达中转站后的超时/异常不会自动重发——请自行登录中转站，在「个人设置 → 使用日志」中查看本次请求的具体详情（是否扣费、上游原始返回、错误码等），再决定是否重跑。\n"
+                    "3. 如果是经常超时，建议：① 排查代理是否绕路（tikpan.com 是国内中转站，最好直连）；② 把节点上「超时秒数」调大；③ 登录中转站，在「个人设置 → 使用日志」中查看本次请求的具体详情与上游通道状态。"
                 )
             if recovery_keys:
-                log += "\n\n🧾 本次请求 Idempotency-Key（调试/客服反查用）:\n" + "\n".join(recovery_keys)
+                log += "\n\n🧾 本次请求 Idempotency-Key（调试/使用日志反查用）:\n" + "\n".join(recovery_keys)
             return (batch, log)
 
         except Exception as e:
@@ -593,7 +593,7 @@ class TikpanGptImage2OfficialEditV2:
                 )
                 raise Exception(
                     f"上游响应等待超时：请求已送达中转站，但 {timeout} 秒内未收到结果。"
-                    f"为避免重复扣费，节点不会自动重发。建议先到中转站后台核实是否已扣费、能否补图，"
+                    f"为避免重复扣费，节点不会自动重发。请自行登录中转站，在「个人设置 → 使用日志」中查看本次请求的具体详情（是否扣费、上游原始返回、错误码等），"
                     f"或在节点上把「超时秒数」调大后再手动重跑。本次幂等键：{idempotency_key}"
                 )
             except requests.exceptions.ProxyError as e:

@@ -126,7 +126,7 @@ class TikpanGptImage2OfficialNode:
         start_time = time.time()
 
         api_key = (kwargs.get("API_密钥") or "").strip()
-        api_host = normalize_api_host(pick(kwargs, "中转站地址", "api_host", default=API_HOST_OPTIONS[0]))
+        api_host = self.resolve_api_host(kwargs)
         prompt = (kwargs.get("生成指令") or "").strip()
         model = kwargs.get("模型", "gpt-image-2")
         tier = kwargs.get("分辨率档位", "1K (1024)")
@@ -395,6 +395,14 @@ class TikpanGptImage2OfficialNode:
 
     def create_session(self):
         session = requests.Session()
+        session.trust_env = False
+
+        return self.configure_session(session)
+
+    def resolve_api_host(self, kwargs):
+        return normalize_api_host(pick(kwargs, "中转站地址", "api_host", default=API_HOST_OPTIONS[0]))
+
+    def configure_session(self, session):
         session.trust_env = False
 
         retries = Retry(
