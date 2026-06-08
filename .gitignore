@@ -25,3 +25,19 @@ secrets.json
 *_credentials.json
 *.key
 *.pem
+
+# Runtime prompt-library cache. Keep node code/docs tracked; skip synced local data.
+data/prompts-library/
+
+# Local PSD/layering AI model downloads and caches. Do not commit model weights.
+models/
+checkpoints/
+.cache/
+.u2net/
+.EasyOCR/
+sam2/
+*.ckpt
+*.safetensors
+*.pth
+*.pt
+*.onnx
