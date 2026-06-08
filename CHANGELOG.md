@@ -12,6 +12,27 @@
 4. `README.md`：只在新增大类能力或主推模型发生变化时更新简介。
 5. `CHANGELOG.md`：记录新增功能、修复、文档同步和验证命令。
 
+## [v1.3.7] - 2026-06-08
+
+### Added - GPT-Image-2 福利生图节点
+
+- 新增 `TikpanGptImage2BenefitNode`（显示名：`图片｜GPT-Image-2 福利生图`），用于福利渠道的 GPT-Image-2 生图活动。
+- 节点 UI 仅暴露 `福利渠道` 下拉，当前内置 `福利渠道一`，真实中转站地址固定在代码中，不向 ComfyUI 参数面板暴露。
+- 福利节点走 `/v1/chat/completions`，兼容返回 `choices.message.content` 中的 Markdown 图片链接与 `data:image/...;base64` 图片数据。
+- 对福利渠道偶发尺寸降级做本地兜底：按目标比例居中裁切并缩放到节点计算出的目标尺寸，同时在日志中记录上游原始尺寸。
+- 去除福利节点标题悬浮说明，避免在 ComfyUI 节点标题上展示额外描述。
+
+### Changed - ComfyUI 节点注册与文档
+
+- 根目录 `__init__.py` 注册节点数更新为 47 个，并补充福利节点显示名。
+- `docs/节点速查表.md`、`docs/节点使用教程.md`、`docs/Tikpan_ComfyUI_节点功能分类.md` 同步补充福利节点与当前注册节点口径。
+- `pyproject.toml` 版本号更新为 `1.3.7`。
+
+### Testing
+
+- `D:\ComfyUI-aki-v2\python\python.exe tests\test_node_contracts_offline.py`
+- `D:\ComfyUI-aki-v2\python\python.exe -m compileall __init__.py nodes\tikpan_gpt_image_2_benefit.py nodes\tikpan_gpt_image_2_official.py nodes\tikpan_gpt_image_2_official_edit_v2.py tests\test_node_contracts_offline.py`
+
 ## [v1.3.6] - 2026-05-31
 
 ### Enhanced - PSD 智能分层优化
