@@ -2,7 +2,7 @@
 
 ## Documentation Maintenance Index
 
-当前文档维护口径：根目录 `__init__.py` 注册 44 个 ComfyUI 节点，用户文档按"教程 + 速查表 + 功能分类 + 更新日志"四件套同步维护。
+当前文档维护口径：根目录 `__init__.py` 注册 49 个 ComfyUI 节点，用户文档按"教程 + 速查表 + 功能分类 + 更新日志"四件套同步维护。
 
 新增或调整节点时请同步检查：
 
@@ -11,6 +11,79 @@
 3. `docs/Tikpan_ComfyUI_节点功能分类.md`：确认菜单分类和显示名位置正确。
 4. `README.md`：只在新增大类能力或主推模型发生变化时更新简介。
 5. `CHANGELOG.md`：记录新增功能、修复、文档同步和验证命令。
+
+## [v1.3.8] - 2026-06-08
+
+### Added - GPT-Image-2 福利生图节点 & 独立「福利」菜单目录
+
+- 新增 `TikpanGptImage2BenefitNode`（显示名：`图片｜GPT-Image-2 福利生图`），继承官方 GPT-Image-2 节点，面向福利渠道生图活动。
+- 节点 UI 仅暴露 `福利渠道` 下拉（内置 `福利渠道一`），真实中转站地址固定在代码内、不向参数面板暴露。
+- 福利节点走 `/v1/chat/completions`，兼容返回 `choices.message.content` 中的 Markdown 图片链接与 `data:image/...;base64` 图片数据，并对上游尺寸降级做居中裁切兜底。
+- 新增独立二级目录 `07 福利 Benefit`（`CATEGORY_BENEFIT`，`nodes/tikpan_categories.py`），与 `01 图片`/`02 视频`/`03 音频` 等并列；福利节点归入该目录。
+- 离线契约测试 `tests/test_node_contracts_offline.py` 补充福利节点用例，并放宽分类白名单接纳 `07 福利 Benefit`。
+
+### 验证
+
+- `python tests/test_node_contracts_offline.py`：福利节点契约、分类菜单树、注册完整性用例均通过。
+
+
+
+### Enhanced - 提示词库解析与中文化
+
+本次重写提示词库解析器并新增中文翻译能力，让英文 prompt 库对中文用户低门槛可用。
+
+- **解析器重构**（`utils/prompts_library.py`）：
+  - 章节黑名单大幅扩展（中英双语）：自动跳过 Introduction / News / Quick Start / 我的其他开源项目 / Acknowledge / License 等 50+ 类非提示词章节
+  - 内容启发式过滤：丢弃以 `npx`、`pip install`、`git clone`、`Welcome to` 开头的安装指引/介绍文字
+  - H2 必须包含代码块或 blockquote 才入库：纯软件 README（如 toki-plus 系列）自动 0 卡片
+  - 按 H3 拆细颗粒度：GPT-Image-2、Seedance 等仓库的 100+ 用例每个独立成卡
+  - 优先识别 `#### 📝 Prompt` 子节：精准提取 Nano Banana 仓库的真实提示词
+  - **效果**：80 张混合卡片 → 503 张真实可用卡片
+
+- **中文翻译缓存**（可选启用）：
+  - 「提示词库管理器」新增 `Tikpan_API密钥` 和 `翻译模型` 字段
+  - 默认模型 `deepseek-v4-flash`，500 张全译成本 ≈ ¥0.05
+  - 翻译标题 + 80 字 prompt 预览，**原文 prompt 永不翻译**（保证生图质量）
+  - 自动检测已是中文的内容并跳过翻译，省 token
+  - 批量翻译（每批 10 条），约 1-2 分钟翻完 500 张
+
+- **断点续传**：
+  - 每批翻译完成立即原子写盘（`.tmp` + `os.replace`），中途崩溃不丢译文
+  - 下次同步通过 `prompt_head` 比对自动跳过已译卡片
+  - 最坏情况浪费 1 个批次（< 1 分钱）
+
+- **选择器节点优化**（`nodes/tikpan_prompts_selector.py`）：
+  - 下拉框上限 200 → 800
+  - 下拉标签格式：`{编号}. {中文标题或英文} — {中文预览或英文预览}`
+  - 索引精确匹配完整卡片列表，过滤条件改为下拉占位时的回退（修复原索引/过滤错配 bug）
+  - 控制台详情同时显示中英对照
+
+- **新增 2 个专用选择器**（按内容类型预过滤，避免下拉框混杂）：
+  - `TikpanPromptsImageSelectorNode` 「工具｜提示词选择器·图片」：只显示 336 张图片类卡片（gpt-image-2 + nano-banana）
+  - `TikpanPromptsVideoSelectorNode` 「工具｜提示词选择器·视频」：只显示 163 张视频类卡片（seedance）
+  - 通过基类 `CARD_TYPE_FILTER` 类属性实现，子类零代码改动
+  - 仓库/标签下拉框自动剔除冗余（视频选择器里不再出现 gpt-image-2 仓库；图片选择器里不再列 `image` 标签）
+  - 原 `TikpanPromptsSelectorNode` 显示名改为「工具｜提示词选择器·全部」
+
+### Technical Details
+
+- `PromptCard` 新增 `title_zh` 和 `prompt_preview_zh` 字段，向后兼容旧 JSON
+- 翻译走 `https://tikpan.com/v1/chat/completions` OpenAI 兼容协议
+- `_load_existing_translations()` 在写盘前读取旧译文缓存，防止覆盖丢失
+- `translate_cards()` 支持 `checkpoint_callback`，每批落盘
+- 401 连通性测试已验证端点和模型名路由正常
+
+### Verification
+
+```
+# 本地校验解析器（无需 API key）
+python -c "from utils.prompts_library import sync_prompt_repo, PROMPT_REPOS;
+[print(sync_prompt_repo(r)) for r in PROMPT_REPOS]"
+
+# 翻译连通性测试（用假 key 期望 401）
+python -c "from utils.prompts_library import _batch_translate;
+print(_batch_translate(['test'], 'sk-fake', 'deepseek-v4-flash'))"
+```
 
 ## [v1.3.6] - 2026-05-31
 
@@ -27,24 +100,19 @@
 
 - 在 `tikpan_psd_processor.py` 中新增 `_generate_smart_name()` 方法，实现九宫格位置判断和大小分级
 - 在 `_build_layer_list()` 中为每个图层添加 `group` 字段
-- 在 `save_as_psd()` 中新增 `_organize_layers_by_group()` 方法，使用 pytoshop 的 `Group` 功能创建图层组
+- 在 `save_as_psd()` 中新增 `_organize_layers_by_group()` 方法，使用 PSD 兼容图层分组流程创建图层组
 - 在 `create_preview()` 中实现缩略图渲染，使用深色主题界面
 
 ## [v1.3.5] - 2026-05-30
 
 ### New Features - PSD 分层导出能力
 
-本次新增 3 个节点，构成完整的 PSD 工作流：单图 PSD 保存 → 智能 AI 分层 → 模型预下载。
+本次新增 PSD 智能分层工作流：智能 AI 分层 → 模型预下载。
 
-- **`TikpanPSDSaverNode` 工具｜PSD 文件保存器**：将 ComfyUI 的 IMAGE 保存为 PSD。
-  - 标准模式（Pillow）：使用已有 Pillow 直接保存，无需依赖，单层 PSD。
-  - 高级模式（psd-tools）：自动安装 `psd-tools`，多张输入自动多图层。
-  - 文件名去重、非法字符清理、安装失败自动降级。
-
-- **`TikpanSmartPSDLayeringNode` 工具｜智能分层 PSD 生成器**：纯本地 AI 自动识别图片元素并保存为分层 PSD，**三档可选**：
-  - **经济档（~300MB / 5-10秒）**：rembg(ISNet) + OpenCV 连通域。适合简单商品图、白底图。
-  - **标准档（~2.4GB / 15-30秒）⭐推荐**：SAM2 (Hiera Small) + EasyOCR。适合复杂场景、多对象、海报。
-  - **极致档（~5GB+ / 60-120秒）**：SAM2 + LaMa Inpainting。商业级分层（**被遮挡区域智能补全**），让每一层都是完整的。
+- **`TikpanSmartPSDLayeringNode` 工具｜智能分层 PSD 生成器**：纯本地 AI 自动识别图片元素并保存为分层 PSD，**三档可选**:
+  - **经济档（5-15秒）**：BiRefNet + OpenCV 连通域 + PaddleOCR。适合简单商品图、追求速度。
+  - **标准档（20-60秒）⭐推荐**：BiRefNet + SAM2 自动多尺度 + PaddleOCR。适合大多数日常场景、复杂商品图和海报。
+  - **极致档（60-180秒）**：BiRefNet + GroundingDINO + SAM2 + LaMa。商业级分层（**被遮挡区域智能补全**），让每一层都是完整的。
   - 标准档可勾选"补全被遮挡区域"升级到极致档效果。
   - 输出：原图参考层（默认隐藏）+ 背景层 + N 个独立元素层 + N 个文字层。
   - 处理流程异常时自动降级（SAM2 不可用降级到 rembg，inpainting 失败跳过补全）。
@@ -63,11 +131,11 @@
 
 ### Documentation
 
-- 节点速查表 (`docs/节点速查表.md`) 新增"PSD 节点"表与"三档分层精度对比"表。
-- 节点功能分类 (`docs/Tikpan_ComfyUI_节点功能分类.md`) 在"06 任务与并发 Tools"分类下新增 3 个 PSD 节点条目。
+- 节点速查表 (`docs/节点速查表.md`) 新增 PSD 智能分层表与三档精度对比表。
+- 节点功能分类 (`docs/Tikpan_ComfyUI_节点功能分类.md`) 在"06 任务与并发 Tools"分类下新增 PSD 智能分层和模型预下载条目。
 - 节点使用教程 (`docs/节点使用教程.md`) 新增第 10 章 "PSD 分层导出"，覆盖三档选择决策、首次使用流程、工作流示例与常见失败处理。
 - 新增飞书文档同步指南 (`docs/飞书文档同步指南.md`)：完整的飞书 API 配置教程、使用方法、常见问题排查和安全提示。
-- README 新增"快速开始：PSD 分层导出"章节，补充 PSD 功能简介和三档对比说明。
+- README 新增"快速开始：PSD 分层导出"章节，补充 PSD 智能分层功能简介和三档对比说明。
 
 ### Testing
 

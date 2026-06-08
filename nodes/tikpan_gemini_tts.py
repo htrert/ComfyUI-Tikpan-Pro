@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_AUDIO
 import base64
 import hashlib
 import json
@@ -120,7 +121,6 @@ class TikpanGemini31FlashTTSNode:
                 "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
                 "自定义voice_name": (
                     "STRING",
                     {
@@ -140,14 +140,6 @@ class TikpanGemini31FlashTTSNode:
                     {
                         "default": False,
                         "tooltip": "批量工作流可开启。失败时返回空音频和错误日志，不中断整个工作流。",
-                    },
-                ),
-                "高级自定义_JSON": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "会深度合并到最终请求体，用于后续上游新增参数时临时透传。",
                     },
                 ),
             },
@@ -173,8 +165,8 @@ class TikpanGemini31FlashTTSNode:
     )
     OUTPUT_NODE = True
     FUNCTION = "generate_tts"
-    CATEGORY = "🎵 Tikpan 云端模型/03 云端音频"
-    DESCRIPTION = "📝 Gemini 3.1 Flash TTS：Google 多语种语音合成，支持自然语言『语气指令』（欢快地说/纪录片旁白等）。适合多语种 + 富情感的口播。"
+    CATEGORY = CATEGORY_AUDIO
+    DESCRIPTION = "📝 Gemini 3.1 Flash TTS：通过 Tikpan 调用 Gemini TTS，隐藏固定 host 和高级 JSON 透传，保留官方语音配置和本地缓存/重试参数。"
 
     def empty_audio(self):
         try:

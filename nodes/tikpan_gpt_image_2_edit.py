@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_IMAGE
 import json
 import requests
 import base64
@@ -37,7 +38,7 @@ class TikpanGptImage2EditNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_重绘结果图", "📄_渲染日志")
     FUNCTION = "edit"
-    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
+    CATEGORY = CATEGORY_IMAGE
     DESCRIPTION = "📝 GPT-Image-2-all 修图节点：基于底图做指令式重绘，支持遮罩局部修改、参考图融合。适合换背景/换主体/产品融入。"
 
     def edit(self, 获取密钥请访问, API_密钥, 底图, 修改指令, 模型, 输出尺寸="沿用底图尺寸", 画面比例="沿用底图比例", 品质="高清｜hd", 遮罩_Mask=None, 产品参考图=None, **kwargs):

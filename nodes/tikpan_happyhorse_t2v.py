@@ -14,6 +14,7 @@ API 端点（中转站 tikpan.com）：
 - 文件安全（避免覆盖、校验非空）
 """
 
+from .tikpan_categories import CATEGORY_VIDEO
 import json
 import time
 import os
@@ -163,7 +164,7 @@ class TikpanHappyHorseT2VNode:
     RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_视频云端链接", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
-    CATEGORY = "🎬 Tikpan 云端模型/02 云端视频"
+    CATEGORY = CATEGORY_VIDEO
     DESCRIPTION = "📝 HappyHorse 1.0 文生视频 T2V：纯文本提示词生成 3-15 秒视频，720P/1080P，支持同步等待或异步提交。适合快速文生短片。"
 
     # ------------------------------------------------------------------

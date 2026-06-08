@@ -1,10 +1,11 @@
 """
 Tikpan: Gemini Omni 视频生成节点
-- 模型：omni-flash（文生视频）、omni-flash-components（参考图生视频）
-- 端点：POST https://tikpan.com/v1/video/create（固定，用户不可更改）
-- 轮询：GET /v1/video/query?id={task_id}
+- 模型：omni-flash、omni-flash-edit
+- 端点：POST https://tikpan.com/v1/video/create（固定 Tikpan 中转站）
+- 轮询：GET /v1/video/query?id={task_id}&model={model}
 - 官方均为异步模式，节点内自动轮询直到完成
 """
+from .tikpan_categories import CATEGORY_VIDEO
 import base64
 import hashlib
 import json
@@ -14,6 +15,7 @@ import time
 import traceback
 import wave
 from io import BytesIO
+from urllib.parse import quote
 
 import folder_paths
 import numpy as np
@@ -32,24 +34,27 @@ from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, normalize
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# ─── 仅包含 Tikpan 价格页已上线的模型 ─────────────────────────────────────────
+# ─── Tikpan 中转站当前 Omni 视频接口模型 ───────────────────────────────────────
 MODEL_OPTIONS = [
     "omni-flash",
-    "omni-flash-components",
+    "omni-flash-edit",
 ]
-COMPONENT_MODELS = {"omni-flash-components"}
+
+GENERATION_TYPE_OPTIONS = [
+    "文生视频｜1",
+    "首尾帧｜2",
+    "垫图参考｜3",
+    "Omni-Flash 视频编辑｜4",
+]
 
 ASPECT_OPTIONS = [
     "16:9 横屏｜16:9",
     "9:16 竖屏｜9:16",
-    "1:1 方形｜1:1",
-    "4:3 经典横屏｜4:3",
-    "3:4 经典竖屏｜3:4",
 ]
 
 RESOLUTION_OPTIONS = [
-    "720p｜720p",
-    "1080p｜1080p",
+    "720p 标准｜720p",
+    "1080p 高清｜1080p",
 ]
 
 DURATION_OPTIONS = [
@@ -58,11 +63,10 @@ DURATION_OPTIONS = [
     "10 秒｜10",
 ]
 
-# 固定端点 —— 两个模型都走 /v1/video/create
 HARDCODED_ENDPOINT = "/v1/video/create"
-QUERY_ENDPOINT_TEMPLATE = "/v1/video/query?id={task_id}"
+QUERY_ENDPOINT_TEMPLATE = "/v1/video/query?id={task_id}&model={model}"
 
-MAX_REFERENCE_IMAGES = 5
+MAX_REFERENCE_IMAGES = 3
 MAX_INLINE_VIDEO_BYTES = 48 * 1024 * 1024
 MAX_INLINE_AUDIO_BYTES = 24 * 1024 * 1024
 
@@ -81,65 +85,26 @@ def _raw(value, default=""):
 class TikpanGeminiOmniVideoNode:
     @classmethod
     def INPUT_TYPES(cls):
-        optional = {
-            "负面提示词": (
-                "STRING",
-                {
-                    "multiline": True,
-                    "default": "",
-                    "tooltip": "告诉模型不要出现什么内容，例如：blurry, text overlay, watermark, low quality",
-                },
-            ),
-        }
-        # 参考图（仅 omni-flash-components 有效）
+        optional = {}
+        # 参考图：type=2 首尾帧需 1-2 张，type=3 垫图参考需 1-3 张
         for i in range(1, MAX_REFERENCE_IMAGES + 1):
-            optional[f"参考图{i}"] = ("IMAGE", {"tooltip": f"参考图 {i}：作为视觉参考输入，仅 omni-flash-components 模型有效"})
+            optional[f"参考图{i}"] = ("IMAGE", {"tooltip": f"参考图 {i}：首尾帧最多 2 张，垫图参考最多 3 张"})
 
         optional["视频URL"] = (
             "STRING",
             {
                 "multiline": False,
                 "default": "",
-                "tooltip": "用于视频编辑/视频参考。优先使用公开可访问 URL；本字段会透传为 video_url/input_video 等兼容字段。",
+                "tooltip": "用于 Omni-Flash 视频编辑（type=4），优先使用公开可访问 URL；会传给 input_reference。",
             },
         )
         optional["本地视频"] = (
             "VIDEO",
-            {"tooltip": "用于视频编辑/视频参考。小于约 48MB 时会 inline 直传为 data:video。更大的视频请使用视频URL。"},
+            {"tooltip": "用于 Omni-Flash 视频编辑（type=4）。小于约 48MB 时会 inline 直传为 data:video；更大的视频请使用视频URL。"},
         )
-        optional["参考音频URL"] = (
-            "STRING",
-            {
-                "multiline": False,
-                "default": "",
-                "tooltip": "用于音频驱动或参考音色。优先使用公开可访问 URL；会透传为 audio_url/reference_audio 等兼容字段。",
-            },
-        )
-        optional["参考音频"] = (
-            "AUDIO",
-            {"tooltip": "用于音频驱动或参考音色。会打包为 wav data URL；体积建议小于 24MB。"},
-        )
-        optional["参考音色ID"] = (
-            "STRING",
-            {
-                "multiline": False,
-                "default": "",
-                "tooltip": "如果 Tikpan/上游已返回音色 ID，可填入这里；会透传为 voice_id/reference_voice_id。",
-            },
-        )
-        optional["保留原视频声音"] = ("BOOLEAN", {"default": True, "tooltip": "做视频编辑时是否保留原视频音轨"})
-
-        optional["高级自定义JSON"] = (
-            "STRING",
-            {
-                "multiline": True,
-                "default": "",
-                "tooltip": "深度合并到 POST /v1/video/create payload，用于 Tikpan 后续新增参数或临时调试。",
-            },
-        )
-        optional["最长等待秒数"] = ("INT", {"default": 1200, "min": 60, "max": 7200, "step": 30, "tooltip": "等待视频生成完成的最长时间；长视频/高清建议加大"})
-        optional["查询间隔秒数"] = ("INT", {"default": 8, "min": 3, "max": 60, "step": 1, "tooltip": "轮询任务状态的间隔；过小会浪费请求，过大响应慢"})
-        optional["校验HTTPS证书"] = ("BOOLEAN", {"default": False, "tooltip": "默认关闭以兼容部分网络；遇到 SSL 问题可保持关闭"})
+        optional["最长等待秒数"] = ("INT", {"default": 1200, "min": 60, "max": 7200, "step": 30, "tooltip": "本地轮询等待最长秒数，不会传给上游模型"})
+        optional["查询间隔秒数"] = ("INT", {"default": 8, "min": 3, "max": 60, "step": 1, "tooltip": "本地轮询任务状态的间隔秒数"})
+        optional["校验HTTPS证书"] = ("BOOLEAN", {"default": False, "tooltip": "本地网络参数：控制 requests 是否校验证书，不会传给上游模型"})
         optional["跳过错误"] = ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回空，不打断后续工作流"})
 
         return {
@@ -158,12 +123,11 @@ class TikpanGeminiOmniVideoNode:
                         "tooltip": "描述你想生成的视频画面/动作/氛围，越具体越准确",
                     },
                 ),
-                "模型": (MODEL_OPTIONS, {"default": "omni-flash", "tooltip": "选择 omni 视频模型：flash 快，components 支持参考图"}),
-                "视频时长": (DURATION_OPTIONS, {"default": "8 秒｜8", "tooltip": "生成视频的秒数；越长越慢越贵"}),
-                "画面比例": (ASPECT_OPTIONS, {"default": "16:9 横屏｜16:9", "tooltip": "视频比例：16:9 横屏，9:16 竖屏短视频，1:1 方屏"}),
-                "清晰度": (RESOLUTION_OPTIONS, {"default": "720p｜720p", "tooltip": "视频分辨率：1080p 更清晰但更贵更慢"}),
-                "生成原生音频": ("BOOLEAN", {"default": True, "tooltip": "是否同步生成对白/环境音"}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"}),
+                "模型": (MODEL_OPTIONS, {"default": "omni-flash", "tooltip": "选择 Omni 视频模型；视频编辑推荐 omni-flash-edit"}),
+                "生成类型": (GENERATION_TYPE_OPTIONS, {"default": "文生视频｜1", "tooltip": "1=文生视频，2=首尾帧，3=垫图参考，4=Omni-Flash 视频编辑"}),
+                "视频时长": (DURATION_OPTIONS, {"default": "8 秒｜8", "tooltip": "生成视频的秒数；会按上游接口传 seconds 字段"}),
+                "画面比例": (ASPECT_OPTIONS, {"default": "16:9 横屏｜16:9", "tooltip": "视频比例：16:9 横屏，9:16 竖屏短视频"}),
+                "清晰度": (RESOLUTION_OPTIONS, {"default": "720p 标准｜720p", "tooltip": "1080p 会启用 enable_sample；720p 不启用"}),
             },
             "optional": optional,
         }
@@ -172,8 +136,8 @@ class TikpanGeminiOmniVideoNode:
     RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_视频云端直链", "📋_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "generate"
-    CATEGORY = "🎬 Tikpan 云端模型/02 云端视频"
-    DESCRIPTION = "📝 Gemini Omni Flash 视频：Google Gemini 视频模型，支持 720P/1080P、原生音频生成、视频编辑、参考音色驱动。适合带原生对白/音效的视频。"
+    CATEGORY = CATEGORY_VIDEO
+    DESCRIPTION = "📝 Gemini Omni Flash 视频：通过 Tikpan /v1/video/create 调用 Omni 视频接口，隐藏未确认的 seed、negative_prompt、音频透传和高级 JSON。"
 
     # ─── Session ────────────────────────────────────────────────────────────────
     def _create_session(self):
@@ -297,30 +261,34 @@ class TikpanGeminiOmniVideoNode:
         return "data:audio/wav;base64," + base64.b64encode(raw).decode("utf-8")
 
     # ─── Payload 构建 ───────────────────────────────────────────────────────────
-    def _build_payload(self, model, prompt, duration, aspect_ratio, resolution,
+    def _build_payload(self, model, prompt, generation_type, seconds, aspect_ratio, resolution,
                        generate_audio, seed, negative_prompt, images, video_ref,
                        audio_ref, voice_id, keep_original_sound, custom_json_str):
+        gen_type = int(generation_type)
         payload = {
             "model": model,
             "prompt": prompt,
+            "type": gen_type,
             "aspect_ratio": aspect_ratio,
-            "duration": int(duration),
-            "resolution": resolution,
-            "seed": int(seed) % 2147483647,
-            "generate_audio": bool(generate_audio),
+            "seconds": str(int(seconds)),
         }
+        if resolution == "1080p":
+            payload["enable_sample"] = True
         if negative_prompt:
             payload["negative_prompt"] = negative_prompt
 
-        if video_ref:
-            payload["video_url"] = video_ref
-            payload["input_video"] = video_ref
-            payload["reference_video"] = video_ref
-            payload["video_list"] = [{
-                "video_url": video_ref,
-                "refer_type": "base",
-                "keep_original_sound": "yes" if keep_original_sound else "no",
-            }]
+        if gen_type in {2, 3}:
+            limit = 2 if gen_type == 2 else 3
+            if not images:
+                raise ValueError("首尾帧/垫图参考生成需要至少连接 1 张参考图")
+            payload["images"] = images[:limit]
+
+        if gen_type == 4:
+            if not video_ref:
+                raise ValueError("视频编辑需要填写视频URL或连接本地视频")
+            payload["input_reference"] = video_ref
+            if model == "omni-flash":
+                payload["model"] = "omni-flash-edit"
 
         if audio_ref:
             payload["audio_url"] = audio_ref
@@ -332,17 +300,17 @@ class TikpanGeminiOmniVideoNode:
             payload["reference_voice_id"] = voice_id
             payload["element_voice_id"] = voice_id
 
-        if images:
-            if model in COMPONENT_MODELS:
-                # components 模型：传参考图列表
-                payload["images"] = images
-                # 同时保留 reference_images 作为别名，适配 Tikpan 不同上游路由
-                payload["reference_images"] = images
-            else:
-                # omni-flash 文生视频，如果用户误接了参考图也忽略
-                pass
+        payload["duration"] = int(seconds)
+        payload["resolution"] = resolution
+        if seed is not None:
+            payload["seed"] = int(seed) % 2147483647
+        if generate_audio is not None:
+            payload["generate_audio"] = bool(generate_audio)
+        if video_ref:
+            payload["video_url"] = video_ref
+        if keep_original_sound is not None:
+            payload["keep_original_sound"] = bool(keep_original_sound)
 
-        # 高级 JSON 合并
         if custom_json_str:
             custom_json_str = custom_json_str.strip()
             if custom_json_str:
@@ -386,13 +354,14 @@ class TikpanGeminiOmniVideoNode:
             raise RuntimeError(f"任务创建失败：返回不是合法 JSON\n{response.text[:1600]}") from exc
 
     # ─── 轮询 ────────────────────────────────────────────────────────────────────
-    def _poll(self, session, api_host, task_id, api_key, max_wait, poll_interval, verify_tls, pbar):
+    def _poll(self, session, api_host, task_id, model, api_key, max_wait, poll_interval, verify_tls, pbar):
         task = str(task_id or "").strip()
-        # 优先查 /v1/video/query，再 fallback
+        model_name = quote(str(model or "omni-flash"), safe="")
         candidate_urls = []
-        candidate_urls.append(f"{api_host}{QUERY_ENDPOINT_TEMPLATE.format(task_id=task)}")
-        candidate_urls.append(f"{api_host}/v1/videos/{task}")
-        candidate_urls.append(f"{api_host}/v1/videos/query?id={task}")
+        candidate_urls.append(f"{api_host}{QUERY_ENDPOINT_TEMPLATE.format(task_id=quote(task, safe=''), model=model_name)}")
+        candidate_urls.append(f"{api_host}/v1/video/query?id={quote(task, safe='')}")
+        candidate_urls.append(f"{api_host}/v1/videos/{quote(task, safe='')}")
+        candidate_urls.append(f"{api_host}/v1/videos/query?id={quote(task, safe='')}")
         # 去重
         seen = set()
         query_urls = [u for u in candidate_urls if not (u in seen or seen.add(u))]
@@ -468,11 +437,13 @@ class TikpanGeminiOmniVideoNode:
             verify_tls = bool(pick(kwargs, "校验HTTPS证书", "verify_tls", default=False))
             prompt = str(pick(kwargs, "生成指令", "prompt", default="") or "").strip()
             model = _raw(pick(kwargs, "模型", "model", default="omni-flash"), "omni-flash")
-            duration = _raw(pick(kwargs, "视频时长", "duration", default="8 秒｜8"), "8")
+            generation_type = _raw(pick(kwargs, "生成类型", "type", "generation_type", default="文生视频｜1"), "1")
+            duration = _raw(pick(kwargs, "视频时长", "duration", "seconds", default="8 秒｜8"), "8")
             aspect_ratio = _raw(pick(kwargs, "画面比例", "aspect_ratio", default="16:9 横屏｜16:9"), "16:9")
-            resolution = _raw(pick(kwargs, "清晰度", "resolution", default="720p｜720p"), "720p")
+            resolution = _raw(pick(kwargs, "清晰度", "resolution", default="720p 标准｜720p"), "720p")
             generate_audio = bool(pick(kwargs, "生成原生音频", "generate_audio", default=True))
-            seed = normalize_seed(pick(kwargs, "随机种子", "seed", default=888888), default=888888)
+            seed_value = pick(kwargs, "随机种子", "seed", default=None)
+            seed = normalize_seed(seed_value, default=888888) if seed_value is not None else None
             negative_prompt = str(pick(kwargs, "负面提示词", "negative_prompt", default="") or "").strip()
             video_url = str(pick(kwargs, "视频URL", "video_url", default="") or "").strip()
             local_video = pick(kwargs, "本地视频", "local_video", default=None)
@@ -490,6 +461,8 @@ class TikpanGeminiOmniVideoNode:
                 return self._err("❌ 生成指令不能为空", skip_error)
             if model not in MODEL_OPTIONS:
                 model = "omni-flash"
+            if generation_type not in {"1", "2", "3", "4"}:
+                generation_type = "1"
 
             images = self._collect_images(kwargs)
             video_ref = video_url if video_url.startswith(("http://", "https://", "data:video")) else ""
@@ -500,20 +473,13 @@ class TikpanGeminiOmniVideoNode:
             if not audio_ref and audio is not None:
                 audio_ref = self._audio_to_wav_data_url(audio)
 
-            if images and model not in COMPONENT_MODELS:
-                print(
-                    f"[Tikpan-GeminiOmni] ⚠️ 当前模型 {model} 不是 components 版本，"
-                    f"参考图输入将被忽略。请切换到 omni-flash-components 以使用参考图生视频。",
-                    flush=True,
-                )
-                images = []
-
             pbar.update_absolute(8, 100)
             payload = self._build_payload(
-                model, prompt, duration, aspect_ratio, resolution,
+                model, prompt, generation_type, duration, aspect_ratio, resolution,
                 generate_audio, seed, negative_prompt, images, video_ref,
                 audio_ref, voice_id, keep_original_sound, custom_json_str,
             )
+            model = str(payload.get("model") or model)
             session = self._create_session()
             pbar.update_absolute(15, 100)
 
@@ -531,7 +497,7 @@ class TikpanGeminiOmniVideoNode:
                         f"{json.dumps(create_json, ensure_ascii=False, default=str)[:1800]}"
                     )
                 ok, result, final_json = self._poll(
-                    session, api_host, task_id, api_key, max_wait, poll_interval, verify_tls, pbar
+                    session, api_host, task_id, model, api_key, max_wait, poll_interval, verify_tls, pbar
                 )
                 if not ok:
                     raise RuntimeError(result)
@@ -545,8 +511,8 @@ class TikpanGeminiOmniVideoNode:
 
             log = (
                 f"✅ Gemini Omni 视频生成成功\n"
-                f"model={model} | duration={duration}s | aspect={aspect_ratio} | resolution={resolution} | "
-                f"audio={generate_audio} | refs={len(images)} | video_ref={bool(video_ref)} | "
+                f"model={model} | type={generation_type} | seconds={duration}s | aspect={aspect_ratio} | resolution={resolution} | "
+                f"audio={generate_audio} | refs={len(payload.get('images') or [])} | input_reference={bool(payload.get('input_reference'))} | "
                 f"audio_ref={bool(audio_ref)} | voice_id={bool(voice_id)} | endpoint={HARDCODED_ENDPOINT}\n"
                 f"task_id={task_id}\nvideo_url={video_url}\npath={save_path}\n\n"
                 f"{json.dumps(self._redact(final_json), ensure_ascii=False, indent=2, default=str)[:3000]}"

@@ -2,7 +2,10 @@
 
 import sys
 import os
+import re
 from pathlib import Path
+
+from .tikpan_categories import CATEGORY_PROMPT_LIBRARY
 
 # 添加父目录到路径以导入 utils
 parent_dir = Path(__file__).parent.parent
@@ -37,32 +40,57 @@ class TikpanPromptsSelectorNode:
     - 支持按标签、仓库过滤
     - 支持搜索关键词
     - 输出提示词文本供其他节点使用
+
+    子类可通过 CARD_TYPE_FILTER 限定只显示某类卡片(image/video)
     """
+
+    # None = 不过滤(显示全部);"image" = 只显示图片卡片;"video" = 只显示视频卡片
+    CARD_TYPE_FILTER = None
+    EMPTY_HINT = "(请先同步提示词库)"
+
+    @classmethod
+    def _scoped_cards(cls):
+        """读取并按 CARD_TYPE_FILTER 过滤后的卡片列表"""
+        data = read_all_prompt_cards()
+        cards = data["cards"]
+        if cls.CARD_TYPE_FILTER:
+            cards = [c for c in cards if cls.CARD_TYPE_FILTER in c.tags]
+        return cards
 
     @classmethod
     def INPUT_TYPES(cls):
-        # 读取所有卡片用于生成选项
         try:
-            data = read_all_prompt_cards()
-            cards = data["cards"]
+            cards = cls._scoped_cards()
 
-            # 生成卡片选项（显示标题）
-            card_options = ["(请先同步提示词库)"]
+            # 生成卡片选项(优先中文,回退英文)
+            card_options = [cls.EMPTY_HINT]
             if cards:
-                card_options = [f"{i+1}. {card.title[:60]}" for i, card in enumerate(cards[:200])]
+                card_options = []
+                for i, card in enumerate(cards[:800]):
+                    title = (card.title_zh or card.title or "Untitled")[:50]
+                    raw_preview = card.prompt_preview_zh or card.prompt or ""
+                    preview = re.sub(r'\s+', ' ', raw_preview.strip())[:40]
+                    label = f"{i+1}. {title} — {preview}" if preview else f"{i+1}. {title}"
+                    card_options.append(label[:140])
 
-            # 生成仓库选项
-            repo_options = ["全部"] + [repo["slug"] for repo in PROMPT_REPOS]
+            # 仓库选项:专用选择器只列含该类型卡片的仓库
+            if cls.CARD_TYPE_FILTER:
+                involved_repos = sorted(set(c.repo for c in cards))
+                repo_options = ["全部"] + involved_repos
+            else:
+                repo_options = ["全部"] + [repo["slug"] for repo in PROMPT_REPOS]
 
-            # 生成标签选项
+            # 标签选项:专用选择器排除自身定位标签,避免冗余
             all_tags = set()
             for card in cards:
                 all_tags.update(card.tags)
+            if cls.CARD_TYPE_FILTER:
+                all_tags.discard(cls.CARD_TYPE_FILTER)
             tag_options = ["全部"] + sorted(list(all_tags))
 
         except Exception as e:
             print(f"读取提示词库失败: {e}")
-            card_options = ["(请先同步提示词库)"]
+            card_options = [cls.EMPTY_HINT]
             repo_options = ["全部"]
             tag_options = ["全部"]
 
@@ -81,80 +109,77 @@ class TikpanPromptsSelectorNode:
     RETURN_TYPES = ("STRING", "STRING", "STRING")
     RETURN_NAMES = ("提示词文本", "卡片标题", "卡片详情")
     FUNCTION = "execute"
-    CATEGORY = "📝 Tikpan 本地工具/01 提示词工具"
+    CATEGORY = CATEGORY_PROMPT_LIBRARY
 
     def execute(self, 选择提示词, 过滤_仓库="全部", 过滤_标签="全部", 搜索关键词="", 显示详情=True):
         """执行提示词选择"""
         try:
-            # 读取所有卡片
-            data = read_all_prompt_cards()
-            cards = data["cards"]
+            # 同 INPUT_TYPES 使用相同的卡片范围,确保索引一致
+            cards = self._scoped_cards()
 
             if not cards:
+                scope = f"({self.CARD_TYPE_FILTER})" if self.CARD_TYPE_FILTER else ""
                 return (
-                    "请先使用'提示词库管理器'节点同步提示词库",
+                    f"请先使用'提示词库管理器'节点同步提示词库{scope}",
                     "未找到提示词",
                     "提示词库为空"
                 )
 
-            # 应用过滤
-            filtered_cards = cards
+            # 优先按下拉选择的索引精确取卡片(索引基于过滤后的卡片列表,与 INPUT_TYPES 一致)
+            selected_card = None
+            m = re.match(r'^(\d+)\.', 选择提示词)
+            if m:
+                idx = int(m.group(1)) - 1
+                if 0 <= idx < len(cards):
+                    selected_card = cards[idx]
 
-            # 按仓库过滤
-            if 过滤_仓库 != "全部":
-                filtered_cards = [c for c in filtered_cards if c.repo == 过滤_仓库]
-
-            # 按标签过滤
-            if 过滤_标签 != "全部":
-                filtered_cards = [c for c in filtered_cards if 过滤_标签 in c.tags]
-
-            # 按搜索关键词过滤
-            if 搜索关键词.strip():
-                search_lower = 搜索关键词.lower()
-                filtered_cards = [
-                    c for c in filtered_cards
-                    if search_lower in c.title.lower()
-                    or search_lower in c.prompt.lower()
-                    or search_lower in c.body.lower()
-                ]
-
-            if not filtered_cards:
-                return (
-                    "未找到匹配的提示词",
-                    "无结果",
-                    f"过滤条件: 仓库={过滤_仓库}, 标签={过滤_标签}, 关键词={搜索关键词}"
-                )
-
-            # 解析选择的卡片索引
-            try:
-                # 从 "1. 标题" 格式中提取索引
-                index_str = 选择提示词.split(".")[0]
-                card_index = int(index_str) - 1
-
-                # 确保索引在范围内
-                if card_index < 0 or card_index >= len(filtered_cards):
-                    card_index = 0
-
-            except (ValueError, IndexError):
-                card_index = 0
-
-            # 获取选中的卡片
-            selected_card = filtered_cards[card_index]
+            # 下拉为占位符时,按过滤条件返回第一个匹配(兼容旧用法)
+            if selected_card is None:
+                filtered_cards = cards
+                if 过滤_仓库 != "全部":
+                    filtered_cards = [c for c in filtered_cards if c.repo == 过滤_仓库]
+                if 过滤_标签 != "全部":
+                    filtered_cards = [c for c in filtered_cards if 过滤_标签 in c.tags]
+                if 搜索关键词.strip():
+                    s = 搜索关键词.lower()
+                    filtered_cards = [
+                        c for c in filtered_cards
+                        if s in c.title.lower() or s in c.prompt.lower() or s in c.body.lower()
+                    ]
+                if not filtered_cards:
+                    return (
+                        "未找到匹配的提示词",
+                        "无结果",
+                        f"过滤条件: 仓库={过滤_仓库}, 标签={过滤_标签}, 关键词={搜索关键词}"
+                    )
+                selected_card = filtered_cards[0]
 
             # 生成详情信息
+            title_line = selected_card.title
+            if selected_card.title_zh and selected_card.title_zh != selected_card.title:
+                title_line = f"{selected_card.title_zh}  ({selected_card.title})"
             details_lines = [
                 "=" * 60,
-                f"📝 {selected_card.title}",
+                f"📝 {title_line}",
                 "=" * 60,
                 f"来源: {selected_card.repo}",
                 f"标签: {', '.join(selected_card.tags)}",
                 f"链接: {selected_card.url}",
                 "",
-                "提示词内容:",
+            ]
+            if selected_card.prompt_preview_zh:
+                details_lines.extend([
+                    "中文预览:",
+                    "-" * 60,
+                    selected_card.prompt_preview_zh,
+                    "",
+                ])
+            details_lines.extend([
+                "提示词内容(原文):",
                 "-" * 60,
                 selected_card.prompt,
                 "",
-            ]
+            ])
 
             if selected_card.body:
                 details_lines.extend([
@@ -227,7 +252,7 @@ class TikpanPromptsSearchNode:
     RETURN_TYPES = ("STRING", "STRING", "STRING", "INT")
     RETURN_NAMES = ("提示词文本", "卡片标题", "搜索结果列表", "结果总数")
     FUNCTION = "execute"
-    CATEGORY = "📝 Tikpan 本地工具/01 提示词工具"
+    CATEGORY = CATEGORY_PROMPT_LIBRARY
 
     def execute(self, 搜索关键词, 过滤_仓库="全部", 过滤_标签="全部", 最多返回数量=10, 结果索引=0):
         """执行提示词搜索"""
@@ -308,13 +333,33 @@ class TikpanPromptsSearchNode:
             return (error_msg, "错误", error_msg, 0)
 
 
+class TikpanPromptsImageSelectorNode(TikpanPromptsSelectorNode):
+    """图片提示词选择器:下拉框只显示带 image 标签的卡片
+    (覆盖 GPT-Image-2 / Nano Banana 等图像生成模型)
+    """
+    CARD_TYPE_FILTER = "image"
+    EMPTY_HINT = "(请先同步提示词库,或当前无图片类卡片)"
+
+
+class TikpanPromptsVideoSelectorNode(TikpanPromptsSelectorNode):
+    """视频提示词选择器:下拉框只显示带 video 标签的卡片
+    (覆盖 Seedance 等视频生成模型)
+    """
+    CARD_TYPE_FILTER = "video"
+    EMPTY_HINT = "(请先同步提示词库,或当前无视频类卡片)"
+
+
 # ComfyUI 节点注册
 NODE_CLASS_MAPPINGS = {
     "TikpanPromptsSelectorNode": TikpanPromptsSelectorNode,
+    "TikpanPromptsImageSelectorNode": TikpanPromptsImageSelectorNode,
+    "TikpanPromptsVideoSelectorNode": TikpanPromptsVideoSelectorNode,
     "TikpanPromptsSearchNode": TikpanPromptsSearchNode,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "TikpanPromptsSelectorNode": "工具｜提示词选择器",
+    "TikpanPromptsSelectorNode": "工具｜提示词选择器·全部",
+    "TikpanPromptsImageSelectorNode": "工具｜提示词选择器·图片",
+    "TikpanPromptsVideoSelectorNode": "工具｜提示词选择器·视频",
     "TikpanPromptsSearchNode": "工具｜提示词搜索",
 }

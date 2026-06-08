@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_IMAGE
 import base64
 import json
 import re
@@ -55,12 +56,10 @@ class TikpanGeminiImageMaxNode:
                 ),
                 "调用方式": (
                     ["gemini原生", "images_generations", "chat_completions"],
-                    {"default": "gemini原生", "tooltip": "走哪个接口：gemini原生 最稳；images_generations 兼容生图风格；chat_completions 兼容 OpenAI 协议"},
+                    {"default": "gemini原生", "tooltip": "不同调用方式使用不同 Tikpan endpoint；只建议在需要兼容旧工作流时切换"},
                 ),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff, "tooltip": "同种子+同提示词可复现画面；改种子可换不同结果"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
                 **{f"参考图_{i}": ("IMAGE", {"tooltip": f"参考图 {i}：作为视觉参考输入；最多 14 张"}) for i in range(1, 15)},
             },
         }
@@ -68,8 +67,8 @@ class TikpanGeminiImageMaxNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成结果图", "📄_渲染日志")
     FUNCTION = "execute"
-    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
-    DESCRIPTION = "📝 Gemini 14 图极限生图：支持 Gemini-3-Pro / Flash / Nano-Banana 等多模型，最多 14 张参考图融合，2K/4K 输出。适合主体一致性、多图合成、IP 衍生。"
+    CATEGORY = CATEGORY_IMAGE
+    DESCRIPTION = "📝 Gemini 图像节点：使用 Tikpan 支持的 Gemini 原生 / images_generations / chat_completions endpoint，隐藏未确认生效的 seed 参数。"
 
     def black_image(self):
         return torch.zeros((1, 512, 512, 3), dtype=torch.float32)

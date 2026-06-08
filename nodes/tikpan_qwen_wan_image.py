@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_IMAGE
 import base64
 import hashlib
 import json
@@ -44,27 +45,14 @@ class _TikpanOpenImageBase:
     @classmethod
     def INPUT_TYPES(cls):
         optional = {
-            "兼容尺寸": (SIZE_OPTIONS, {"default": "Auto", "tooltip": "兼容老工作流的尺寸字段；Auto 由上面的比例+清晰度决定"}),
-            "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
-            "返回方式": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0], "tooltip": "url=返回云端链接（推荐）；b64_json=直接返回 Base64"}),
             "跳过错误": (
                 "BOOLEAN",
                 {
                     "default": False,
-                    "tooltip": "开启后，请求失败时返回黑图，避免整个工作流中断。",
-                },
-            ),
-            "高级自定义JSON": (
-                "STRING",
-                {
-                    "multiline": True,
-                    "default": "",
-                    "tooltip": "会深度合并到 /v1/images/generations payload，方便 Tikpan/上游新增参数。",
+                    "tooltip": "本地执行参数：请求失败时返回黑图，避免整个工作流中断。",
                 },
             ),
         }
-        for index in range(1, cls.MAX_REFERENCE_IMAGES + 1):
-            optional[f"参考图{index}"] = ("IMAGE", {"tooltip": f"参考图 {index}：图生图/编辑模式时作为视觉参考"})
         return {
             "required": {
                 "💰_福利_💰": (
@@ -84,12 +72,11 @@ class _TikpanOpenImageBase:
                     },
                 ),
                 "模型": ([cls.MODEL_ID], {"default": cls.MODEL_ID, "tooltip": "本节点使用的生图模型"}),
-                "生成张数": ("INT", {"default": 1, "min": 1, "max": 4, "step": 1, "tooltip": "一次生成几张结果；张数越多越慢越贵"}),
-                "生成模式": (TASK_MODE_OPTIONS, {"default": TASK_MODE_OPTIONS[0], "tooltip": "auto=由模型决定；text2image=纯文生图；image2image/edit=带参考图"}),
-                "画面比例": (ASPECT_RATIO_OPTIONS, {"default": "auto", "tooltip": "画面比例：auto 让模型决定；常用 1:1、16:9、9:16"}),
-                "清晰度": (cls.RESOLUTION_OPTIONS, {"default": "auto", "tooltip": "分辨率档位：越高越清晰但更慢更贵"}),
-                "画质策略": (QUALITY_OPTIONS, {"default": QUALITY_OPTIONS[0], "tooltip": "low=快且省钱；medium=日常推荐；high=精细但更慢更贵"}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "tooltip": "同种子+同提示词可复现画面；改种子可换不同结果"}),
+                "生成张数": ("INT", {"default": 1, "min": 1, "max": 4, "step": 1, "tooltip": "Tikpan /v1/images/generations 的 n 参数"}),
+                "画面比例": (ASPECT_RATIO_OPTIONS, {"default": "auto", "tooltip": "用于换算 size；auto 使用模型默认尺寸"}),
+                "清晰度": (cls.RESOLUTION_OPTIONS, {"default": "auto", "tooltip": "用于换算 size；auto 使用模型默认尺寸"}),
+                "水印": (["关闭｜false", "开启｜true"], {"default": "关闭｜false", "tooltip": "Tikpan /v1/images/generations 的 watermark 参数"}),
+                "提示词扩展": (["关闭｜false", "开启｜true"], {"default": "关闭｜false", "tooltip": "Tikpan /v1/images/generations 的 prompt_extend 参数"}),
             },
             "optional": optional,
         }
@@ -97,7 +84,7 @@ class _TikpanOpenImageBase:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("Image", "Log")
     FUNCTION = "generate"
-    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
+    CATEGORY = CATEGORY_IMAGE
 
     def generate(self, **kwargs):
         start_time = time.time()
@@ -110,8 +97,10 @@ class _TikpanOpenImageBase:
         resolution = self.normalize_choice(pick(kwargs, "清晰度", "resolution", default="auto"), self.RESOLUTION_OPTIONS, "auto")
         quality = option_value(pick(kwargs, "画质策略", "quality", default=QUALITY_OPTIONS[0]), "auto")
         size = str(pick(kwargs, "兼容尺寸", "size", default="Auto") or "Auto").strip()
-        seed = self.safe_int(pick(kwargs, "随机种子", "seed", default=888888), 888888, 0, 0x7FFFFFFF)
+        seed = pick(kwargs, "随机种子", "seed", default=None)
         response_format = self.build_response_format(option_value(pick(kwargs, "返回方式", "response_format", default=RESPONSE_FORMAT_OPTIONS[0]), "url"))
+        watermark = option_value(pick(kwargs, "水印", "watermark", default="关闭｜false"), "false") == "true"
+        prompt_extend = option_value(pick(kwargs, "提示词扩展", "prompt_extend", default="关闭｜false"), "false") == "true"
         api_host = normalize_api_host(pick(kwargs, "中转站地址", "Relay_Host", "api_host", default=API_HOST_OPTIONS[0]))
         skip_error = bool(pick(kwargs, "跳过错误", "Skip_Error", "skip_error", default=False))
 
@@ -135,7 +124,7 @@ class _TikpanOpenImageBase:
             session = self.create_session()
             reference_images = self.collect_reference_images(kwargs)
             resolved_mode = self.resolve_mode(mode, reference_images)
-            payload = self.build_payload(model, prompt, count, resolved_mode, aspect_ratio, resolution, quality, size, seed, response_format, reference_images, kwargs)
+            payload = self.build_payload(model, prompt, count, resolved_mode, aspect_ratio, resolution, quality, size, seed, response_format, watermark, prompt_extend, reference_images, kwargs)
             custom_json = self.parse_custom_json(pick(kwargs, "高级自定义JSON", "custom_json", default=""))
             if custom_json:
                 payload = self.deep_merge(payload, custom_json)
@@ -244,28 +233,18 @@ class _TikpanOpenImageBase:
                 raise
             return (self.black_image(width, height), self.skip_error_message(msg))
 
-    def build_payload(self, model, prompt, count, mode, aspect_ratio, resolution, quality, size, seed, response_format, reference_images, kwargs):
+    def build_payload(self, model, prompt, count, mode, aspect_ratio, resolution, quality, size, seed, response_format, watermark, prompt_extend, reference_images, kwargs):
+        width, height = self.size_from_options(size, aspect_ratio, resolution)
         payload = {
             "model": model,
             "prompt": prompt,
+            "size": f"{width}x{height}",
             "n": count,
-            "response_format": response_format,
-            "seed": seed,
+            "watermark": watermark,
+            "prompt_extend": prompt_extend,
         }
-        if mode != "auto":
-            payload["mode"] = mode
-        if aspect_ratio != "auto":
-            payload["aspect_ratio"] = aspect_ratio
-        if resolution != "auto":
-            payload["resolution"] = resolution
-        if quality != "auto":
-            payload["quality"] = quality
-        if size != "Auto":
-            payload["size"] = size
         if reference_images:
-            payload["images"] = reference_images
-            payload["reference_images"] = reference_images
-            payload["image"] = reference_images[0]
+            payload["image"] = reference_images[0] if len(reference_images) == 1 else reference_images
         return payload
 
     def resolve_mode(self, mode, reference_images):
@@ -516,61 +495,29 @@ class TikpanQwenImage20Node(_TikpanOpenImageBase):
     RESOLUTION_OPTIONS = QWEN_RESOLUTION_OPTIONS
     MAX_REFERENCE_IMAGES = 4
     DEFAULT_PROMPT = "一张高端商业海报，包含清晰准确的中文标题文字，真实材质，细腻光影，专业排版。"
-    DESCRIPTION = "📝 Qwen-Image-2.0：通义千问图像 2.0 模型，最大特点是『中英文字渲染准确』，最多 4 张参考图。适合海报、标题图、带文字的商业素材。"
+    DESCRIPTION = "📝 Qwen-Image-2.0：使用 Tikpan /v1/images/generations，只暴露 Apifox 已记录的 size/n/watermark/prompt_extend 等核心参数。"
 
-    def build_payload(self, model, prompt, count, mode, aspect_ratio, resolution, quality, size, seed, response_format, reference_images, kwargs):
-        payload = super().build_payload(model, prompt, count, mode, aspect_ratio, resolution, quality, size, seed, response_format, reference_images, kwargs)
-        payload["text_rendering"] = True
-        payload["instruction_tokens"] = "1k"
-        return payload
+    def build_payload(self, model, prompt, count, mode, aspect_ratio, resolution, quality, size, seed, response_format, watermark, prompt_extend, reference_images, kwargs):
+        return super().build_payload(model, prompt, count, mode, aspect_ratio, resolution, quality, size, seed, response_format, watermark, prompt_extend, reference_images, kwargs)
 
 
 class TikpanWan27ImageProNode(_TikpanOpenImageBase):
     MODEL_ID = "wan2.7-image-pro"
     MODEL_NAME = "Wan 2.7 Image Pro"
-    PRICE_TEXT = "万相 2.7 专业图像 | 4K/编辑/多图参考/成套图/主体一致性"
+    PRICE_TEXT = "万相 2.7 专业图像 | Tikpan /v1/images/generations"
     RESOLUTION_OPTIONS = WAN_RESOLUTION_OPTIONS
     MAX_REFERENCE_IMAGES = 8
     DEFAULT_PROMPT = "生成一张高端商业产品图，主体一致，真实材质，复杂场景自然融合，4K级细节。"
-    DESCRIPTION = "📝 Wan 2.7 Image Pro：阿里万相 2.7 专业版，支持 4K、最多 8 张参考图、成套图、主体一致性、品牌色板、局部编辑。适合电商/产品/IP 商业项目。"
+    DESCRIPTION = "📝 Wan 2.7 Image Pro：使用 Tikpan /v1/images/generations，只暴露 Apifox 已记录的 size/n/watermark/prompt_extend 等核心参数。"
 
     @classmethod
     def INPUT_TYPES(cls):
         schema = super().INPUT_TYPES()
-        schema["required"]["清晰度"] = (cls.RESOLUTION_OPTIONS, {"default": "2k", "tooltip": "分辨率档位：2k 默认；越高越清晰但更慢更贵"})
-        schema["optional"]["思考模式"] = (WAN_THINKING_OPTIONS, {"default": WAN_THINKING_OPTIONS[0], "tooltip": "开启后模型会先做推理再出图，质量更稳但更慢"})
-        schema["optional"]["成套图数量"] = ("INT", {"default": 1, "min": 1, "max": 9, "step": 1, "tooltip": "成套图模式：一次生成多张风格一致的图"})
-        schema["optional"]["主体保持"] = ("BOOLEAN", {"default": True, "tooltip": "开启后跨多张图保持主体一致；做产品图/IP 时推荐"})
-        schema["optional"]["品牌色/色板"] = ("STRING", {"default": "", "tooltip": "例如 #FF6600, black, gold。会透传为 palette。"})
-        schema["optional"]["编辑区域BBOX"] = (
-            "STRING",
-            {
-                "default": "",
-                "tooltip": "可选 JSON 数组，例如 [0.1,0.2,0.6,0.8]，用于局部编辑区域。",
-            },
-        )
+        schema["required"]["清晰度"] = (cls.RESOLUTION_OPTIONS, {"default": "2k", "tooltip": "用于换算 size；2k 默认，4k 更慢更贵"})
         return schema
 
-    def build_payload(self, model, prompt, count, mode, aspect_ratio, resolution, quality, size, seed, response_format, reference_images, kwargs):
-        payload = super().build_payload(model, prompt, count, mode, aspect_ratio, resolution, quality, size, seed, response_format, reference_images, kwargs)
-        thinking = option_value(pick(kwargs, "思考模式", "thinking", default=WAN_THINKING_OPTIONS[0]), "auto")
-        image_set_count = self.safe_int(pick(kwargs, "成套图数量", "image_set_count", default=1), 1, 1, 9)
-        consistency = bool(pick(kwargs, "主体保持", "subject_consistency", default=True))
-        palette = str(pick(kwargs, "品牌色/色板", "palette", default="") or "").strip()
-        bbox_raw = str(pick(kwargs, "编辑区域BBOX", "bbox", default="") or "").strip()
-        payload["subject_consistency"] = consistency
-        payload["image_set_count"] = image_set_count
-        if thinking in {"true", "false"}:
-            payload["thinking"] = thinking == "true"
-        if palette:
-            payload["palette"] = [item.strip() for item in palette.replace("，", ",").split(",") if item.strip()]
-        if bbox_raw:
-            try:
-                bbox = json.loads(bbox_raw)
-            except Exception as exc:
-                raise ValueError(f"编辑区域BBOX 不是合法 JSON: {exc}") from exc
-            payload["bbox"] = bbox
-        return payload
+    def build_payload(self, model, prompt, count, mode, aspect_ratio, resolution, quality, size, seed, response_format, watermark, prompt_extend, reference_images, kwargs):
+        return super().build_payload(model, prompt, count, mode, aspect_ratio, resolution, quality, size, seed, response_format, watermark, prompt_extend, reference_images, kwargs)
 
 
 NODE_CLASS_MAPPINGS = {

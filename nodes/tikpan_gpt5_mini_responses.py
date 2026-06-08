@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_TEXT_MULTIMODAL
 import base64
 import hashlib
 import json
@@ -118,7 +119,6 @@ class TikpanGPT5MiniResponsesNode:
                 "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
                 "图片1": ("IMAGE", {"tooltip": "可选输入图 1，用于图文混合提问（最多 16 张）"}),
                 "图片2": ("IMAGE", {"tooltip": "可选输入图 2"}),
                 "图片3": ("IMAGE", {"tooltip": "可选输入图 3"}),
@@ -153,14 +153,6 @@ class TikpanGPT5MiniResponsesNode:
                         "tooltip": "每行一个本地文件路径。小文件会 inline 为 input_file，适合 PDF/TXT/CSV/JSON。",
                     },
                 ),
-                "高级自定义JSON": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "可选，深度合并到 /v1/responses payload，用于临时透传 Tikpan/上游新参数。",
-                    },
-                ),
             },
         }
 
@@ -168,8 +160,8 @@ class TikpanGPT5MiniResponsesNode:
     RETURN_NAMES = ("回答文本", "优化提示词", "结构化JSON", "用量", "状态日志")
     OUTPUT_NODE = True
     FUNCTION = "run_responses"
-    CATEGORY = "💬 Tikpan 云端模型/04 AI 对话分析"
-    DESCRIPTION = "📝 GPT-5.4 Mini 多模态推理：走 /v1/responses 接口，性价比极高，推理强度可调，支持图/视频/文件/联网。适合通用问答、文案优化、数据分析。"
+    CATEGORY = CATEGORY_TEXT_MULTIMODAL
+    DESCRIPTION = "📝 GPT-5.4 Mini 多模态推理：走 Tikpan /v1/responses 接口，隐藏固定 host 和高级 JSON 透传，保留 Responses 核心参数与本地处理参数。"
 
     def make_return(self, answer="", prompt="", structured="", usage="", log=""):
         return (str(answer or ""), str(prompt or ""), str(structured or ""), str(usage or ""), str(log or ""))

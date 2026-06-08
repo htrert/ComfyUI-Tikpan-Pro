@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_IMAGE
 import math
 import time
 import base64
@@ -25,9 +26,7 @@ from .tikpan_node_options import (
     API_HOST_OPTIONS,
     normalize_api_host,
     IMAGE_FORMAT_OPTIONS,
-    MODERATION_OPTIONS,
     QUALITY_OPTIONS,
-    normalize_seed,
     option_value,
     pick,
 )
@@ -64,8 +63,8 @@ class TikpanGptImage2OfficialNode:
                 "模型": (["gpt-image-2"], {"default": "gpt-image-2", "tooltip": "本节点使用的官方生图模型，目前仅 gpt-image-2"}),
 
                 "分辨率档位": (
-                    ["512", "1K (1024)", "2K (2048)", "4K (官方极限 3840)"],
-                    {"default": "1K (1024)", "tooltip": "分辨率档位：档位越高画面越清晰，但更慢更贵；4K 接近官方极限"}
+                    ["512", "1K (1024)", "2K (2048)", "4K (3840)"],
+                    {"default": "1K (1024)", "tooltip": "Tikpan gpt-image-2 的输出尺寸档位；档位越高越慢、消耗越高。"}
                 ),
 
                 "画面比例": (
@@ -87,28 +86,12 @@ class TikpanGptImage2OfficialNode:
                     QUALITY_OPTIONS,
                     {
                         "default": "均衡质量｜medium",
-                        "tooltip": "速度优先选“快速低消耗”，商业成片优先选“均衡质量”或“高质量细节”。"
+                        "tooltip": "Tikpan /v1/images/generations 的 quality 参数。"
                     }
                 ),
-
-                "审核强度": (
-                    MODERATION_OPTIONS,
-                    {
-                        "default": "自动审核｜auto",
-                        "tooltip": "一般保持自动审核；需要更严格的商用内容风控时选严格审核。"
-                    }
-                ),
-
-                "随机种子": ("INT", {
-                    "default": 888888,
-                    "min": 0,
-                    "max": 0xffffffffffffffff,
-                    "tooltip": "同种子+同提示词可复现画面；改种子可换不同结果"
-                }),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
-                "返回格式": (IMAGE_FORMAT_OPTIONS, {"default": "PNG｜png", "tooltip": "图像编码：PNG 无损画质好，JPEG/WEBP 体积小"}),
+                "返回格式": (IMAGE_FORMAT_OPTIONS, {"default": "PNG｜png", "tooltip": "Tikpan gpt-image-2 generation 使用 format 字段：png / jpg / webp。"}),
                 "跳过错误": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "开启后，网络异常、余额不足或接口异常时返回黑图，避免工作流中断。"
@@ -119,8 +102,8 @@ class TikpanGptImage2OfficialNode:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成结果图", "📄_渲染日志")
     FUNCTION = "generate"
-    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
-    DESCRIPTION = "📝 GPT-Image-2 官方原版生图：直连官方 /v1/images/generations 接口，支持 4K、9 种比例、quality/moderation 全参数控制。适合追求官方原生效果。"
+    CATEGORY = CATEGORY_IMAGE
+    DESCRIPTION = "📝 GPT-Image-2 生图：使用 Tikpan /v1/images/generations 接口，只显示 Apifox 已记录的核心参数。"
 
     def generate(self, **kwargs):
         start_time = time.time()
@@ -132,11 +115,16 @@ class TikpanGptImage2OfficialNode:
         tier = kwargs.get("分辨率档位", "1K (1024)")
         aspect_ratio = kwargs.get("画面比例", "1:1")
         quality = option_value(kwargs.get("画质与推理强度", "均衡质量｜medium"), "medium")
-        moderation = option_value(kwargs.get("审核强度", "自动审核｜auto"), "auto")
+        moderation = option_value(kwargs.get("审核强度", "auto"), "auto")
         output_format = option_value(kwargs.get("返回格式", "PNG｜png"), "png")
         if output_format == "jpeg":
             output_format = "jpg"
-        seed = normalize_seed(pick(kwargs, "随机种子", "seed", default=888888), default=888888)
+        seed = pick(kwargs, "随机种子", "seed", default=None)
+        if seed is not None:
+            try:
+                seed = int(seed) & 0x7fffffff
+            except Exception:
+                seed = None
         skip_error = kwargs.get("跳过错误", False)
 
         pbar = comfy.utils.ProgressBar(100)
@@ -190,7 +178,8 @@ class TikpanGptImage2OfficialNode:
                 "quality": quality,
                 "moderation": moderation,
                 "format": output_format,
-                "seed": seed & 0x7fffffff
+                "n": 1,
+                "seed": seed,
             }
 
             allowed_keys = {
@@ -200,6 +189,7 @@ class TikpanGptImage2OfficialNode:
                 "quality",
                 "moderation",
                 "format",
+                "n",
                 "seed"
             }
             payload = {

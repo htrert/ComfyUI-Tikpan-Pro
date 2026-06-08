@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_IMAGE
 import math
 import base64
 import hashlib
@@ -137,24 +138,23 @@ class TikpanGptImage2OfficialEditV2:
                         "tooltip": "告诉 AI 怎么改图，例如『把背景换成海边』『增加一只猫』。如果上传了遮罩，仅修改遮罩区域。",
                     },
                 ),
-                "生成张数": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1, "tooltip": "一次生成几张结果；张数越多越慢越贵"}),
-                "分辨率档位": (["Auto", "1K", "2K", "4K"], {"default": "2K", "tooltip": "结果分辨率：Auto 跟随主图；档位越高越清晰但更慢更贵"}),
+                "生成张数": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1, "tooltip": "本地会按次数分别提交编辑请求；每次请求固定 n=1，避免单次请求超限"}),
+                "分辨率档位": (["Auto", "1K", "2K", "4K"], {"default": "2K", "tooltip": "本地把主图预处理到对应 Tikpan 支持尺寸后提交"}),
                 "画面比例": (
                     ["Auto", "1:1", "16:9", "9:16", "4:3", "3:4", "21:9", "9:21"],
                     {"default": "Auto", "tooltip": "结果比例：Auto 跟随主图；选定后会缩放/补边到目标比例"},
                 ),
                 "尺寸": (SIZE_OPTIONS, {"default": "Auto", "tooltip": "强制指定输出尺寸（覆盖档位+比例）；一般选 Auto 由前两项决定"}),
                 "画质": (QUALITY_OPTIONS, {"default": "均衡质量｜medium", "tooltip": "low=快且省钱；medium=日常推荐；high=精细但更慢更贵"}),
-                "背景模式": (BACKGROUND_OPTIONS, {"default": "自动背景｜auto", "tooltip": "auto=由模型决定；opaque=不透明；transparent=透明背景（PNG）"}),
-                "审核等级": (MODERATION_OPTIONS, {"default": "auto", "tooltip": "内容审核严格度：auto=默认；low=宽松"}),
-                "遮罩反相": ("BOOLEAN", {"default": False, "tooltip": "开启后把遮罩的黑白对调（让原本要保留的变成要编辑的）"}),
-                "提示增强": ("BOOLEAN", {"default": True, "tooltip": "开启后会自动给指令加补充描述，提升画面质量"}),
-                "并发请求数": ("INT", {"default": 2, "min": 1, "max": 4, "step": 1, "tooltip": "同时发起的请求数；越大越快但更容易触发频率限制"}),
-                "超时秒数": ("INT", {"default": 600, "min": 30, "max": 1800, "step": 10, "tooltip": "等待单次出图的最长秒数；4K/复杂场景建议加大"}),
+                "背景模式": (BACKGROUND_OPTIONS[:2], {"default": "自动背景｜auto", "tooltip": "Tikpan edit 接口 background 参数；transparent 当前不在 UI 暴露，旧工作流会按 auto 处理"}),
+                "审核等级": (MODERATION_OPTIONS, {"default": "auto", "tooltip": "Tikpan edit 接口支持 auto / low"}),
+                "遮罩反相": ("BOOLEAN", {"default": False, "tooltip": "本地遮罩预处理，不会作为模型参数传给上游"}),
+                "提示增强": ("BOOLEAN", {"default": True, "tooltip": "本地给编辑指令补充质量描述，不是上游 API 参数"}),
+                "并发请求数": ("INT", {"default": 2, "min": 1, "max": 4, "step": 1, "tooltip": "本地并发提交次数，不会作为模型参数传给上游"}),
+                "超时秒数": ("INT", {"default": 600, "min": 30, "max": 1800, "step": 10, "tooltip": "本地等待单次请求响应的最长秒数，不是模型参数"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
-                **{f"参考图{i}": ("IMAGE", {"tooltip": f"参考图 {i}：模型会基于这些图片作为视觉参考"}) for i in range(1, 16)},
+                **{f"参考图{i}": ("IMAGE", {"tooltip": f"参考图 {i}：作为 multipart image 字段随主图一起上传"}) for i in range(1, 16)},
                 "参考流": ("IMAGE", {"tooltip": "批量参考图（接入一个 IMAGE 批次即可）"}),
                 "遮罩掩码": ("MASK", {"tooltip": "可选遮罩：白色区域=要重绘，黑色区域=保持不变"}),
                 "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回黑图，不打断后续工作流"}),
@@ -164,8 +164,8 @@ class TikpanGptImage2OfficialEditV2:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("编辑结果", "渲染日志")
     FUNCTION = "edit_image"
-    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
-    DESCRIPTION = "📝 GPT-Image-2 官方修图 V2：批量并发修图引擎，最多 15 张参考图 + 主图 + 遮罩，支持 4K、断线保活、幂等键、错误恢复。商业项目首选。"
+    CATEGORY = CATEGORY_IMAGE
+    DESCRIPTION = "📝 GPT-Image-2 修图：使用 Tikpan /v1/images/edits multipart 接口，UI 只显示当前 Apifox 记录和本地执行所需参数。"
 
     def edit_image(self, **kwargs):
         start_time = time.time()

@@ -1,0 +1,49 @@
+{
+  "slug": "shuyu-labs/BigBanana-AI-Director",
+  "sourceUrl": "https://raw.githubusercontent.com/shuyu-labs/BigBanana-AI-Director/main/README.md",
+  "updatedAt": "2026-06-07T03:29:50.929186Z",
+  "cards": [
+    {
+      "id": "repo_shuyu-labs_BigBanana-AI-Director-1",
+      "repo": "shuyu-labs/BigBanana-AI-Director",
+      "title": "在线使用",
+      "prompt": "💡 推荐直接在浏览器中打开在线版，随时开始使用，无需安装，始终保持最新版本。",
+      "body": "无需下载客户端，直接访问在线版即可开始使用：\n\n**🌐 访问 BigBanana AI Director 在线版**\n\n[https://director.tree456.com/](https://director.tree456.com/)\n\n> 💡 推荐直接在浏览器中打开在线版，随时开始使用，无需安装，始终保持最新版本。\n\n---",
+      "tags": [
+        "orchestration",
+        "director"
+      ],
+      "url": "https://github.com/shuyu-labs/BigBanana-AI-Director#",
+      "title_zh": "在线使用",
+      "prompt_preview_zh": "💡 推荐直接在浏览器中打开在线版，随时开始使用，无需安装，始终保持最新版本。"
+    },
+    {
+      "id": "repo_shuyu-labs_BigBanana-AI-Director-2",
+      "repo": "shuyu-labs/BigBanana-AI-Director",
+      "title": "镜像部署（公开版）",
+      "prompt": "# 1. 获取部署文件\ngit clone https://github.com/shuyu-labs/BigBanana-AI-Director.git\ncd BigBanana-AI-Director\n\n# 2. 启动官方镜像\n# 首次启动时会自动拉取并启动所需官方镜像\ndocker-compose up -d\n\n# 3. 访问应用\n# 浏览器打开 http://localhost:3005\n\n# 查看日志\ndocker-compose logs -f\n\n# 停止服务\ndocker-compose down",
+      "body": "```bash\n# 1. 获取部署文件\ngit clone https://github.com/shuyu-labs/BigBanana-AI-Director.git\ncd BigBanana-AI-Director\n\n# 2. 启动官方镜像\n# 首次启动时会自动拉取并启动所需官方镜像\ndocker-compose up -d\n\n# 3. 访问应用\n# 浏览器打开 http://localhost:3005\n\n# 查看日志\ndocker-compose logs -f\n\n# 停止服务\ndocker-compose down\n```",
+      "tags": [
+        "orchestration",
+        "director"
+      ],
+      "url": "https://github.com/shuyu-labs/BigBanana-AI-Director#",
+      "title_zh": "镜像部署（公开版）",
+      "prompt_preview_zh": "# 1. 获取部署文件"
+    },
+    {
+      "id": "repo_shuyu-labs_BigBanana-AI-Director-3",
+      "repo": "shuyu-labs/BigBanana-AI-Director",
+      "title": "更新官方镜像",
+      "prompt": "# 拉取最新版官方镜像并重建容器\ndocker-compose pull\ndocker-compose up -d --force-recreate",
+      "body": "```bash\n# 拉取最新版官方镜像并重建容器\ndocker-compose pull\ndocker-compose up -d --force-recreate\n```\n\n---",
+      "tags": [
+        "orchestration",
+        "director"
+      ],
+      "url": "https://github.com/shuyu-labs/BigBanana-AI-Director#",
+      "title_zh": "更新官方镜像",
+      "prompt_preview_zh": "# 拉取最新版官方镜像并重建容器"
+    }
+  ]
+}

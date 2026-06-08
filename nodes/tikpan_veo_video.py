@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_VIDEO
 import json
 import time
 import os
@@ -49,11 +50,9 @@ class TikpanVeoVideoNode:
                 "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "Veo专属提示词": ("STRING", {"multiline": True, "default": "请在此直接输入您的视频提示词...", "tooltip": "Veo 视频提示词，推荐英文；描述画面/动作/运镜越具体越好"}),
                 "模型选择": (VEO_MODEL_OPTIONS, {"default": "veo_3_1-lite", "tooltip": "选择 Veo 模型：lite 便宜快，components 支持垫图，4K 更清晰但更贵"}),
-                "比例": (["16:9", "9:16"], {"default": "16:9", "tooltip": "视频比例：16:9 横屏，9:16 竖屏短视频"}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"}),
+                "比例": (["16:9", "9:16"], {"default": "16:9", "tooltip": "Tikpan Veo 视频比例参数"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
             },
         }
 
@@ -61,7 +60,7 @@ class TikpanVeoVideoNode:
         inputs["optional"]["参考图_尾帧"] = ("IMAGE", {"tooltip": "可选尾帧图：作为视频的最后一帧"})
         for i in range(1, 4):
             inputs["optional"][f"垫图_{i}"] = ("IMAGE", {"tooltip": f"垫图 {i}：作为视觉参考；仅 components 系列模型支持"})
-        inputs["optional"]["校验HTTPS证书"] = ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"})
+        inputs["optional"]["校验HTTPS证书"] = ("BOOLEAN", {"default": True, "tooltip": "本地网络参数：控制 requests 是否校验证书，不会传给上游模型"})
 
         return inputs
 
@@ -69,8 +68,8 @@ class TikpanVeoVideoNode:
     RETURN_NAMES = ("📁_本地保存路径", "🏷️_任务ID", "🔗_视频云端直链", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "execute"
-    CATEGORY = "🎬 Tikpan 云端模型/02 云端视频"
-    DESCRIPTION = "📝 Veo 3.1 视频生成：Google Veo 多模型聚合（lite/pro/4K/components 等），支持首帧、尾帧、3 张垫图。物理规律和运镜真实感强，适合电影级短片。"
+    CATEGORY = CATEGORY_VIDEO
+    DESCRIPTION = "📝 Veo 3.1 视频生成：通过 Tikpan 中转调用 Veo 视频接口，隐藏未确认可复现的 seed，保留首帧、尾帧和 components 垫图输入。"
 
     def execute(self, 获取密钥请访问, API_密钥, Veo专属提示词, 模型选择, 比例, 随机种子=888888, **kwargs):
         comfy.model_management.throw_exception_if_processing_interrupted()
@@ -81,7 +80,8 @@ class TikpanVeoVideoNode:
             return ("❌ 模型选择无效", "无", "无", f"不支持的模型: {模型选择}", None)
         verify_tls = bool(kwargs.get("校验HTTPS证书", True))
         api_host = normalize_api_host(kwargs.get("中转站地址", API_HOST_OPTIONS[0]))
-        seed = normalize_seed(kwargs.get("seed", 随机种子), default=888888, maximum=2147483647)
+        seed_value = kwargs.get("seed", kwargs.get("随机种子"))
+        seed = normalize_seed(seed_value, default=888888, maximum=2147483647) if seed_value is not None else None
 
         # /v1/videos 使用 multipart form；/v1/video/create 使用项目内旧视频统一 JSON 格式。
         headers = {"Authorization": f"Bearer {API_密钥}"}
@@ -121,8 +121,9 @@ class TikpanVeoVideoNode:
             "model": 模型选择,
             "prompt": Veo专属提示词,
             "aspect_ratio": 比例,
-            "seed": str(seed) # 表单要求全是字符串
         }
+        if seed is not None:
+            form_data["seed"] = str(seed)
         endpoint_path = "/v1/video/create" if 模型选择 in VEO_CREATE_ENDPOINT_MODELS else "/v1/videos"
 
         form_files = []
@@ -141,8 +142,9 @@ class TikpanVeoVideoNode:
                     "model": 模型选择,
                     "prompt": Veo专属提示词,
                     "aspect_ratio": 比例,
-                    "seed": seed,
                 }
+                if seed is not None:
+                    payload["seed"] = seed
                 if first_frame_bytes:
                     payload["image"] = bytes_to_data_url(first_frame_bytes)
                 if last_frame_bytes:

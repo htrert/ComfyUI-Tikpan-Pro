@@ -17,6 +17,7 @@ API 端点（中转站 tikpan.com）：
 - 视频自动下载到 ComfyUI 输出目录
 """
 
+from .tikpan_categories import CATEGORY_VIDEO
 import json
 import time
 import os
@@ -194,7 +195,7 @@ class TikpanHappyHorseVideoEditNode:
     RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_视频云端链接", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
-    CATEGORY = "🎬 Tikpan 云端模型/02 云端视频"
+    CATEGORY = CATEGORY_VIDEO
     DESCRIPTION = "📝 HappyHorse 1.0 视频编辑：输入原视频 + 编辑指令 + 最多 5 张参考图，AI 重绘原视频。适合改背景、改色调、换主体、动作微调。"
 
     # ---------- 视频处理 ----------

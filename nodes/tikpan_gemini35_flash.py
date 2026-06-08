@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_TEXT_MULTIMODAL
 import base64
 import hashlib
 import json
@@ -184,7 +185,7 @@ class TikpanGemini35FlashNode:
     RETURN_NAMES = ("回答文本", "优化提示词", "结构化JSON", "用量", "状态日志")
     OUTPUT_NODE = True
     FUNCTION = "run"
-    CATEGORY = "💬 Tikpan 云端模型/04 AI 对话分析"
+    CATEGORY = CATEGORY_TEXT_MULTIMODAL
     DESCRIPTION = "📝 Gemini 3.5 Flash 多模态推理：支持图/视频/音频/PDF 输入，思考预算可调，可启用联网搜索和代码执行。适合复杂分析、报告生成、知识问答。"
 
     def make_return(self, answer="", prompt="", structured="", usage="", log=""):

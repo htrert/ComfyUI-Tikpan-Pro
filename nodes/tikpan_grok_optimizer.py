@@ -2,6 +2,7 @@
 import json
 import requests
 import urllib3
+from .tikpan_categories import CATEGORY_PROMPT_ANALYSIS
 from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host
 import comfy.utils
 import comfy.model_management
@@ -47,7 +48,7 @@ class TikpanGrokPromptOptimizerNode:
     RETURN_TYPES = ("STRING", "STRING")
     RETURN_NAMES = ("🎯_Grok3专属提示词", "🧠_GPT重构思考日志")
     FUNCTION = "optimize_prompt"
-    CATEGORY = "📝 Tikpan 本地工具/01 提示词工具"
+    CATEGORY = CATEGORY_PROMPT_ANALYSIS
     DESCRIPTION = "📝 Grok 多图剧本重构：接收视频分镜报告 + 新产品信息，自动重写为 Grok-3 视频提示词，支持 @img1-@img7 多图锚点语法。视频二创神器。"
 
     def optimize_prompt(self, 获取密钥地址, Tikpan_API密钥, 文本处理模型, Gemini原片拆解报告, 核心产品与植入场景, 氛围与运镜微调, **kwargs):

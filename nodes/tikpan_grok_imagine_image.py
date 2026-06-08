@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_IMAGE
 import base64
 import json
 import time
@@ -38,7 +39,7 @@ class _TikpanGrokImagineBase:
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
-                "节点说明": ([f"{cls.MODEL_NAME} | /v1/images/generations | 文生图 | 官方参数: n / aspect_ratio / resolution / response_format | {cls.PRICE_TEXT}"],),
+                "节点说明": ([f"{cls.MODEL_NAME} | /v1/images/generations | 文生图 | Tikpan 参数: n / aspect_ratio / resolution / response_format | {cls.PRICE_TEXT}"],),
                 "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "生成指令": (
                     "STRING",
@@ -54,14 +55,12 @@ class _TikpanGrokImagineBase:
                 "清晰度": (RESOLUTION_OPTIONS, {"default": "auto", "tooltip": "分辨率档位：1k 省钱快出；2k 更精细但更慢更贵"}),
             },
             "optional": {
-                "兼容尺寸": (SIZE_OPTIONS, {"default": "Auto", "tooltip": "兼容老工作流的尺寸字段；Auto 由上面的比例+清晰度决定"}),
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
-                "返回方式": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0], "tooltip": "url=返回云端链接（推荐）；b64_json=直接返回 Base64 数据"}),
+                "返回方式": (RESPONSE_FORMAT_OPTIONS, {"default": RESPONSE_FORMAT_OPTIONS[0], "tooltip": "Tikpan response_format：url 或 b64_json"}),
                 "跳过错误": (
                     "BOOLEAN",
                     {
                         "default": False,
-                        "tooltip": "Return a black image instead of stopping the workflow when the API request fails.",
+                        "tooltip": "本地执行参数：请求失败时返回黑图，避免工作流中断。",
                     },
                 ),
             },
@@ -70,7 +69,7 @@ class _TikpanGrokImagineBase:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("Image", "Log")
     FUNCTION = "generate"
-    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
+    CATEGORY = CATEGORY_IMAGE
 
     def generate(self, **kwargs):
         start_time = time.time()

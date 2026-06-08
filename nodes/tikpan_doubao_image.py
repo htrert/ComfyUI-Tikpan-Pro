@@ -9,7 +9,6 @@
 - 单图 / 多图参考图输入（最多14张）
 - ComfyUI IMAGE 输入 + 手动 URL/Base64 输入
 - 组图全部输出（Batch IMAGE）
-- 联网搜索增强
 - response_format 自动兼容（对象 / 字符串）
 
 尺寸模式：
@@ -22,6 +21,7 @@
 - 支持 URL 或 Base64（data:image/<fmt>;base64,...）
 """
 
+from .tikpan_categories import CATEGORY_IMAGE
 import json
 import requests
 import base64
@@ -121,10 +121,6 @@ class TikpanDoubaoImageNode:
                     WATERMARK_OPTIONS,
                     {"default": "无水印", "tooltip": "是否在图片右下角加豆包官方水印"},
                 ),
-                "联网搜索增强": (
-                    ON_OFF_AUTO_OPTIONS,
-                    {"default": "关闭", "tooltip": "开启后允许模型联网检索素材作为参考"},
-                ),
                 "多图生成": (
                     ON_OFF_AUTO_OPTIONS,
                     {"default": "关闭", "tooltip": "开启后一次返回多张候选图；关闭=每次仅一张"},
@@ -139,7 +135,6 @@ class TikpanDoubaoImageNode:
                 ),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
                 "参考图": ("IMAGE", {"tooltip": "参考图，支持单张或多张（Batch 最多14张）"}),
                 "图片URL或Base64": (
                     "STRING",
@@ -149,22 +144,14 @@ class TikpanDoubaoImageNode:
                         "tooltip": "可手动输入参考图 URL 或 Base64；支持多行，一行一个；可与 input_image 合并，最多14张",
                     },
                 ),
-                "负面提示词": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "告诉模型不要出现什么，例如：blurry, low quality, watermark",
-                    },
-                ),
             },
         }
 
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成图像Batch", "📄_渲染日志")
     FUNCTION = "generate_image"
-    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
-    DESCRIPTION = "📝 豆包 Seedream 图像生成：火山引擎旗舰生图模型，支持 2K/3K、8 种比例、多图生成、联网搜索增强。中文理解强，适合本土化创意。"
+    CATEGORY = CATEGORY_IMAGE
+    DESCRIPTION = "📝 豆包 Seedream 图像生成：使用 Tikpan /v1/images/generations，支持 2K/3K、8 种比例、参考图、多图生成和水印控制。"
 
     def looks_like_base64(self, s):
         if not s:
@@ -473,7 +460,7 @@ class TikpanDoubaoImageNode:
         output_format = str(option_value(pick(kwargs, "图片格式", "output_format", default="JPEG｜jpeg"), "jpeg")).strip().lower()
         response_format = str(option_value(pick(kwargs, "返回方式", "response_format", default="云端链接｜url"), "url")).strip()
         watermark = pick(kwargs, "水印", "watermark", default="无水印")
-        web_search = kwargs.get("联网搜索增强", "关闭")
+        web_search = pick(kwargs, "联网搜索增强", "web_search", default="关闭")
         multi_image = kwargs.get("多图生成", "关闭")
         max_images = int(kwargs.get("最多生成张数", 4))
         multi_image_fallback = pick(kwargs, "多图失败处理", "multi_image_fallback", default="严格报错")

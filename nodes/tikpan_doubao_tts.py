@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_AUDIO
 import base64
 import hashlib
 import json
@@ -112,7 +113,6 @@ class TikpanDoubaoTTS20Node:
                 "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
                 "自定义voice_type": (
                     "STRING",
                     {
@@ -141,14 +141,6 @@ class TikpanDoubaoTTS20Node:
                 "用户ID": ("STRING", {"default": "tikpan_comfyui_user", "tooltip": "调用方标识，便于上游做用量统计；保持默认即可"}),
                 "复用本地缓存": ("BOOLEAN", {"default": True, "tooltip": "开启后同一文本同一参数命中缓存时复用，避免重复扣费"}),
                 "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回空音频，不打断后续工作流"}),
-                "高级自定义_JSON": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "会深度合并到最终请求体，例如透传 context_language、emotion 等后续新增参数。",
-                    },
-                ),
             },
         }
 
@@ -156,8 +148,8 @@ class TikpanDoubaoTTS20Node:
     RETURN_NAMES = ("📁_音频路径", "🔗_音频链接", "🎙️_voice_type", "💰_计费字符数", "📋_状态日志", "🎧_音频流")
     OUTPUT_NODE = True
     FUNCTION = "generate_tts"
-    CATEGORY = "🎵 Tikpan 云端模型/03 云端音频"
-    DESCRIPTION = "📝 豆包语音合成 2.0：火山引擎 Seed-TTS 2.0 模型，丰富中文音色（含方言/年龄/角色），按字符计费。适合中文广告口播、有声书、短视频配音。"
+    CATEGORY = CATEGORY_AUDIO
+    DESCRIPTION = "📝 豆包语音合成 2.0：通过 Tikpan 调用 Seed-TTS，隐藏固定 host 和高级 JSON 透传，保留音色、语速、音量、音调、情感和音频设置。"
 
     DEFAULT_OPTIONAL_VALUES = {
         "自定义voice_type": "",

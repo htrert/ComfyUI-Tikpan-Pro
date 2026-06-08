@@ -17,6 +17,7 @@ from urllib3.util.retry import Retry
 
 import comfy.utils
 
+from .tikpan_categories import CATEGORY_PARALLEL_ENGINE
 from .tikpan_gpt_image_recovery import get_with_retry, make_idempotency_key
 from .tikpan_node_options import API_HOST_OPTIONS, RESPONSE_FORMAT_OPTIONS, normalize_api_host, option_value, pick
 
@@ -91,7 +92,7 @@ class TikpanParallelImageEngineNode:
     RETURN_TYPES = ("IMAGE", "STRING", "STRING")
     RETURN_NAMES = ("Images", "Stage_Log", "Result_JSON")
     FUNCTION = "run"
-    CATEGORY = "⚡ Tikpan 本地工具/04 并发引擎"
+    CATEGORY = CATEGORY_PARALLEL_ENGINE
     DESCRIPTION = "📝 API 多模型并发生图引擎：一次任务跨多个模型 + 多个中转站并发出图，支持 failover/race/parallel_all 三种策略。适合 A/B 测试、批量出图、容灾备份。"
 
     def run(self, **kwargs):

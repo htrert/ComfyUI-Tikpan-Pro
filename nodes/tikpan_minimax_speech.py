@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_AUDIO
 import base64
 import hashlib
 import json
@@ -186,7 +187,6 @@ class TikpanMiniMaxSpeech28BaseNode:
                 "校验HTTPS证书": ("BOOLEAN", {"default": True, "tooltip": "默认开启；遇到本地证书问题再关闭（不推荐关闭）"}),
             },
             "optional": {
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
                 "自定义voice_id": (
                     "STRING",
                     {
@@ -239,14 +239,6 @@ class TikpanMiniMaxSpeech28BaseNode:
                         "tooltip": "批量工作流可开启。失败时返回空音频和错误日志，不中断整个工作流。",
                     },
                 ),
-                "高级自定义_JSON": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "会深度合并到最终请求体，用于后续上游新增参数时临时透传。",
-                    },
-                ),
             },
     }
 
@@ -282,7 +274,7 @@ class TikpanMiniMaxSpeech28BaseNode:
     )
     OUTPUT_NODE = True
     FUNCTION = "generate_speech"
-    CATEGORY = "🎵 Tikpan 云端模型/03 云端音频"
+    CATEGORY = CATEGORY_AUDIO
 
     def empty_audio(self):
         try:
@@ -828,7 +820,7 @@ class TikpanMiniMaxSpeech28HDNode(TikpanMiniMaxSpeech28BaseNode):
     USER_AGENT_SUFFIX = "Speech-2.8-HD"
     CACHE_PREFIX = "tikpan-speech-2-8-hd"
     DISPLAY_NAME = "🎙️ Tikpan: speech-2.8-hd 高清语音合成"
-    DESCRIPTION = "📝 MiniMax speech-2.8-hd 高清语音合成：丰富音色库 + 20 种语言增强，支持情感/语速/音调/字幕/音色混合。适合商业广告、纪录片旁白。"
+    DESCRIPTION = "📝 MiniMax speech-2.8-hd 高清语音合成：通过 Tikpan 调用 MiniMax T2A，隐藏固定 host 和高级 JSON 透传，保留语音/字幕/音色混合参数。"
 
 
 class TikpanMiniMaxSpeech28TurboNode(TikpanMiniMaxSpeech28BaseNode):
@@ -840,7 +832,7 @@ class TikpanMiniMaxSpeech28TurboNode(TikpanMiniMaxSpeech28BaseNode):
     USER_AGENT_SUFFIX = "Speech-2.8-Turbo"
     CACHE_PREFIX = "tikpan-speech-2-8-turbo"
     DISPLAY_NAME = "🎙️ Tikpan: speech-2.8-turbo 极速语音合成"
-    DESCRIPTION = "📝 MiniMax speech-2.8-turbo 极速语音：HD 同款功能但响应更快、更便宜。适合短视频口播、批量配音、实时预览。"
+    DESCRIPTION = "📝 MiniMax speech-2.8-turbo 极速语音：通过 Tikpan 调用 MiniMax T2A，隐藏固定 host 和高级 JSON 透传，保留 HD 同款核心参数。"
 
 
 NODE_CLASS_MAPPINGS = {

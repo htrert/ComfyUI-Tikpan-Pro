@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_IMAGE
 import json
 import requests
 import torch
@@ -33,7 +34,7 @@ class TikpanGptImage2Node:
     RETURN_TYPES = ("IMAGE", "STRING")
     RETURN_NAMES = ("🖼️_生成图像", "📄_完整日志")
     FUNCTION = "generate_image"
-    CATEGORY = "📷 Tikpan 云端模型/01 云端生图"
+    CATEGORY = CATEGORY_IMAGE
     DESCRIPTION = "📝 GPT-Image-2-all 简易生图：单张文生图，支持 1024/1792 尺寸、HD 高清画质、vivid/natural 两种风格。适合快速出图测试。"
 
     def generate_image(self, 获取密钥请访问, API_密钥, 提示词, 模型, 尺寸, 品质, 风格, 随机种子, **kwargs):

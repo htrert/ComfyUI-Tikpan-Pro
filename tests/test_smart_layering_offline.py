@@ -3,8 +3,45 @@
 """
 import sys
 import os
-import torch
+
+# Windows 终端默认 GBK 编不出 emoji，强制 stdout 为 utf-8
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 import numpy as np
+try:
+    import torch
+except ImportError:
+    class MockTensor:
+        def __init__(self, array):
+            self._array = array
+
+        @property
+        def shape(self):
+            return self._array.shape
+
+        def unsqueeze(self, axis):
+            return MockTensor(np.expand_dims(self._array, axis))
+
+        def detach(self):
+            return self
+
+        def cpu(self):
+            return self
+
+        def numpy(self):
+            return self._array
+
+    class MockTorch:
+        @staticmethod
+        def from_numpy(array):
+            return MockTensor(array)
+
+    torch = MockTorch()
 from PIL import Image
 
 # 添加项目路径
@@ -41,7 +78,14 @@ sys.modules['folder_paths'] = MockFolderPaths()
 sys.modules['comfy'] = type('obj', (object,), {'utils': MockComfyUtils()})
 sys.modules['comfy.utils'] = MockComfyUtils()
 
-from nodes.tikpan_smart_psd_layering import TikpanSmartPSDLayeringNode
+from nodes.tikpan_smart_psd_layering import (
+    TikpanSmartPSDLayeringNode,
+    TIER_ECONOMY, TIER_STANDARD, TIER_PREMIUM,
+    TIER_KIND_ECONOMY, TIER_KIND_STANDARD, TIER_KIND_PREMIUM,
+    normalize_tier,
+    SCENE_AUTO, SCENE_ECOM_ITEM, SCENE_ECOM_BANNER, SCENE_PORTRAIT, SCENE_LIFESTYLE, SCENE_ALL,
+    SCENE_LABEL_TO_KEY,
+)
 
 
 def create_test_image_tensor(width=512, height=512):
@@ -113,13 +157,20 @@ def test_input_types():
         assert '输入图片' in required
         assert '文件名' in required
         assert '分层档位' in required
+        assert '场景类型' in required, "新增的场景类型下拉框缺失"
         assert '补全被遮挡区域' in required
         assert '检测文字' in required
         assert '最小元素面积' in required
         assert '边缘羽化' in required
         assert '自动安装依赖' in required
 
+        # 验证场景下拉框选项
+        scene_options = required['场景类型'][0]
+        for s in [SCENE_AUTO, SCENE_ECOM_ITEM, SCENE_ECOM_BANNER, SCENE_PORTRAIT, SCENE_LIFESTYLE, SCENE_ALL]:
+            assert s in scene_options, f"场景选项缺失: {s}"
+
         print("   ✓ 所有关键参数存在")
+        print(f"   ✓ 场景下拉框包含 {len(scene_options)} 个选项")
         return True
     except Exception as e:
         print(f"❌ 输入类型定义失败: {e}")
@@ -141,9 +192,9 @@ def test_dependency_check(node):
             print(f"     {dep}: {status}")
 
         # 测试缺失依赖检测
-        missing_economy = node._check_missing_for_tier("经济档 (300MB) - 简单商品图", False)
-        missing_standard = node._check_missing_for_tier("标准档 (2.4GB) - 复杂场景 推荐", False)
-        missing_premium = node._check_missing_for_tier("极致档 (5GB+) - 商业级分层", False)
+        missing_economy = node._check_missing_for_tier(TIER_ECONOMY, False)
+        missing_standard = node._check_missing_for_tier(TIER_STANDARD, False)
+        missing_premium = node._check_missing_for_tier(TIER_PREMIUM, False)
 
         print(f"\n   经济档缺失依赖: {missing_economy if missing_economy else '无'}")
         print(f"   标准档缺失依赖: {missing_standard if missing_standard else '无'}")
@@ -265,7 +316,8 @@ def test_mock_smart_layer_without_deps(node):
         result = node.smart_layer(
             输入图片=test_tensor,
             文件名="test_no_deps",
-            分层档位="经济档 (300MB) - 简单商品图",
+            分层档位=TIER_ECONOMY,
+            场景类型=SCENE_AUTO,
             补全被遮挡区域="否",
             检测文字="否",
             最小元素面积=2000,
@@ -339,8 +391,199 @@ def test_layer_structure():
         return False
 
 
-def main():
-    """运行所有测试"""
+def test_scene_label_mapping():
+    """测试场景下拉框 label -> key 映射完整性"""
+    print("\n" + "=" * 60)
+    print("测试 9: 场景标签映射")
+    print("=" * 60)
+    try:
+        expected_keys = {"auto", "ecom_item", "ecom_banner", "portrait", "lifestyle", "all"}
+        actual_keys = set(SCENE_LABEL_TO_KEY.values())
+        missing = expected_keys - actual_keys
+        assert not missing, f"映射缺失: {missing}"
+
+        # 每个 label 都不空
+        for label, key in SCENE_LABEL_TO_KEY.items():
+            assert label and key
+        print(f"   ✓ {len(SCENE_LABEL_TO_KEY)} 个场景映射齐全: {sorted(actual_keys)}")
+        return True
+    except Exception as e:
+        print(f"❌ 场景映射测试失败: {e}")
+        import traceback; traceback.print_exc()
+        return False
+
+
+def test_segmentation_models_exports():
+    """测试 segmentation_models 模块暴露的所有公共符号"""
+    print("\n" + "=" * 60)
+    print("测试 10: segmentation_models 公共符号")
+    print("=" * 60)
+    try:
+        from nodes import tikpan_segmentation_models as sm
+        expected = [
+            "birefnet_matting", "birefnet_portrait_matting",
+            "get_sam2_predictor", "get_sam2_auto_generator",
+            "gdino_detect", "paddle_ocr_detect",
+            "detect_qrcodes",
+            "cluster_text_by_size", "extract_color_blocks", "color_name",
+            "get_scene_prompt", "auto_detect_scene",
+            "SCENE_PROMPTS", "GDINO_PROMPT_PRODUCT",
+        ]
+        missing = [s for s in expected if not hasattr(sm, s)]
+        assert not missing, f"缺少符号: {missing}"
+        print(f"   ✓ 全部 {len(expected)} 个公共符号都暴露")
+
+        # 检查 prompt 字典里每个场景的 prompt 都符合 GroundingDINO 格式
+        for key, prompt in sm.SCENE_PROMPTS.items():
+            assert prompt.endswith("."), f"prompt 必须以句号结尾: {key}"
+            assert prompt == prompt.lower(), f"prompt 必须全小写: {key}"
+        print(f"   ✓ {len(sm.SCENE_PROMPTS)} 套场景 prompt 格式都合规")
+        return True
+    except Exception as e:
+        print(f"❌ segmentation_models 公共符号失败: {e}")
+        import traceback; traceback.print_exc()
+        return False
+
+
+def test_text_size_clustering():
+    """测试文字按字号聚类（纯算法）"""
+    print("\n" + "=" * 60)
+    print("测试 11: 文字字号聚类")
+    print("=" * 60)
+    try:
+        from nodes.tikpan_segmentation_models import cluster_text_by_size
+
+        # 模拟 OCR 结果：1000px 高的图
+        image_height = 1000
+        ocr_results = [
+            {"bbox": [10, 10, 500, 110], "text": "夏季大促", "score": 0.95},   # 高100 (10%) -> 标题
+            {"bbox": [10, 130, 400, 200], "text": "全场五折", "score": 0.9},   # 高70 (7%) -> 标题
+            {"bbox": [10, 220, 300, 270], "text": "新款上市", "score": 0.85},  # 高50 (5%) -> 副标题
+            {"bbox": [10, 300, 200, 330], "text": "包邮到家", "score": 0.8},   # 高30 (3%) -> 正文
+            {"bbox": [10, 400, 100, 415], "text": "¥99.00", "score": 0.95},    # 价格符号
+            {"bbox": [10, 500, 80, 510], "text": "tap", "score": 0.7},         # 高10 (1%) -> 小字
+        ]
+        groups = cluster_text_by_size(ocr_results, image_height)
+        print(f"   聚类结果: {list(groups.keys())}")
+        for tier, items in groups.items():
+            texts = [it.get("text", "") for it in items]
+            print(f"     {tier}: {texts}")
+
+        assert "标题" in groups, "标题组缺失"
+        assert "价格" in groups, "价格组缺失（应识别 ¥）"
+        assert any("¥" in it.get("text", "") for it in groups["价格"])
+        return True
+    except Exception as e:
+        print(f"❌ 文字字号聚类测试失败: {e}")
+        import traceback; traceback.print_exc()
+        return False
+
+
+def test_color_block_extraction():
+    """测试 k-means 颜色块提取（纯算法，用合成 3 色块图）"""
+    print("\n" + "=" * 60)
+    print("测试 12: 颜色块 k-means 提取")
+    print("=" * 60)
+    try:
+        from nodes.tikpan_segmentation_models import extract_color_blocks, color_name
+
+        # 合成图：左红 / 中绿 / 右蓝（各占 1/3）
+        h, w = 200, 600
+        arr = np.zeros((h, w, 3), dtype=np.uint8)
+        arr[:, :200] = (220, 30, 30)    # 红
+        arr[:, 200:400] = (30, 200, 50) # 绿
+        arr[:, 400:] = (40, 60, 220)    # 蓝
+
+        pil = Image.fromarray(arr, "RGB")
+        blocks = extract_color_blocks(pil, n_clusters=3, min_area_ratio=0.05)
+        print(f"   检出 {len(blocks)} 个色块:")
+        for b in blocks:
+            print(f"     {color_name(b['color'])} 占 {b['ratio']*100:.1f}%")
+
+        assert len(blocks) >= 3, "应至少检出 3 个色块"
+        # 每个色块面积应接近 1/3
+        for b in blocks:
+            assert 0.2 < b["ratio"] < 0.45, f"色块面积异常: {b['ratio']}"
+        return True
+    except Exception as e:
+        print(f"❌ 颜色块测试失败: {e}")
+        import traceback; traceback.print_exc()
+        return False
+
+
+def test_qrcode_graceful_fallback():
+    """测试二维码检测在无 pyzbar 时不崩（cv2 自带降级）"""
+    print("\n" + "=" * 60)
+    print("测试 13: 二维码检测降级行为")
+    print("=" * 60)
+    try:
+        from nodes.tikpan_segmentation_models import detect_qrcodes
+        # 用白图测试，不该有结果也不该崩
+        pil = Image.new("RGB", (300, 300), (255, 255, 255))
+        result = detect_qrcodes(pil)
+        assert isinstance(result, list)
+        print(f"   ✓ 空白图返回 {len(result)} 个二维码（合理）")
+        return True
+    except Exception as e:
+        print(f"❌ 二维码降级失败: {e}")
+        import traceback; traceback.print_exc()
+        return False
+
+
+def test_processor_scene_routing():
+    """测试 _scene_extras 路由：不同场景启用不同增强（不调用真实模型，看路由分支）"""
+    print("\n" + "=" * 60)
+    print("测试 14: 场景增强路由")
+    print("=" * 60)
+    try:
+        from nodes.tikpan_psd_processor import PSDLayerProcessor
+        test_output = os.path.join(project_root, "tests", "test_outputs")
+        processor = PSDLayerProcessor(test_output)
+
+        pil = Image.new("RGB", (300, 300), (255, 255, 255))
+
+        # 各场景跑 _scene_extras（白图，所有增强返回空列表即可，关键看不崩）
+        for scene, premium in [
+            ("ecom_item", False), ("ecom_item", True),
+            ("ecom_banner", False), ("ecom_banner", True),
+            ("portrait", True),
+            ("lifestyle", True),
+            ("all", True),
+        ]:
+            try:
+                extras = processor._scene_extras(pil, scene, min_area=500, blur=0, premium=premium)
+                assert isinstance(extras, list)
+                print(f"   ✓ scene={scene} premium={premium} -> {len(extras)} 额外元素")
+            except Exception as e:
+                print(f"   ⚠️ scene={scene} premium={premium} 异常: {e}")
+                # 模型未装时 _scene_extras 内的子调用会 graceful，外层不该抛
+                # 真抛了说明路由本身有 bug
+                raise
+        return True
+    except Exception as e:
+        print(f"❌ 场景路由测试失败: {e}")
+        import traceback; traceback.print_exc()
+        return False
+
+
+def test_tier_normalization_compatibility():
+    """测试新旧 PSD 档位标签都能映射到稳定内部档位"""
+    assert normalize_tier(TIER_ECONOMY) == TIER_KIND_ECONOMY
+    assert normalize_tier("经济档 (300MB) - 简单商品图") == TIER_KIND_ECONOMY
+    assert normalize_tier("经济档 (300MB) - 快速分层") == TIER_KIND_ECONOMY
+
+    assert normalize_tier(TIER_STANDARD) == TIER_KIND_STANDARD
+    assert normalize_tier("标准档 (2.4GB) - 复杂场景 推荐") == TIER_KIND_STANDARD
+    assert normalize_tier("标准档 (300MB) - 智能分层 推荐") == TIER_KIND_STANDARD
+
+    assert normalize_tier(TIER_PREMIUM) == TIER_KIND_PREMIUM
+    assert normalize_tier("极致档 (5GB+) - 商业级分层") == TIER_KIND_PREMIUM
+    assert normalize_tier("极致档 (500MB) - 补全背景") == TIER_KIND_PREMIUM
+
+    assert normalize_tier("未知档位") == TIER_KIND_STANDARD
+
+
+
     print("\n" + "🧪" * 30)
     print("开始测试 Tikpan 智能分层 PSD 节点")
     print("🧪" * 30 + "\n")
@@ -375,6 +618,28 @@ def main():
 
     # 测试 8: 图层结构
     results.append(("图层结构构建", test_layer_structure()))
+
+    # 测试 9: 场景标签映射
+    results.append(("场景标签映射", test_scene_label_mapping()))
+
+    # 测试 10: segmentation_models 公共符号
+    results.append(("segmentation_models 公共符号", test_segmentation_models_exports()))
+
+    # 测试 11: 文字字号聚类
+    results.append(("文字字号聚类", test_text_size_clustering()))
+
+    # 测试 12: 颜色块 k-means 提取
+    results.append(("颜色块 k-means 提取", test_color_block_extraction()))
+
+    # 测试 13: 二维码降级
+    results.append(("二维码降级行为", test_qrcode_graceful_fallback()))
+
+    # 测试 14: 场景增强路由
+    results.append(("场景增强路由", test_processor_scene_routing()))
+
+    # 测试 15: 档位归一化兼容
+    test_tier_normalization_compatibility()
+    results.append(("档位归一化兼容", True))
 
     # 汇总结果
     print("\n" + "=" * 60)

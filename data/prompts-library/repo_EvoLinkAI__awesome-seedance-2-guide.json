@@ -1,0 +1,21 @@
+{
+  "slug": "EvoLinkAI/awesome-seedance-2-guide",
+  "sourceUrl": "https://raw.githubusercontent.com/EvoLinkAI/awesome-seedance-2-guide/main/README.md",
+  "updatedAt": "2026-06-07T03:29:23.484963Z",
+  "cards": [
+    {
+      "id": "repo_EvoLinkAI_awesome-seedance-2-guide-1",
+      "repo": "EvoLinkAI/awesome-seedance-2-guide",
+      "title": "Prompt Templates",
+      "prompt": "@image1 [product name] as the main subject, camera movement references @video1, zoom in to close-up of [specific part],\ncamera rotates and [product] flips to show full view, [product feature details] clearly visible,\nsurrounding environment [atmosphere description]",
+      "body": "**Product 360 Showcase**\n```\n@image1 [product name] as the main subject, camera movement references @video1, zoom in to close-up of [specific part],\ncamera rotates and [product] flips to show full view, [product feature details] clearly visible,\nsurrounding environment [atmosphere description]\n```\n\n**Advertisement Comparison**\n```\nThis is a [product] advertisement, @image1 as the first frame, [character A] in [state A, e.g.: elegant],\ncamera quickly pans right, shooting @image2 [character B] [state B, e.g.: disheveled],\ncamera pans left and zooms in shooting [product], [product] references @im",
+      "tags": [
+        "guide",
+        "seedance"
+      ],
+      "url": "https://github.com/EvoLinkAI/awesome-seedance-2-guide#prompt-templates",
+      "title_zh": "提示词模板",
+      "prompt_preview_zh": "@image1 [产品名称]作为主要主体，镜头运动参考@video1，"
+    }
+  ]
+}

@@ -33,6 +33,7 @@ from .nodes.tikpan_gpt_image_2_gen import TikpanGptImage2GenNode
 from .nodes.tikpan_gpt_image_2_edit import TikpanGptImage2EditNode
 from .nodes.tikpan_gpt_image_2_official import TikpanGptImage2OfficialNode
 from .nodes.tikpan_gpt_image_2_official_edit_v2 import TikpanGptImage2OfficialEditV2
+from .nodes.tikpan_gpt_image_2_benefit import TikpanGptImage2BenefitNode
 from .nodes.tikpan_grok_videos import TikpanGrokVideoNode
 from .nodes.tikpan_kling_motion_control import TikpanKlingMotionControlNode
 from .nodes.tikpan_vidu_video import TikpanVidu3ReferenceVideoNode, TikpanVidu3TurboVideoNode
@@ -46,7 +47,12 @@ from .nodes.tikpan_task_fetcher import TikpanTaskFetcherNode
 from .nodes.tikpan_smart_psd_layering import TikpanSmartPSDLayeringNode
 from .nodes.tikpan_psd_downloader import TikpanPSDDependencyDownloaderNode
 from .nodes.tikpan_prompts_manager import TikpanPromptsManagerNode
-from .nodes.tikpan_prompts_selector import TikpanPromptsSelectorNode, TikpanPromptsSearchNode
+from .nodes.tikpan_prompts_selector import (
+    TikpanPromptsSelectorNode,
+    TikpanPromptsImageSelectorNode,
+    TikpanPromptsVideoSelectorNode,
+    TikpanPromptsSearchNode,
+)
 
 # 2. 建立内部类名映射
 NODE_CLASS_MAPPINGS = {
@@ -78,6 +84,7 @@ NODE_CLASS_MAPPINGS = {
     "TikpanGptImage2EditNode": TikpanGptImage2EditNode,
     "TikpanGptImage2OfficialNode": TikpanGptImage2OfficialNode,
     "TikpanGptImage2OfficialEditV2": TikpanGptImage2OfficialEditV2,
+    "TikpanGptImage2BenefitNode": TikpanGptImage2BenefitNode,
     "TikpanGrokVideoNode": TikpanGrokVideoNode,
     "TikpanKlingMotionControlNode": TikpanKlingMotionControlNode,
     "TikpanVidu3ReferenceVideoNode": TikpanVidu3ReferenceVideoNode,
@@ -95,6 +102,8 @@ NODE_CLASS_MAPPINGS = {
     "TikpanPSDDependencyDownloaderNode": TikpanPSDDependencyDownloaderNode,
     "TikpanPromptsManagerNode": TikpanPromptsManagerNode,
     "TikpanPromptsSelectorNode": TikpanPromptsSelectorNode,
+    "TikpanPromptsImageSelectorNode": TikpanPromptsImageSelectorNode,
+    "TikpanPromptsVideoSelectorNode": TikpanPromptsVideoSelectorNode,
     "TikpanPromptsSearchNode": TikpanPromptsSearchNode,
 }
 
@@ -128,6 +137,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanGptImage2EditNode": "图片｜GPT-Image-2-all 修图",
     "TikpanGptImage2OfficialNode": "图片｜GPT-Image-2 官方生图",
     "TikpanGptImage2OfficialEditV2": "图片｜GPT-Image-2 官方修图 V2",
+    "TikpanGptImage2BenefitNode": "图片｜GPT-Image-2 福利生图",
     "TikpanGrokVideoNode": "视频｜Grok-Videos 视频生成",
     "TikpanKlingMotionControlNode": "视频｜Kling Motion Control 动作控制",
     "TikpanVidu3ReferenceVideoNode": "视频｜Vidu3 参考生视频",
@@ -144,7 +154,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanSmartPSDLayeringNode": "工具｜智能分层 PSD 生成器",
     "TikpanPSDDependencyDownloaderNode": "工具｜PSD 模型预下载器",
     "TikpanPromptsManagerNode": "工具｜提示词库管理器",
-    "TikpanPromptsSelectorNode": "工具｜提示词选择器",
+    "TikpanPromptsSelectorNode": "工具｜提示词选择器·全部",
+    "TikpanPromptsImageSelectorNode": "工具｜提示词选择器·图片",
+    "TikpanPromptsVideoSelectorNode": "工具｜提示词选择器·视频",
     "TikpanPromptsSearchNode": "工具｜提示词搜索",
 }
 

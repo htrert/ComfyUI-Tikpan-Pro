@@ -1,5 +1,7 @@
 # Tikpan Parallel Engine ComfyUI 使用说明
 
+> 路径：`👑 Tikpan 官方独家节点 / 06 任务与并发 Tools / 并发引擎 Parallel Engine`
+
 这个节点是 Tikpan Pro 的 API 并发生图引擎第一版。它不修改 ComfyUI 全局队列，而是在单个节点内部管理多个 API 请求，所以适合稳定地做模型对比、Tikpan 通道容灾和批量出图。
 
 ## 节点在哪里

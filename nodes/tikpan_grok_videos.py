@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_VIDEO
 import json
 import time
 import os
@@ -68,7 +69,7 @@ class TikpanGrokVideoNode:
     RETURN_NAMES = ("📁_本地保存路径", "🎬_视频云端直链", "📄_渲染日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
-    CATEGORY = "🎬 Tikpan 云端模型/02 云端视频"
+    CATEGORY = CATEGORY_VIDEO
     DESCRIPTION = "📝 Grok-Videos 视频生成：xAI 的多模式视频模型，6 秒/10 秒，支持纯文生视频或最多 4 张参考图图生视频。适合内容创作和广告短片。"
 
     def normalize_size(self, aspect_ratio):

@@ -52,6 +52,19 @@ def load_node_module(filename, module_name):
     return module
 
 
+def load_plugin_package():
+    install_comfy_stubs()
+    spec = importlib.util.spec_from_file_location(
+        "tikpan_plugin",
+        ROOT / "__init__.py",
+        submodule_search_locations=[str(ROOT)],
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def all_input_keys(input_types):
     return set(input_types["required"].keys()) | set(input_types.get("optional", {}).keys())
 
@@ -169,9 +182,102 @@ def test_gemini_image_native_payload_keeps_rest_and_sdk_image_config_fields():
     assert 'gen_config["responseFormat"] = {"image": image_config}' in native_block
 
 
+def test_gpt_image_2_benefit_node_hides_relay_host_and_uses_builtin_channel():
+    module = load_node_module("tikpan_gpt_image_2_benefit.py", "tikpan_gpt_image_2_benefit")
+    node = module.TikpanGptImage2BenefitNode()
+    inputs = node.INPUT_TYPES()
+    keys = all_input_keys(inputs)
+
+    assert "福利渠道" in inputs["required"]
+    assert "福利渠道一" in inputs["required"]["福利渠道"][0]
+    assert "中转站地址" not in keys
+    assert node.resolve_api_host({"福利渠道": "福利渠道一"}) == "https://688.qzz.io"
+
+    payload = node.build_chat_payload(
+        model="gpt-image-2",
+        prompt="生成一张图",
+        target_res="1024x1024",
+        aspect_ratio="1:1",
+        tier="1K (1024)",
+        quality="medium",
+        moderation="auto",
+        output_format="png",
+        seed=888888,
+    )
+    assert module.BENEFIT_ENDPOINT == "/v1/chat/completions"
+    assert payload["modalities"] == ["text", "image"]
+    assert payload["aspect_ratio"] == "1:1"
+    assert payload["image_size"] == "1K"
+    assert payload["image_config"] == {"aspect_ratio": "1:1", "image_size": "1K", "size": "1024x1024", "format": "png"}
+    assert payload["response_format"] == {"image": payload["image_config"]}
+    assert payload["requested_size"] == "1024x1024"
+    assert payload["requested_resolution"] == "1024x1024"
+    assert "Required output size: 1024x1024" in payload["messages"][0]["content"][0]["text"]
+
+    resized = node.coerce_output_size(module.Image.new("RGB", (1536, 1024)), 3840, 1648)
+    assert resized.size == (3840, 1648)
+
+    raw, raw_type = node.extract_chat_image_result({
+        "choices": [{
+            "message": {
+                "content": "![image_1](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ)"
+            }
+        }]
+    })
+    assert raw_type == "b64"
+    assert raw.startswith("data:image/png;base64,")
+
+
+def test_tikpan_categories_stay_in_single_menu_tree():
+    init_module = load_plugin_package()
+    categories = {
+        key: getattr(cls, "CATEGORY", "")
+        for key, cls in init_module.NODE_CLASS_MAPPINGS.items()
+    }
+
+    assert categories
+    forbidden_roots = ("🏆 Tikpan 官方独家节点", "Tikpan Pro", "📷 Tikpan 云端模型", "🎬 Tikpan 云端模型", "🎵 Tikpan 云端模型", "💬 Tikpan 云端模型", "🛠️ Tikpan 本地工具", "⚡ Tikpan 本地工具", "📝 Tikpan 本地工具")
+    allowed_second_levels = {
+        "01 图片 Image",
+        "02 视频 Video",
+        "03 音频 Audio",
+        "04 文字与多模态 Text & Multimodal",
+        "05 提示词与分析 Prompt & Analysis",
+        "06 任务与并发 Tools",
+        "07 福利 Benefit",
+    }
+
+    for node_key, category in categories.items():
+        assert category, f"{node_key} missing CATEGORY"
+        assert not category.startswith(forbidden_roots), f"{node_key} uses old category {category}"
+        assert category.startswith("👑 Tikpan 官方独家节点/"), f"{node_key} outside Tikpan tree: {category}"
+        second_level = category.split("/", 2)[1]
+        assert second_level in allowed_second_levels, f"{node_key} uses unexpected category {category}"
+
+
+def test_key_node_registration_names_stay_stable():
+    init_module = load_plugin_package()
+    required_keys = {
+        "TikpanSmartPSDLayeringNode",
+        "TikpanPSDDependencyDownloaderNode",
+        "TikpanPromptsManagerNode",
+        "TikpanPromptsSelectorNode",
+        "TikpanPromptsSearchNode",
+        "TikpanAsyncImageSubmitNode",
+        "TikpanAsyncImageResultNode",
+        "TikpanAsyncImageJoinNode",
+        "TikpanAsyncTaskListNode",
+    }
+
+    assert required_keys <= set(init_module.NODE_CLASS_MAPPINGS)
+
+
 if __name__ == "__main__":
     test_shared_option_helpers_normalize_seed_and_dropdown_values()
     test_suno_uses_dropdowns_and_gates_advanced_parameters()
     test_nano_banana_pro_uses_official_gemini_image_config()
     test_gemini_image_native_payload_keeps_rest_and_sdk_image_config_fields()
+    test_gpt_image_2_benefit_node_hides_relay_host_and_uses_builtin_channel()
+    test_tikpan_categories_stay_in_single_menu_tree()
+    test_key_node_registration_names_stay_stable()
     print("node contract offline tests passed")

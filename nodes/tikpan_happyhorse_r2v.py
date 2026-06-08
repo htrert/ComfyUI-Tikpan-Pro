@@ -15,6 +15,7 @@ API 端点（中转站 tikpan.com）：
 - 视频自动下载到 ComfyUI 输出目录
 """
 
+from .tikpan_categories import CATEGORY_VIDEO
 import json
 import time
 import os
@@ -181,7 +182,7 @@ class TikpanHappyHorseR2VNode:
     RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_视频云端链接", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
-    CATEGORY = "🎬 Tikpan 云端模型/02 云端视频"
+    CATEGORY = CATEGORY_VIDEO
     DESCRIPTION = "📝 HappyHorse 1.0 参考生视频 R2V：最多 9 张参考图融合生成视频，保持主体一致性。适合 IP 角色短片、商品多视角动效。"
 
     # ------------------------------------------------------------------

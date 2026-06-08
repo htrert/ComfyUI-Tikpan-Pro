@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_TEXT_MULTIMODAL
 import base64
 import hashlib
 import json
@@ -147,7 +148,7 @@ class TikpanGemini3FlashPreviewAnalystNode:
     RETURN_NAMES = ("分析报告", "反推提示词", "结构化JSON", "用量", "状态日志")
     OUTPUT_NODE = True
     FUNCTION = "analyze_media"
-    CATEGORY = "💬 Tikpan 云端模型/04 AI 对话分析"
+    CATEGORY = CATEGORY_TEXT_MULTIMODAL
     DESCRIPTION = "📝 Gemini 3 Flash 图片/视频分析：专业级图像和视频理解节点，支持视频抽帧（多种策略）、商品/广告诊断、提示词反推、合规检查。"
 
     def make_return(self, report="", prompt="", structured="", usage="", log=""):

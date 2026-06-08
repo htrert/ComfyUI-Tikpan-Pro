@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_VIDEO
 import base64
 import json
 import os
@@ -30,7 +31,7 @@ VIDU_AUDIO_TYPE_OPTIONS = ["All", "Speech_only", "Sound-effect_only"]
 
 
 class _TikpanViduBase:
-    CATEGORY = "🎬 Tikpan 云端模型/02 云端视频"
+    CATEGORY = CATEGORY_VIDEO
     RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "VIDEO")
     RETURN_NAMES = ("📁_本地保存路径", "🆔_任务ID", "🔗_视频云端直链", "📄_完整日志", "🎬_视频输出")
     OUTPUT_NODE = True
@@ -87,9 +88,10 @@ class _TikpanViduBase:
             "prompt": prompt,
             "duration": int(duration),
             "resolution": resolution,
-            "seed": int(seed) % 2147483647,
             "off_peak": bool(off_peak),
         }
+        if seed is not None:
+            payload["seed"] = int(seed) % 2147483647
         if movement:
             payload["movement_amplitude"] = movement
         payload["audio"] = bool(audio)
@@ -297,8 +299,7 @@ class TikpanVidu3ReferenceVideoNode(_TikpanViduBase):
                 "参考图1": ("IMAGE", {"tooltip": "必填的主参考图，对应提示词中的 @1"}),
                 "视频时长": ("INT", {"default": 5, "min": 3, "max": 16, "step": 1, "tooltip": "生成视频秒数，越长越慢越贵"}),
                 "清晰度": (VIDU_RESOLUTION_OPTIONS, {"default": "720p", "tooltip": "视频分辨率：越高越清晰但更慢更贵"}),
-                "画面比例": (VIDU_ASPECT_OPTIONS, {"default": "16:9", "tooltip": "视频比例：16:9 横屏，9:16 竖屏短视频，1:1 方屏"}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"}),
+                "画面比例": (VIDU_ASPECT_OPTIONS, {"default": "16:9", "tooltip": "Vidu endpoint 的 aspect_ratio 参数"}),
             },
             "optional": {
                 "参考图2": ("IMAGE", {"tooltip": "可选第 2 张参考图，对应 @2"}),
@@ -307,20 +308,19 @@ class TikpanVidu3ReferenceVideoNode(_TikpanViduBase):
                 "参考图5": ("IMAGE", {"tooltip": "可选第 5 张参考图，对应 @5"}),
                 "参考图6": ("IMAGE", {"tooltip": "可选第 6 张参考图，对应 @6"}),
                 "参考图7": ("IMAGE", {"tooltip": "可选第 7 张参考图，对应 @7"}),
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
-                "智能主体库": ("BOOLEAN", {"default": False, "tooltip": "开启后让模型自动识别参考图中的主体并复用"}),
+                "智能主体库": ("BOOLEAN", {"default": False, "tooltip": "Vidu reference2video 的 auto_subjects 参数"}),
                 "音画同步": ("BOOLEAN", {"default": True, "tooltip": "是否生成与画面匹配的环境音/配乐"}),
                 "音频类型": (VIDU_AUDIO_TYPE_OPTIONS, {"default": "All", "tooltip": "限定生成的音频类型（环境音/对白/全部）"}),
-                "错峰生成": ("BOOLEAN", {"default": False, "tooltip": "开启后任务可能延迟出片，但费用更低"}),
-                "最长等待秒数": ("INT", {"default": 1200, "min": 60, "max": 7200, "step": 30, "tooltip": "等待视频生成完成的最长秒数；长视频/高清建议加大"}),
-                "查询间隔秒数": ("INT", {"default": 8, "min": 5, "max": 60, "step": 1, "tooltip": "轮询任务状态的间隔秒数"}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": False, "tooltip": "默认关闭以兼容部分网络；遇到 SSL 问题可保持关闭"}),
+                "错峰生成": ("BOOLEAN", {"default": False, "tooltip": "Vidu off_peak 参数；开启后任务可能延迟出片"}),
+                "最长等待秒数": ("INT", {"default": 1200, "min": 60, "max": 7200, "step": 30, "tooltip": "本地轮询等待最长秒数，不会传给上游模型"}),
+                "查询间隔秒数": ("INT", {"default": 8, "min": 5, "max": 60, "step": 1, "tooltip": "本地轮询任务状态的间隔秒数"}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": False, "tooltip": "本地网络参数：控制 requests 是否校验证书，不会传给上游模型"}),
                 "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后异常时返回空，不打断后续工作流"}),
             },
         }
 
     FUNCTION = "generate_reference_video"
-    DESCRIPTION = "📝 Vidu3 参考生视频：最多 7 张参考图（@1-@7 锚点语法），生成 3-16 秒视频，720P/1080P，支持音画同步。适合多主体复杂场景、角色一致性视频。"
+    DESCRIPTION = "📝 Vidu3 参考生视频：使用 Tikpan /ent/v2/reference2video，UI 隐藏未确认可复现的 seed，保留 Vidu 文档参数和本地轮询参数。"
 
     def generate_reference_video(self, **kwargs):
         pbar = comfy.utils.ProgressBar(100)
@@ -335,7 +335,8 @@ class TikpanVidu3ReferenceVideoNode(_TikpanViduBase):
             duration = int(pick(kwargs, "视频时长", "duration", default=5) or 5)
             resolution = str(pick(kwargs, "清晰度", "resolution", default="720p") or "720p")
             aspect_ratio = str(pick(kwargs, "画面比例", "aspect_ratio", default="16:9") or "16:9")
-            seed = normalize_seed(pick(kwargs, "随机种子", "seed", default=888888), default=888888)
+            seed_value = pick(kwargs, "随机种子", "seed", default=None)
+            seed = normalize_seed(seed_value, default=888888) if seed_value is not None else None
             audio = bool(pick(kwargs, "音画同步", "audio", default=True))
             audio_type = str(pick(kwargs, "音频类型", "audio_type", default="All") or "All")
             off_peak = bool(pick(kwargs, "错峰生成", "off_peak", default=False))
@@ -404,14 +405,12 @@ class TikpanVidu3TurboVideoNode(_TikpanViduBase):
                 ),
                 "视频时长": ("INT", {"default": 5, "min": 1, "max": 16, "step": 1, "tooltip": "生成视频秒数；越长越慢越贵"}),
                 "清晰度": (VIDU_RESOLUTION_OPTIONS, {"default": "720p", "tooltip": "视频分辨率：越高越清晰但更慢更贵"}),
-                "画面比例": (VIDU_ASPECT_OPTIONS, {"default": "16:9", "tooltip": "视频比例：16:9 横屏，9:16 竖屏短视频，1:1 方屏"}),
-                "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"}),
+                "画面比例": (VIDU_ASPECT_OPTIONS, {"default": "16:9", "tooltip": "Vidu endpoint 的 aspect_ratio 参数"}),
             },
             "optional": {
                 "首帧图": ("IMAGE", {"tooltip": "图生视频/首尾帧模式必填：视频的第一帧"}),
                 "尾帧图": ("IMAGE", {"tooltip": "首尾帧模式必填：视频的最后一帧"}),
-                "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
-                "运动幅度": (VIDU_MOVEMENT_OPTIONS, {"default": "auto", "tooltip": "画面运动强度：auto 自动；small 微动；large 大幅运动"}),
+                "运动幅度": (VIDU_MOVEMENT_OPTIONS, {"default": "auto", "tooltip": "Vidu movement_amplitude 参数：auto 自动；small 微动；large 大幅运动"}),
                 "音画同步": ("BOOLEAN", {"default": True, "tooltip": "是否生成与画面匹配的环境音/配乐"}),
                 "音频类型": (VIDU_AUDIO_TYPE_OPTIONS, {"default": "All", "tooltip": "限定生成的音频类型（环境音/对白/全部）"}),
                 "错峰生成": ("BOOLEAN", {"default": False, "tooltip": "开启后任务可能延迟出片，但费用更低"}),
@@ -423,7 +422,7 @@ class TikpanVidu3TurboVideoNode(_TikpanViduBase):
         }
 
     FUNCTION = "generate_turbo_video"
-    DESCRIPTION = "📝 Vidu3 Turbo 视频：极速版视频模型，支持文生视频/图生视频/首尾帧三种模式，1-16 秒，运动幅度可调。适合快速出片、批量短视频。"
+    DESCRIPTION = "📝 Vidu3 Turbo 视频：使用 Tikpan /ent/v2/text2video、img2video、start-end2video，隐藏未确认可复现的 seed。"
 
     def generate_turbo_video(self, **kwargs):
         pbar = comfy.utils.ProgressBar(100)
@@ -441,7 +440,8 @@ class TikpanVidu3TurboVideoNode(_TikpanViduBase):
             resolution = str(pick(kwargs, "清晰度", "resolution", default="720p") or "720p")
             aspect_ratio = str(pick(kwargs, "画面比例", "aspect_ratio", default="16:9") or "16:9")
             movement = str(pick(kwargs, "运动幅度", "movement_amplitude", default="auto") or "auto")
-            seed = normalize_seed(pick(kwargs, "随机种子", "seed", default=888888), default=888888)
+            seed_value = pick(kwargs, "随机种子", "seed", default=None)
+            seed = normalize_seed(seed_value, default=888888) if seed_value is not None else None
             audio = bool(pick(kwargs, "音画同步", "audio", default=True))
             audio_type = str(pick(kwargs, "音频类型", "audio_type", default="All") or "All")
             off_peak = bool(pick(kwargs, "错峰生成", "off_peak", default=False))

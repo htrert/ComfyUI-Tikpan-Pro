@@ -8,6 +8,8 @@ import subprocess
 from PIL import Image, ImageDraw
 import numpy as np
 
+from .tikpan_categories import CATEGORY_PSD_TOOLS
+
 
 KEY_TIER = "下载档位"
 KEY_INPAINT = "包含补全模型"
@@ -41,7 +43,7 @@ class TikpanPSDDependencyDownloaderNode:
     RETURN_TYPES = ("STRING", "IMAGE")
     RETURN_NAMES = (RET_LOG, RET_STATUS)
     FUNCTION = "download"
-    CATEGORY = "🛠️ Tikpan 本地工具/02 PSD 智能分层"
+    CATEGORY = CATEGORY_PSD_TOOLS
     OUTPUT_NODE = True
     DESCRIPTION = "📦 PSD 模型预下载器：提前下载分层节点所需的所有依赖和 AI 模型，避免首次使用时等待"
 

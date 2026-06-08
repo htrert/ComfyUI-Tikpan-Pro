@@ -1,3 +1,4 @@
+from .tikpan_categories import CATEGORY_AUDIO
 import json
 import time
 import os
@@ -97,7 +98,7 @@ class TikpanSunoMusicNode:
     )
     OUTPUT_NODE = True
     FUNCTION = "generate_music"
-    CATEGORY = "🎵 Tikpan 云端模型/03 云端音频"
+    CATEGORY = CATEGORY_AUDIO
     DESCRIPTION = "📝 Suno 音乐生成：业界顶级 AI 作曲，支持灵感/自定义/续写/歌手风格 4 种模式，多种风格预设和模型版本（V5/Fenix/V4 等）。一次返回 2 个版本可选。"
 
     def safe_json_text(self, obj, max_len=800):
