@@ -32,6 +32,7 @@ from .nodes.tikpan_gpt_image_node import TikpanGptImage2Node
 from .nodes.tikpan_gpt_image_2_gen import TikpanGptImage2GenNode
 from .nodes.tikpan_gpt_image_2_edit import TikpanGptImage2EditNode
 from .nodes.tikpan_gpt_image_2_official import TikpanGptImage2OfficialNode
+from .nodes.tikpan_gpt_image_2_benefit import TikpanGptImage2BenefitNode
 from .nodes.tikpan_gpt_image_2_official_edit_v2 import TikpanGptImage2OfficialEditV2
 from .nodes.tikpan_grok_videos import TikpanGrokVideoNode
 from .nodes.tikpan_kling_motion_control import TikpanKlingMotionControlNode
@@ -77,6 +78,7 @@ NODE_CLASS_MAPPINGS = {
     "TikpanGptImage2GenNode": TikpanGptImage2GenNode,
     "TikpanGptImage2EditNode": TikpanGptImage2EditNode,
     "TikpanGptImage2OfficialNode": TikpanGptImage2OfficialNode,
+    "TikpanGptImage2BenefitNode": TikpanGptImage2BenefitNode,
     "TikpanGptImage2OfficialEditV2": TikpanGptImage2OfficialEditV2,
     "TikpanGrokVideoNode": TikpanGrokVideoNode,
     "TikpanKlingMotionControlNode": TikpanKlingMotionControlNode,
@@ -127,6 +129,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanGptImage2GenNode": "图片｜GPT-Image-2-all 生图",
     "TikpanGptImage2EditNode": "图片｜GPT-Image-2-all 修图",
     "TikpanGptImage2OfficialNode": "图片｜GPT-Image-2 官方生图",
+    "TikpanGptImage2BenefitNode": "图片｜GPT-Image-2 福利生图",
     "TikpanGptImage2OfficialEditV2": "图片｜GPT-Image-2 官方修图 V2",
     "TikpanGrokVideoNode": "视频｜Grok-Videos 视频生成",
     "TikpanKlingMotionControlNode": "视频｜Kling Motion Control 动作控制",
