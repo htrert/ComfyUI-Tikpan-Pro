@@ -15,6 +15,7 @@ from .tikpan_node_options import normalize_seed, option_value, pick
 
 BENEFIT_CHANNELS = {
     "福利渠道一": "https://688.qzz.io",
+    "福利渠道二": "https://api.haoduotoken.com",
 }
 DEFAULT_BENEFIT_CHANNEL = "福利渠道一"
 BENEFIT_ENDPOINT = "/v1/chat/completions"
@@ -29,10 +30,10 @@ class TikpanGptImage2BenefitNode(TikpanGptImage2OfficialNode):
 
         required["福利渠道"] = (
             list(BENEFIT_CHANNELS.keys()),
-            {"default": DEFAULT_BENEFIT_CHANNEL, "tooltip": "选择内置福利中转渠道；当前为福利渠道一。"},
+            {"default": DEFAULT_BENEFIT_CHANNEL, "tooltip": "选择内置福利中转渠道。"},
         )
-        required["💎_源头拿货价福利_💎"] = (["福利渠道一"],)
-        required["获取密钥请访问"] = (["请使用福利渠道一对应的 API Key"],)
+        required["💎_源头拿货价福利_💎"] = (list(BENEFIT_CHANNELS.keys()),)
+        required["获取密钥请访问"] = (["请使用所选福利渠道对应的 API Key"],)
         required["API_密钥"] = (
             "STRING",
             {"default": "sk-", "tooltip": "福利渠道 API 密钥，以 sk- 开头。"},

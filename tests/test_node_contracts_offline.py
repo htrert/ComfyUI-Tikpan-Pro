@@ -190,8 +190,10 @@ def test_gpt_image_2_benefit_node_hides_relay_host_and_uses_builtin_channel():
 
     assert "福利渠道" in inputs["required"]
     assert "福利渠道一" in inputs["required"]["福利渠道"][0]
+    assert "福利渠道二" in inputs["required"]["福利渠道"][0]
     assert "中转站地址" not in keys
     assert node.resolve_api_host({"福利渠道": "福利渠道一"}) == "https://688.qzz.io"
+    assert node.resolve_api_host({"福利渠道": "福利渠道二"}) == "https://api.haoduotoken.com"
 
     payload = node.build_chat_payload(
         model="gpt-image-2",
