@@ -112,6 +112,8 @@ def extract_video_url(res_json):
     key_names = (
         "video_url",
         "videoUrl",
+        "download_url",
+        "backup_download_url",
         "url",
         "media_url",
         "file_url",

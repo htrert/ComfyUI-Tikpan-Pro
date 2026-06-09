@@ -12,6 +12,40 @@
 4. `README.md`：只在新增大类能力或主推模型发生变化时更新简介。
 5. `CHANGELOG.md`：记录新增功能、修复、文档同步和验证命令。
 
+## [v1.4.1] - 2026-06-09
+
+### Fixed - 视频节点上游 API 参数与模型名对齐
+
+- **MiniMax Hailuo 视频生成**（`nodes/tikpan_minimax_video.py`）：
+  - 移除未在上游文档/中转站广场确认的 `MiniMax-Hailuo-2.3-fast`，默认改为 `MiniMax-Hailuo-2.3`。
+  - 兼容旧工作流：保存的 `MiniMax-Hailuo-2.3-fast` 会自动归一化为 `MiniMax-Hailuo-2.3`。
+  - 首尾帧模式增加本地校验：仅允许 `MiniMax-Hailuo-02`。
+  - 增加 `10秒 + 1080P` 本地校验，避免提交上游不支持的组合。
+- **通用视频结果提取**（`nodes/tikpan_happyhorse_common.py`）：支持从 `download_url` / `backup_download_url` 提取视频文件，兼容 MiniMax 查询任务返回结构。
+- **Kling 文生/图生视频**（`nodes/tikpan_kling_video.py`）：
+  - `kling-v2-5-turbo` 开启 `sound=on` 时提前本地报错，提示切换到 `kling-v2-6` 或 `kling-v3`。
+  - 图生视频连接 `尾帧图` 时强制 5 秒，避免提交上游不支持的尾帧 10 秒请求。
+  - 更新 `生成声音` tooltip，标注仅支持 Kling v2.6 及以上模型。
+- **Kling Motion Control**（`nodes/tikpan_kling_motion_control.py`）：
+  - 模型选项从 `kling-v3-0` 改为上游文档示例中的 `kling-v3`。
+  - 兼容旧工作流：`kling-v3-0` 自动归一化为 `kling-v3`。
+  - 请求字段从 `image` / `video` 改为 `image_url` / `video_url`，对齐上游 Motion Control 文档。
+
+### Documentation
+
+- 更新 README、节点使用教程、节点速查表、节点功能分类和飞书合并文档内容。
+- 将项目版本提升到 `1.4.1`。
+- 标注当前注册节点口径为 52 个节点、7 类菜单。
+
+### Verification
+
+```bash
+python -m py_compile "nodes/tikpan_minimax_video.py" "nodes/tikpan_happyhorse_common.py" "nodes/tikpan_kling_video.py" "nodes/tikpan_kling_motion_control.py" "tests/test_node_contracts_offline.py"
+```
+
+- 通过针对本次修改点的离线 stub 检查：`download_url` 提取、Hailuo 模型列表、Kling 声音 tooltip、Kling Motion `kling-v3-0` 归一化。
+- 完整离线契约脚本在当前轻量环境缺少 `torch` 时无法直接运行，非本次变更导致。
+
 ## [v1.3.8] - 2026-06-08
 
 ### Added - GPT-Image-2 福利生图节点 & 独立「福利」菜单目录

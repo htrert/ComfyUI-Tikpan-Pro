@@ -285,7 +285,7 @@ class TikpanKlingText2VideoNode(_TikpanKlingVideoBase):
             "optional": {
                 "负向提示词": ("STRING", {"multiline": True, "default": "", "tooltip": "不希望出现的内容，留空则不传"}),
                 "CFG Scale": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.05, "tooltip": "Kling cfg_scale 参数"}),
-                "生成声音": ("BOOLEAN", {"default": False, "tooltip": "开启后发送 sound=on，可能增加耗时/费用"}),
+                "生成声音": ("BOOLEAN", {"default": False, "tooltip": "开启后发送 sound=on；仅支持 Kling v2.6 及以上模型，可能增加耗时/费用"}),
                 "相机控制JSON": ("STRING", {"multiline": True, "default": "", "tooltip": "可选，传入 Kling camera_control JSON 对象"}),
                 "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
                 "最长等待秒数": ("INT", {"default": 1200, "min": 60, "max": 7200, "step": 30, "tooltip": "等待视频生成完成的最长秒数"}),
@@ -307,15 +307,19 @@ class TikpanKlingText2VideoNode(_TikpanKlingVideoBase):
             prompt = str(pick(kwargs, "生成指令", "prompt", default="") or "").strip()
             if not prompt:
                 return self.error_return("❌ 生成指令不能为空", skip_error)
+            model_name = option_value(pick(kwargs, "模型版本", "model_name", default=KLING_MODEL_OPTIONS[0]), "kling-v2-5-turbo")
+            sound_enabled = bool(pick(kwargs, "生成声音", "sound", default=False))
+            if sound_enabled and model_name == "kling-v2-5-turbo":
+                return self.error_return("❌ Kling 生成声音 sound 仅支持 v2.6 及以上模型，请切换到 kling-v2-6 或 kling-v3。", skip_error)
             payload = self.build_text_payload(
-                model_name=option_value(pick(kwargs, "模型版本", "model_name", default=KLING_MODEL_OPTIONS[0]), "kling-v2-5-turbo"),
+                model_name=model_name,
                 prompt=prompt,
                 mode=option_value(pick(kwargs, "模式", "mode", default=KLING_MODE_OPTIONS[0]), "std"),
                 duration=option_value(pick(kwargs, "视频时长", "duration", default=KLING_DURATION_OPTIONS[0]), "5"),
                 aspect_ratio=option_value(pick(kwargs, "画面比例", "aspect_ratio", default=KLING_ASPECT_OPTIONS[0]), "16:9"),
                 negative_prompt=str(pick(kwargs, "负向提示词", "negative_prompt", default="") or "").strip(),
                 cfg_scale=pick(kwargs, "CFG Scale", "cfg_scale", default=0.5),
-                sound=bool(pick(kwargs, "生成声音", "sound", default=False)),
+                sound=sound_enabled,
                 camera_control=pick(kwargs, "相机控制JSON", "camera_control", default=""),
             )
             session = self.create_session()
@@ -353,21 +357,28 @@ class TikpanKlingImage2VideoNode(_TikpanKlingVideoBase):
                 return self.error_return("❌ 请连接首帧图", skip_error)
             if not prompt:
                 return self.error_return("❌ 生成指令不能为空", skip_error)
+            model_name = option_value(pick(kwargs, "模型版本", "model_name", default=KLING_MODEL_OPTIONS[0]), "kling-v2-5-turbo")
+            duration = option_value(pick(kwargs, "视频时长", "duration", default=KLING_DURATION_OPTIONS[0]), "5")
+            sound_enabled = bool(pick(kwargs, "生成声音", "sound", default=False))
+            if sound_enabled and model_name == "kling-v2-5-turbo":
+                return self.error_return("❌ Kling 生成声音 sound 仅支持 v2.6 及以上模型，请切换到 kling-v2-6 或 kling-v3。", skip_error)
+            tail_tensor = pick(kwargs, "尾帧图", "image_tail", default=None)
+            if tail_tensor is not None and str(duration) != "5":
+                return self.error_return("❌ Kling 尾帧图 image_tail 仅支持 5秒视频，请将视频时长改为 5秒或移除尾帧图。", skip_error)
             session = self.create_session()
             image_url = self.upload_image(session, api_host, api_key, first_frame, verify_tls, "kling_i2v_first.jpg", pbar, 15)
-            tail_tensor = pick(kwargs, "尾帧图", "image_tail", default=None)
             tail_url = self.upload_image(session, api_host, api_key, tail_tensor, verify_tls, "kling_i2v_tail.jpg", pbar, 22) if tail_tensor is not None else ""
             payload = self.build_image_payload(
-                model_name=option_value(pick(kwargs, "模型版本", "model_name", default=KLING_MODEL_OPTIONS[0]), "kling-v2-5-turbo"),
+                model_name=model_name,
                 prompt=prompt,
                 image=image_url,
                 mode=option_value(pick(kwargs, "模式", "mode", default=KLING_MODE_OPTIONS[0]), "std"),
-                duration=option_value(pick(kwargs, "视频时长", "duration", default=KLING_DURATION_OPTIONS[0]), "5"),
+                duration=duration,
                 aspect_ratio=option_value(pick(kwargs, "画面比例", "aspect_ratio", default=KLING_ASPECT_OPTIONS[0]), "16:9"),
                 image_tail=tail_url,
                 negative_prompt=str(pick(kwargs, "负向提示词", "negative_prompt", default="") or "").strip(),
                 cfg_scale=pick(kwargs, "CFG Scale", "cfg_scale", default=0.5),
-                sound=bool(pick(kwargs, "生成声音", "sound", default=False)),
+                sound=sound_enabled,
                 camera_control=pick(kwargs, "相机控制JSON", "camera_control", default=""),
             )
             task_id, video_url, save_path, final_json = self.submit_and_wait(session, api_host, "/kling/v1/videos/image2video", "/kling/v1/videos/image2video", payload, api_key, max_wait, poll_interval, verify_tls, "Tikpan_Kling_I2V", pbar)

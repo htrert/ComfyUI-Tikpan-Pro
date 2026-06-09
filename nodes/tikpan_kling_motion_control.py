@@ -35,8 +35,8 @@ BASE_URL = "https://tikpan.com"
 KLING_MOTION_MODEL_OPTIONS = [
     "kling-v2-6｜std｜720P",
     "kling-v2-6｜pro｜1080P",
-    "kling-v3-0｜std｜720P",
-    "kling-v3-0｜pro｜1080P",
+    "kling-v3｜std｜720P",
+    "kling-v3｜pro｜1080P",
 ]
 KLING_MOTION_DURATION_OPTIONS = ["自动按参考视频｜auto", "5秒｜5", "10秒｜10", "15秒｜15", "20秒｜20", "30秒｜30"]
 KLING_MOTION_ASPECT_OPTIONS = ["自动｜auto", "16:9 横屏｜16:9", "9:16 竖屏｜9:16", "1:1 方形｜1:1"]
@@ -147,8 +147,8 @@ class TikpanKlingMotionControlNode:
                 "mode": mode,
                 "resolution": resolution,
                 "prompt": prompt,
-                "image": image_url,
-                "video": motion_video_url,
+                "image_url": image_url,
+                "video_url": motion_video_url,
             }
             if duration_value:
                 payload["duration"] = duration_value
@@ -250,6 +250,9 @@ class TikpanKlingMotionControlNode:
     def parse_model_option(self, option):
         parts = [part.strip() for part in str(option or "").split("｜") if part.strip()]
         model_name = parts[0] if len(parts) >= 1 else "kling-v2-6"
+        if model_name == "kling-v3-0":
+            print("[Tikpan-KlingMotion] kling-v3-0 已按上游文档自动改用 kling-v3。", flush=True)
+            model_name = "kling-v3"
         mode = parts[1] if len(parts) >= 2 else "std"
         resolution = parts[2] if len(parts) >= 3 else ("1080P" if mode == "pro" else "720P")
         return model_name, mode, resolution

@@ -33,7 +33,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 HAILUO_MODE_OPTIONS = ["文生视频｜text2video", "首帧图生视频｜image2video", "首尾帧视频｜first-last-frame"]
 HAILUO_MODEL_OPTIONS = [
-    "MiniMax-Hailuo-2.3 Fast 低成本｜MiniMax-Hailuo-2.3-fast",
     "MiniMax-Hailuo-2.3 最新质量｜MiniMax-Hailuo-2.3",
     "MiniMax-Hailuo-02 稳定旧版｜MiniMax-Hailuo-02",
 ]
@@ -50,7 +49,7 @@ class TikpanMiniMaxHailuoVideoNode:
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
                 "API_密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 "生成模式": (HAILUO_MODE_OPTIONS, {"default": HAILUO_MODE_OPTIONS[0], "tooltip": "MiniMax/Hailuo 视频模式：文生、首帧图生、首尾帧"}),
-                "模型版本": (HAILUO_MODEL_OPTIONS, {"default": HAILUO_MODEL_OPTIONS[0], "tooltip": "默认使用 2.3-fast，性价比更高；质量优先可切 2.3"}),
+                "模型版本": (HAILUO_MODEL_OPTIONS, {"default": HAILUO_MODEL_OPTIONS[0], "tooltip": "默认使用 MiniMax-Hailuo-2.3；首尾帧模式请切换 MiniMax-Hailuo-02"}),
                 "生成指令": (
                     "STRING",
                     {
@@ -79,7 +78,7 @@ class TikpanMiniMaxHailuoVideoNode:
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
     CATEGORY = CATEGORY_VIDEO
-    DESCRIPTION = "📝 MiniMax Hailuo 2.3 视频生成：支持文生视频、首帧图生视频、首尾帧视频，默认 2.3-fast 性价比模式。"
+    DESCRIPTION = "📝 MiniMax Hailuo 2.3 视频生成：支持文生视频、首帧图生视频、首尾帧视频，默认 MiniMax-Hailuo-2.3。"
 
     def generate_video(self, **kwargs):
         pbar = comfy.utils.ProgressBar(100)
@@ -91,7 +90,10 @@ class TikpanMiniMaxHailuoVideoNode:
             skip_error = bool(pick(kwargs, "跳过错误", "skip_error", default=False))
             verify_tls = bool(pick(kwargs, "校验HTTPS证书", "verify_tls", default=False))
             mode = option_value(pick(kwargs, "生成模式", "mode", default=HAILUO_MODE_OPTIONS[0]), "text2video")
-            model = option_value(pick(kwargs, "模型版本", "model", default=HAILUO_MODEL_OPTIONS[0]), "MiniMax-Hailuo-2.3-fast")
+            model = option_value(pick(kwargs, "模型版本", "model", default=HAILUO_MODEL_OPTIONS[0]), "MiniMax-Hailuo-2.3")
+            if model == "MiniMax-Hailuo-2.3-fast":
+                print("[Tikpan-Hailuo] MiniMax-Hailuo-2.3-fast 当前未在上游文档支持列表中，已自动改用 MiniMax-Hailuo-2.3。", flush=True)
+                model = "MiniMax-Hailuo-2.3"
             prompt = str(pick(kwargs, "生成指令", "prompt", default="") or "").strip()
             duration = int(option_value(pick(kwargs, "视频时长", "duration", default=HAILUO_DURATION_OPTIONS[0]), "6"))
             resolution = str(pick(kwargs, "分辨率", "resolution", default="768P") or "768P")
@@ -109,6 +111,10 @@ class TikpanMiniMaxHailuoVideoNode:
                 return self.error_return("❌ 当前模式需要连接首帧图", skip_error)
             if mode == "first-last-frame" and last_frame is None:
                 return self.error_return("❌ 首尾帧模式需要连接尾帧图", skip_error)
+            if mode == "first-last-frame" and model != "MiniMax-Hailuo-02":
+                return self.error_return("❌ MiniMax Hailuo 首尾帧视频仅支持 MiniMax-Hailuo-02，请切换模型版本。", skip_error)
+            if duration == 10 and resolution == "1080P":
+                return self.error_return("❌ MiniMax Hailuo 不支持 10秒 + 1080P，请改用 6秒 + 1080P 或 10秒 + 768P。", skip_error)
 
             payload = self.build_payload(
                 mode=mode,

@@ -267,13 +267,13 @@ def test_new_video_nodes_contracts_and_payloads():
     hailuo = hailuo_module.TikpanMiniMaxHailuoVideoNode()
     hailuo_inputs = hailuo.INPUT_TYPES()
     assert "生成模式" in hailuo_inputs["required"]
-    assert any("MiniMax-Hailuo-2.3-fast" in item for item in hailuo_inputs["required"]["模型版本"][0])
+    assert not any("MiniMax-Hailuo-2.3-fast" in item for item in hailuo_inputs["required"]["模型版本"][0])
     assert any("MiniMax-Hailuo-2.3" in item for item in hailuo_inputs["required"]["模型版本"][0])
     assert any("MiniMax-Hailuo-02" in item for item in hailuo_inputs["required"]["模型版本"][0])
 
-    text_payload = hailuo.build_payload("text2video", "MiniMax-Hailuo-2.3-fast", "p", 6, "768P", True)
+    text_payload = hailuo.build_payload("text2video", "MiniMax-Hailuo-2.3", "p", 6, "768P", True)
     assert text_payload == {
-        "model": "MiniMax-Hailuo-2.3-fast",
+        "model": "MiniMax-Hailuo-2.3",
         "prompt": "p",
         "duration": 6,
         "prompt_optimizer": True,

@@ -6,7 +6,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Official-Tikpan.com-red?style=for-the-badge" alt="Tikpan Official">
   <img src="https://img.shields.io/badge/ComfyUI-Registry-green?style=for-the-badge" alt="Registry">
-  <img src="https://img.shields.io/badge/Version-1.3.6-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.4.1-blue?style=for-the-badge" alt="Version">
 </p>
 
 **ComfyUI-Tikpan-Pro** 是由 [攀升AI (Tikpan.com)](https://tikpan.com/) 官方发布的深度集成插件。专为 **TikTok 电商矩阵运营**、**高阶内容创作**及 **AI 工作流自动化**设计，通过接入自有的高稳定性 API 渠道，为全球创作者提供顶级的模型生成能力。
@@ -43,7 +43,9 @@
 * **HappyHorse 1.0 系列**：文生视频、图生视频、多参考图生视频、视频编辑，支持同步/异步模式。
 * **Grok-Videos**：Grok 视频生成，支持最多 4 张参考图。
 * **Veo 3.1**：Google Veo 3.1 多模型，lite/fast/pro/components，支持首尾帧和 components 垫图。
-* **Kling Motion Control**：Kling v2.6/v3.0 动作控制，把角色图像+动作参考视频合成新视频。
+* **Kling Motion Control**：Kling v2.6/v3 动作控制，把角色图像+动作参考视频合成新视频；已对齐 `image_url` / `video_url` 参数。
+* **MiniMax Hailuo 视频生成**：支持 Hailuo 2.3 文生/图生视频和 Hailuo-02 首尾帧视频，自动校验 10 秒/1080P、尾帧等上游限制。
+* **Kling 文生/图生视频**：支持 Kling v2.5 Turbo、v2.6、v3，自动校验声音生成与尾帧 5 秒限制。
 * **Vidu3 参考生视频**：最多 7 张参考图，通过 `@1`/`@2` 保持角色一致性生视频。
 * **Vidu3 Turbo**：快速文生/图生/首尾帧视频，底层模型 `viduq3-turbo`。
 * **Gemini Omni Flash**：多模态视频生成，支持文生/图生/多参考/编辑/音频驱动五种模式。
