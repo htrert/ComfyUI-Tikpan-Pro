@@ -193,7 +193,11 @@ def test_gpt_image_2_benefit_node_hides_relay_host_and_uses_builtin_channel():
     assert "福利渠道二" in inputs["required"]["福利渠道"][0]
     assert "中转站地址" not in keys
     assert node.resolve_api_host({"福利渠道": "福利渠道一"}) == "https://688.qzz.io"
+    assert node.resolve_endpoint({"福利渠道": "福利渠道一"}) == "/v1/chat/completions"
+    assert node.resolve_mode({"福利渠道": "福利渠道一"}) == "chat_completions"
     assert node.resolve_api_host({"福利渠道": "福利渠道二"}) == "https://api.haoduotoken.com"
+    assert node.resolve_endpoint({"福利渠道": "福利渠道二"}) == "/v1/images/generations"
+    assert node.resolve_mode({"福利渠道": "福利渠道二"}) == "images_generations"
 
     payload = node.build_chat_payload(
         model="gpt-image-2",
@@ -215,6 +219,24 @@ def test_gpt_image_2_benefit_node_hides_relay_host_and_uses_builtin_channel():
     assert payload["requested_size"] == "1024x1024"
     assert payload["requested_resolution"] == "1024x1024"
     assert "Required output size: 1024x1024" in payload["messages"][0]["content"][0]["text"]
+
+    images_payload = node.build_images_payload(
+        model="gpt-image-2",
+        prompt="生成一张图",
+        target_res="1024x1024",
+        quality="medium",
+        output_format="png",
+        seed=888888,
+    )
+    assert images_payload == {
+        "model": "gpt-image-2",
+        "prompt": "生成一张图",
+        "n": 1,
+        "size": "1024x1024",
+        "quality": "standard",
+        "style": "vivid",
+        "response_format": "url",
+    }
 
     resized = node.coerce_output_size(module.Image.new("RGB", (1536, 1024)), 3840, 1648)
     assert resized.size == (3840, 1648)

@@ -14,10 +14,18 @@ from .tikpan_node_options import normalize_seed, option_value, pick
 
 
 BENEFIT_CHANNELS = {
-    "福利渠道一": "https://688.qzz.io",
-    "福利渠道二": "https://api.haoduotoken.com",
+    "福利渠道一": {
+        "host": "https://688.qzz.io",
+        "endpoint": "/v1/chat/completions",
+        "mode": "chat_completions",
+    },
+    "福利渠道二": {
+        "host": "https://api.haoduotoken.com",
+        "endpoint": "/v1/images/generations",
+        "mode": "images_generations",
+    },
 }
-DEFAULT_BENEFIT_CHANNEL = "福利渠道一"
+DEFAULT_BENEFIT_CHANNEL = "福利渠道二"
 BENEFIT_ENDPOINT = "/v1/chat/completions"
 
 
@@ -45,9 +53,22 @@ class TikpanGptImage2BenefitNode(TikpanGptImage2OfficialNode):
     CATEGORY = CATEGORY_BENEFIT
     DESCRIPTION = ""
 
-    def resolve_api_host(self, kwargs):
+    def resolve_channel_config(self, kwargs):
         channel = str(kwargs.get("福利渠道") or DEFAULT_BENEFIT_CHANNEL).strip()
-        return BENEFIT_CHANNELS.get(channel, BENEFIT_CHANNELS[DEFAULT_BENEFIT_CHANNEL]).rstrip("/")
+        config = BENEFIT_CHANNELS.get(channel, BENEFIT_CHANNELS[DEFAULT_BENEFIT_CHANNEL])
+        return channel, config
+
+    def resolve_api_host(self, kwargs):
+        _channel, config = self.resolve_channel_config(kwargs)
+        return str(config["host"]).rstrip("/")
+
+    def resolve_endpoint(self, kwargs):
+        _channel, config = self.resolve_channel_config(kwargs)
+        return str(config["endpoint"])
+
+    def resolve_mode(self, kwargs):
+        _channel, config = self.resolve_channel_config(kwargs)
+        return str(config["mode"])
 
     def generate(self, **kwargs):
         start_time = time.time()
@@ -83,35 +104,48 @@ class TikpanGptImage2BenefitNode(TikpanGptImage2OfficialNode):
 
             width, height, target_res = self.compute_target_resolution(tier=tier, aspect_ratio=aspect_ratio)
             connect_timeout, read_timeout = self.compute_timeout_by_tier(tier)
-            payload = self.build_chat_payload(
-                model=model,
-                prompt=prompt,
-                target_res=target_res,
-                aspect_ratio=aspect_ratio,
-                tier=tier,
-                quality=quality,
-                moderation=moderation,
-                output_format=output_format,
-                seed=seed,
+            endpoint = self.resolve_endpoint(kwargs)
+            mode = self.resolve_mode(kwargs)
+            payload = (
+                self.build_images_payload(
+                    model=model,
+                    prompt=prompt,
+                    target_res=target_res,
+                    quality=quality,
+                    output_format=output_format,
+                    seed=seed,
+                )
+                if mode == "images_generations"
+                else self.build_chat_payload(
+                    model=model,
+                    prompt=prompt,
+                    target_res=target_res,
+                    aspect_ratio=aspect_ratio,
+                    tier=tier,
+                    quality=quality,
+                    moderation=moderation,
+                    output_format=output_format,
+                    seed=seed,
+                )
             )
-            idempotency_key = make_idempotency_key("chat/completions-benefit-generation", payload)
+            idempotency_key = make_idempotency_key(f"benefit-{mode}", payload)
             save_recovery_record(
                 "benefit_generation",
                 idempotency_key,
                 "pending",
-                endpoint=BENEFIT_ENDPOINT,
+                endpoint=endpoint,
                 payload_hash=short_hash(payload),
                 size=target_res,
                 channel=kwargs.get("福利渠道", DEFAULT_BENEFIT_CHANNEL),
             )
 
-            print(f"[Tikpan-Benefit-Gen] 🚀 福利渠道启动 | endpoint: {BENEFIT_ENDPOINT} | 档位: {tier} | 比例: {aspect_ratio}", flush=True)
+            print(f"[Tikpan-Benefit-Gen] 🚀 福利渠道启动 | endpoint: {endpoint} | 档位: {tier} | 比例: {aspect_ratio}", flush=True)
             print(f"[Tikpan-Benefit-Gen] 🧾 模型: {model} | 质量: {quality} | 审核: {moderation} | 格式: {output_format}", flush=True)
             pbar.update(20)
 
             session = self.create_session()
             response = session.post(
-                f"{api_host}{BENEFIT_ENDPOINT}",
+                f"{api_host}{endpoint}",
                 json=payload,
                 headers={
                     "Authorization": f"Bearer {api_key}",
@@ -132,7 +166,7 @@ class TikpanGptImage2BenefitNode(TikpanGptImage2OfficialNode):
                     "benefit_generation",
                     idempotency_key,
                     "http_error",
-                    endpoint=BENEFIT_ENDPOINT,
+                    endpoint=endpoint,
                     http_status=response.status_code,
                     error=err_text,
                 )
@@ -153,7 +187,7 @@ class TikpanGptImage2BenefitNode(TikpanGptImage2OfficialNode):
                 "benefit_generation",
                 idempotency_key,
                 "response_received",
-                endpoint=BENEFIT_ENDPOINT,
+                endpoint=endpoint,
                 http_status=response.status_code,
                 response=safe_json_for_log(res_json),
             )
@@ -180,7 +214,7 @@ class TikpanGptImage2BenefitNode(TikpanGptImage2OfficialNode):
             final_tensor = torch.from_numpy(np.array(final_pil).astype(np.float32) / 255.0)[None, ...]
             elapsed = round(time.time() - start_time, 2)
             log_text = (
-                f"✅ 渲染成功 | 福利渠道: {kwargs.get('福利渠道', DEFAULT_BENEFIT_CHANNEL)} | endpoint: {BENEFIT_ENDPOINT} | "
+                f"✅ 渲染成功 | 福利渠道: {kwargs.get('福利渠道', DEFAULT_BENEFIT_CHANNEL)} | endpoint: {endpoint} | "
                 f"模型: {model} | 比例: {aspect_ratio} | 尺寸: {target_res} | 质量: {quality} | seed: {seed & 0x7fffffff} | 耗时: {elapsed}s"
             )
             if raw_size != (width, height):
@@ -192,7 +226,7 @@ class TikpanGptImage2BenefitNode(TikpanGptImage2OfficialNode):
                 "benefit_generation",
                 idempotency_key,
                 "success",
-                endpoint=BENEFIT_ENDPOINT,
+                endpoint=endpoint,
                 raw_type=raw_type,
                 image_url=img_raw if raw_type == "url" else "",
             )
@@ -204,6 +238,17 @@ class TikpanGptImage2BenefitNode(TikpanGptImage2OfficialNode):
             if not skip_error:
                 raise
             return (self.black_image(width, height), err_msg)
+
+    def build_images_payload(self, model, prompt, target_res, quality, output_format, seed):
+        return {
+            "model": model,
+            "prompt": prompt,
+            "n": 1,
+            "size": target_res,
+            "quality": "standard",
+            "style": "vivid",
+            "response_format": "url",
+        }
 
     def build_chat_payload(self, model, prompt, target_res, aspect_ratio, tier, quality, moderation, output_format, seed):
         image_size = self.normalize_image_size(tier)
