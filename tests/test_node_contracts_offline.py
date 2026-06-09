@@ -252,6 +252,62 @@ def test_gpt_image_2_benefit_node_hides_relay_host_and_uses_builtin_channel():
     assert raw.startswith("data:image/png;base64,")
 
 
+def test_new_video_nodes_contracts_and_payloads():
+    init_module = load_plugin_package()
+    required_keys = {
+        "TikpanMiniMaxHailuoVideoNode",
+        "TikpanKlingText2VideoNode",
+        "TikpanKlingImage2VideoNode",
+    }
+    assert required_keys <= set(init_module.NODE_CLASS_MAPPINGS)
+    for key in required_keys:
+        assert init_module.NODE_CLASS_MAPPINGS[key].CATEGORY.endswith("02 视频 Video")
+
+    hailuo_module = load_node_module("tikpan_minimax_video.py", "tikpan_minimax_video")
+    hailuo = hailuo_module.TikpanMiniMaxHailuoVideoNode()
+    hailuo_inputs = hailuo.INPUT_TYPES()
+    assert "生成模式" in hailuo_inputs["required"]
+    assert any("MiniMax-Hailuo-2.3-fast" in item for item in hailuo_inputs["required"]["模型版本"][0])
+    assert any("MiniMax-Hailuo-2.3" in item for item in hailuo_inputs["required"]["模型版本"][0])
+    assert any("MiniMax-Hailuo-02" in item for item in hailuo_inputs["required"]["模型版本"][0])
+
+    text_payload = hailuo.build_payload("text2video", "MiniMax-Hailuo-2.3-fast", "p", 6, "768P", True)
+    assert text_payload == {
+        "model": "MiniMax-Hailuo-2.3-fast",
+        "prompt": "p",
+        "duration": 6,
+        "prompt_optimizer": True,
+        "resolution": "768P",
+    }
+    image_payload = hailuo.build_payload("image2video", "MiniMax-Hailuo-2.3", "p", 10, "1080P", False, first_frame_image="data:image/jpeg;base64,aaa")
+    assert image_payload["first_frame_image"].startswith("data:image")
+    assert "last_frame_image" not in image_payload
+    frames_payload = hailuo.build_payload("first-last-frame", "MiniMax-Hailuo-02", "p", 10, "1080P", True, "first", "last")
+    assert frames_payload["first_frame_image"] == "first"
+    assert frames_payload["last_frame_image"] == "last"
+
+    kling_module = load_node_module("tikpan_kling_video.py", "tikpan_kling_video")
+    kling_text = kling_module.TikpanKlingText2VideoNode()
+    kling_image = kling_module.TikpanKlingImage2VideoNode()
+    assert any("kling-v2-5-turbo" in item for item in kling_text.INPUT_TYPES()["required"]["模型版本"][0])
+    assert any("kling-v2-6" in item for item in kling_text.INPUT_TYPES()["required"]["模型版本"][0])
+    assert any("kling-v3" in item for item in kling_text.INPUT_TYPES()["required"]["模型版本"][0])
+
+    text_payload = kling_text.build_text_payload("kling-v2-5-turbo", "p", "std", 5, "16:9", camera_control='{"type":"zoom"}')
+    assert text_payload == {
+        "model_name": "kling-v2-5-turbo",
+        "prompt": "p",
+        "mode": "std",
+        "duration": 5,
+        "aspect_ratio": "16:9",
+        "camera_control": {"type": "zoom"},
+    }
+    image_payload = kling_image.build_image_payload("kling-v2-6", "p", "https://example.com/a.jpg", "pro", 10, image_tail="https://example.com/b.jpg")
+    assert image_payload["image"] == "https://example.com/a.jpg"
+    assert image_payload["image_tail"] == "https://example.com/b.jpg"
+    assert "negative_prompt" not in image_payload
+
+
 def test_tikpan_categories_stay_in_single_menu_tree():
     init_module = load_plugin_package()
     categories = {
@@ -302,6 +358,7 @@ if __name__ == "__main__":
     test_nano_banana_pro_uses_official_gemini_image_config()
     test_gemini_image_native_payload_keeps_rest_and_sdk_image_config_fields()
     test_gpt_image_2_benefit_node_hides_relay_host_and_uses_builtin_channel()
+    test_new_video_nodes_contracts_and_payloads()
     test_tikpan_categories_stay_in_single_menu_tree()
     test_key_node_registration_names_stay_stable()
     print("node contract offline tests passed")

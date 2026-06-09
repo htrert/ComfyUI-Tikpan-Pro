@@ -39,6 +39,8 @@ from .nodes.tikpan_kling_motion_control import TikpanKlingMotionControlNode
 from .nodes.tikpan_vidu_video import TikpanVidu3ReferenceVideoNode, TikpanVidu3TurboVideoNode
 from .nodes.tikpan_suno_music import TikpanSunoMusicNode
 from .nodes.tikpan_minimax_speech import TikpanMiniMaxSpeech28HDNode, TikpanMiniMaxSpeech28TurboNode
+from .nodes.tikpan_minimax_video import TikpanMiniMaxHailuoVideoNode
+from .nodes.tikpan_kling_video import TikpanKlingText2VideoNode, TikpanKlingImage2VideoNode
 from .nodes.tikpan_doubao_image import TikpanDoubaoImageNode
 from .nodes.tikpan_doubao_tts import TikpanDoubaoTTS20Node
 from .nodes.tikpan_nano_banana_pro import TikpanNanoBananaProNode
@@ -92,6 +94,9 @@ NODE_CLASS_MAPPINGS = {
     "TikpanSunoMusicNode": TikpanSunoMusicNode,
     "TikpanMiniMaxSpeech28HDNode": TikpanMiniMaxSpeech28HDNode,
     "TikpanMiniMaxSpeech28TurboNode": TikpanMiniMaxSpeech28TurboNode,
+    "TikpanMiniMaxHailuoVideoNode": TikpanMiniMaxHailuoVideoNode,
+    "TikpanKlingText2VideoNode": TikpanKlingText2VideoNode,
+    "TikpanKlingImage2VideoNode": TikpanKlingImage2VideoNode,
     "TikpanDoubaoImageNode": TikpanDoubaoImageNode,
     "TikpanDoubaoTTS20Node": TikpanDoubaoTTS20Node,
     "TikpanNanoBananaProNode": TikpanNanoBananaProNode,
@@ -145,6 +150,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanSunoMusicNode": "音频｜Suno 音乐生成",
     "TikpanMiniMaxSpeech28HDNode": "音频｜speech-2.8-hd 高清语音合成",
     "TikpanMiniMaxSpeech28TurboNode": "音频｜speech-2.8-turbo 极速语音合成",
+    "TikpanMiniMaxHailuoVideoNode": "视频｜MiniMax Hailuo 视频生成",
+    "TikpanKlingText2VideoNode": "视频｜Kling 文生视频",
+    "TikpanKlingImage2VideoNode": "视频｜Kling 图生视频",
     "TikpanDoubaoImageNode": "图片｜豆包图像生成 Seedream",
     "TikpanDoubaoTTS20Node": "音频｜豆包语音合成 2.0",
     "TikpanNanoBananaProNode": "图片｜Nano Banana Pro",
