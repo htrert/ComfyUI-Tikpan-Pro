@@ -13,6 +13,8 @@ docs/assets/wechat-cover-v1.0.1.png
 # 飞书同步脚本相关 - 含 App Secret 等敏感凭证，绝不提交
 .feishu_config.json
 *.feishu_config.json
+.wechat_config.json
+*.wechat_config.json
 .feishu/
 feishu_token_cache.json
 

@@ -1,0 +1,7 @@
+{
+  "_comment": "复制本文件为 .wechat_config.json，并填入微信公众号开放平台/公众平台开发配置。.wechat_config.json 已加入 .gitignore，不要提交真实凭证。",
+  "app_id": "wx_xxxxxxxxxxxxxxxx",
+  "app_secret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "author": "",
+  "content_source_url": ""
+}
