@@ -180,6 +180,16 @@ GROK_ASPECT_OPTIONS = _node_constant(
     "GROK_ASPECT_OPTIONS",
     ["16:9 横屏｜16:9", "9:16 竖屏｜9:16", "1:1 方形｜1024x1024"],
 )
+GROK_IMAGINE_VIDEO_RESOLUTION_OPTIONS = _node_constant(
+    "tikpan_node_options.py",
+    "GROK_IMAGINE_VIDEO_RESOLUTION_OPTIONS",
+    ["480p", "720p"],
+)
+GROK_IMAGINE_VIDEO_MODE_OPTIONS = _node_constant(
+    "tikpan_node_options.py",
+    "GROK_IMAGINE_VIDEO_MODE_OPTIONS",
+    ["文生视频｜text_to_video", "首帧图生视频｜first_frame", "参考图生视频｜reference_image", "视频编辑｜video_edit"],
+)
 
 PROMPT = field("prompt", "textarea", "生成指令 / 提示词", "", placeholder="写清楚主体、场景、风格、镜头、比例和限制。", required=1, rows=5, sort_order=1)
 SEED = field("seed", "number", "随机种子", "888888", placeholder="0 或固定正整数；旧工作流的 -1 会在后端规范化。", sort_order=99, min_value=0, step=1)
@@ -607,6 +617,59 @@ MODELS = [
             field("aspect_ratio", "select", "画面比例", "16:9 横屏｜16:9", options=GROK_ASPECT_OPTIONS, sort_order=4),
             SEED,
             field("reference_images", "file_image", "参考图", "", max_count=4, rows=0, sort_order=5),
+        ],
+    },
+    {
+        "id": "grok-imagine-video",
+        "node_class": "TikpanGrokImagineVideoNode",
+        "name": "Grok Imagine Video 音视频生成/编辑",
+        "category_key": "video_generation",
+        "provider": "xAI / Tikpan",
+        "description": "Grok Imagine Video 官方格式节点，支持文生视频、首帧图生视频、参考图生视频和视频编辑。优质 Grok 分组按次计费：480p 输入图 0.0120/张、输入视频 0.0600/秒、输出视频 0.3000/秒；720p 输入图 0.0120/张、输入视频 0.0600/秒、输出视频 0.4200/秒。",
+        "api_type": "tikpan_proxy",
+        "endpoint": "/v1/videos/generations, /v1/videos/edits",
+        "upstream_model": "grok-imagine-video",
+        "sort_order": 4,
+        "pricing": {"billing_mode": "per_unit", "input_image_480p": "0.0120/张", "input_video": "0.0600/秒", "output_video_480p": "0.3000/秒", "output_video_720p": "0.4200/秒"},
+        "usage": usage(
+            "选择生成模式：文生视频、首帧图生视频、参考图生视频或视频编辑。",
+            "分辨率支持 480p/720p；720p 输出按秒计费更高。视频编辑可传公开视频 URL 或本地视频。",
+        ),
+        "fields": [
+            field("mode", "select", "生成模式", "文生视频｜text_to_video", options=GROK_IMAGINE_VIDEO_MODE_OPTIONS, sort_order=1),
+            field("prompt", "textarea", "生成指令", "A cinematic short video with smooth motion, natural sound, realistic lighting, high detail.", required=1, rows=5, sort_order=2),
+            field("model", "select", "模型", "grok-imagine-video", options=["grok-imagine-video"], sort_order=3),
+            field("resolution", "select", "分辨率", "480p", options=GROK_IMAGINE_VIDEO_RESOLUTION_OPTIONS, sort_order=4),
+            field("aspect_ratio", "select", "画面比例", "16:9 横屏｜16:9", options=GROK_ASPECT_OPTIONS, sort_order=5),
+            SEED,
+            field("first_frame_image", "file_image", "首帧图", "", placeholder="首帧图生视频模式使用。", max_count=1, rows=0, sort_order=6),
+            field("reference_images", "file_image", "参考图", "", placeholder="参考图生视频模式使用，当前节点按第一张发送。", max_count=1, rows=0, sort_order=7),
+            field("video_url", "text", "视频URL", "", placeholder="视频编辑模式可填 http/https 视频地址。", sort_order=8),
+        ],
+    },
+    {
+        "id": "grok-imagine-video-1.5-preview",
+        "node_class": "TikpanGrokImagineVideo15PreviewNode",
+        "name": "Grok Imagine Video 1.5 Preview 首帧生视频",
+        "category_key": "video_generation",
+        "provider": "xAI / Tikpan",
+        "description": "Grok Imagine Video 1.5 Preview 是预览版首帧图生短视频模型，不开放视频编辑。优质 Grok 分组按次计费：480p 输入图 0.0600/张、输出视频 0.4800/秒；720p 输出视频 0.8400/秒。",
+        "api_type": "tikpan_proxy",
+        "endpoint": "/v1/videos/generations",
+        "upstream_model": "grok-imagine-video-1.5-preview",
+        "sort_order": 5,
+        "pricing": {"billing_mode": "per_unit", "input_image_480p": "0.0600/张", "output_video_480p": "0.4800/秒", "output_video_720p": "0.8400/秒"},
+        "usage": usage(
+            "上传一张首帧图并填写生成指令，模型会根据图像提示快速生成短视频。",
+            "只支持 /v1/videos/generations；如需视频编辑或参考图模式，请使用 Grok Imagine Video 正式节点。",
+        ),
+        "fields": [
+            field("prompt", "textarea", "生成指令", "Turn this image into a cinematic short video with natural motion, expressive atmosphere, and matching sound.", required=1, rows=5, sort_order=1),
+            field("model", "select", "模型", "grok-imagine-video-1.5-preview", options=["grok-imagine-video-1.5-preview"], sort_order=2),
+            field("resolution", "select", "分辨率", "480p", options=GROK_IMAGINE_VIDEO_RESOLUTION_OPTIONS, sort_order=3),
+            field("aspect_ratio", "select", "画面比例", "16:9 横屏｜16:9", options=GROK_ASPECT_OPTIONS, sort_order=4),
+            SEED,
+            field("first_frame_image", "file_image", "首帧图", "", placeholder="必填：作为视频第一帧/图像提示。", required=1, max_count=1, rows=0, sort_order=5),
         ],
     },
     {

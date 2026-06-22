@@ -12,6 +12,10 @@ from .nodes.tikpan_grok_imagine_image import (
     TikpanGrokImagineImageEditNode,
     TikpanGrokImagineImageProEditNode,
 )
+from .nodes.tikpan_grok_imagine_video import (
+    TikpanGrokImagineVideoNode,
+    TikpanGrokImagineVideo15PreviewNode,
+)
 from .nodes.tikpan_parallel_image_engine import TikpanParallelImageEngineNode
 from .nodes.tikpan_async_nodes import (
     TikpanAsyncImageSubmitNode,
@@ -67,6 +71,8 @@ NODE_CLASS_MAPPINGS = {
     "TikpanGrokImagineImageProNode": TikpanGrokImagineImageProNode,
     "TikpanGrokImagineImageEditNode": TikpanGrokImagineImageEditNode,
     "TikpanGrokImagineImageProEditNode": TikpanGrokImagineImageProEditNode,
+    "TikpanGrokImagineVideoNode": TikpanGrokImagineVideoNode,
+    "TikpanGrokImagineVideo15PreviewNode": TikpanGrokImagineVideo15PreviewNode,
     "TikpanParallelImageEngineNode": TikpanParallelImageEngineNode,
     "TikpanAsyncImageSubmitNode": TikpanAsyncImageSubmitNode,
     "TikpanAsyncImageResultNode": TikpanAsyncImageResultNode,
@@ -123,6 +129,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanGrokImagineImageProNode": "图片｜Grok Imagine Image Pro 生图",
     "TikpanGrokImagineImageEditNode": "图片｜Grok Imagine Image 参考图/修图",
     "TikpanGrokImagineImageProEditNode": "图片｜Grok Imagine Image Pro 参考图/修图",
+    "TikpanGrokImagineVideoNode": "视频｜Grok Imagine Video 音视频生成/编辑",
+    "TikpanGrokImagineVideo15PreviewNode": "视频｜Grok Imagine Video 1.5 Preview 首帧生视频",
     "TikpanParallelImageEngineNode": "工具｜API 多模型并发生图引擎",
     "TikpanAsyncImageSubmitNode": "工具｜异步提交图片任务",
     "TikpanAsyncImageResultNode": "工具｜异步查询图片结果",

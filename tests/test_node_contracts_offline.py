@@ -258,6 +258,8 @@ def test_new_video_nodes_contracts_and_payloads():
         "TikpanMiniMaxHailuoVideoNode",
         "TikpanKlingText2VideoNode",
         "TikpanKlingImage2VideoNode",
+        "TikpanGrokImagineVideoNode",
+        "TikpanGrokImagineVideo15PreviewNode",
     }
     assert required_keys <= set(init_module.NODE_CLASS_MAPPINGS)
     for key in required_keys:
@@ -306,6 +308,65 @@ def test_new_video_nodes_contracts_and_payloads():
     assert image_payload["image"] == "https://example.com/a.jpg"
     assert image_payload["image_tail"] == "https://example.com/b.jpg"
     assert "negative_prompt" not in image_payload
+
+    grok_module = load_node_module("tikpan_grok_imagine_video.py", "tikpan_grok_imagine_video")
+    grok_video = grok_module.TikpanGrokImagineVideoNode()
+    grok_preview = grok_module.TikpanGrokImagineVideo15PreviewNode()
+    grok_inputs = grok_video.INPUT_TYPES()
+    preview_inputs = grok_preview.INPUT_TYPES()
+    grok_keys = all_input_keys(grok_inputs)
+    preview_keys = all_input_keys(preview_inputs)
+
+    assert "生成模式" in grok_inputs["required"]
+    assert "首帧图" in grok_keys
+    assert "参考图" in grok_keys
+    assert "视频URL" in grok_keys
+    assert "本地视频" in grok_keys
+    assert any("video_edit" in item for item in grok_inputs["required"]["生成模式"][0])
+    assert preview_inputs["required"]["模型"][0] == ["grok-imagine-video-1.5-preview"]
+    assert "首帧图" in preview_inputs["required"]
+    assert "生成模式" not in preview_keys
+
+    generation_payload = grok_video.build_payload(
+        model="grok-imagine-video",
+        prompt="p",
+        resolution="480p",
+        aspect_ratio="16:9",
+        seed=888888,
+        mode="first_frame",
+        first_frame_image="data:image/jpeg;base64,aaa",
+    )
+    assert generation_payload["model"] == "grok-imagine-video"
+    assert generation_payload["prompt"] == "p"
+    assert generation_payload["resolution"] == "480p"
+    assert generation_payload["aspect_ratio"] == "16:9"
+    assert generation_payload["first_frame_image"].startswith("data:image")
+
+    edit_payload = grok_video.build_payload(
+        model="grok-imagine-video",
+        prompt="edit p",
+        resolution="720p",
+        aspect_ratio="9:16",
+        seed=1,
+        mode="video_edit",
+        video="https://example.com/a.mp4",
+    )
+    assert edit_payload["video"] == "https://example.com/a.mp4"
+    assert "first_frame_image" not in edit_payload
+    assert edit_payload["mode"] == "video_edit"
+
+    preview_payload = grok_preview.build_payload(
+        model="grok-imagine-video-1.5-preview",
+        prompt="p",
+        resolution="480p",
+        aspect_ratio="16:9",
+        seed=2,
+        mode="first_frame",
+        first_frame_image="data:image/jpeg;base64,bbb",
+    )
+    assert preview_payload["model"] == "grok-imagine-video-1.5-preview"
+    assert preview_payload["first_frame_image"].startswith("data:image")
+    assert preview_payload["mode"] == "first_frame"
 
 
 def test_tikpan_categories_stay_in_single_menu_tree():

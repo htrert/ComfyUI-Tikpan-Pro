@@ -127,6 +127,15 @@ GROK_ASPECT_OPTIONS = [
     "1:1 方形｜1024x1024",
 ]
 
+GROK_IMAGINE_VIDEO_RESOLUTION_OPTIONS = ["480p", "720p"]
+
+GROK_IMAGINE_VIDEO_MODE_OPTIONS = [
+    "文生视频｜text_to_video",
+    "首帧图生视频｜first_frame",
+    "参考图生视频｜reference_image",
+    "视频编辑｜video_edit",
+]
+
 SUNO_STYLE_OPTIONS = [
     "流行｜Pop｜pop",
     "电影感｜Cinematic｜cinematic, orchestral, emotional",
