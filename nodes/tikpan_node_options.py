@@ -119,12 +119,55 @@ VIDEO_DURATION_OPTIONS = [
     "15秒｜15",
 ]
 
-GROK_DURATION_OPTIONS = ["6秒｜6s", "10秒｜10s"]
+HAPPYHORSE_T2V_MODEL_OPTIONS = [
+    "HappyHorse 1.1 文生视频｜happyhorse-1.1-t2v",
+    "HappyHorse 1.0 文生视频｜happyhorse-1.0-t2v",
+]
+
+HAPPYHORSE_I2V_MODEL_OPTIONS = [
+    "HappyHorse 1.1 图生视频｜happyhorse-1.1-i2v",
+    "HappyHorse 1.0 图生视频｜happyhorse-1.0-i2v",
+]
+
+HAPPYHORSE_R2V_MODEL_OPTIONS = [
+    "HappyHorse 1.1 参考生视频｜happyhorse-1.1-r2v",
+    "HappyHorse 1.0 参考生视频｜happyhorse-1.0-r2v",
+]
+
+GROK_VIDEO_MODEL_OPTIONS = [
+    "Grok Video 1.0 文生/图生/多参考｜grok-video-1.0",
+    "Grok Video 1.5 单图生视频｜grok-video-1.5",
+    "旧版 Grok-Videos｜grok-videos",
+]
+
+GROK_DURATION_OPTIONS = [
+    "6秒｜6s",
+    "8秒｜8s",
+    "10秒｜10s",
+    "12秒｜12s",
+    "15秒｜15s",
+]
 
 GROK_ASPECT_OPTIONS = [
     "16:9 横屏｜16:9",
     "9:16 竖屏｜9:16",
     "1:1 方形｜1024x1024",
+]
+
+GROK_10_15_ASPECT_OPTIONS = [
+    "16:9 横屏｜16:9",
+    "9:16 竖屏｜9:16",
+    "1:1 方形｜1:1",
+]
+
+GROK_15_ASPECT_OPTIONS = [
+    "16:9 横屏｜16:9",
+    "9:16 竖屏｜9:16",
+]
+
+GROK_VIDEO_RESOLUTION_OPTIONS = [
+    "480p 标清｜480p",
+    "720p 高清｜720p",
 ]
 
 GROK_IMAGINE_VIDEO_RESOLUTION_OPTIONS = ["480p", "720p"]

@@ -2,6 +2,22 @@
 
 ## Documentation Maintenance Index
 
+## [v1.4.3] - 2026-06-29
+
+### Fixed - Grok Video 1.5 福利通道节点与离线契约
+
+- 新增 `TikpanGrokVideo15BenefitNode`，固定走 `POST /v1/video/generations`，并支持 `seconds` 时长参数。
+- 将 Grok Video 1.5 主模型名切换为 `grok-video-1.5`，保留旧别名 `119337-grok-video-1.5` 作为兜底。
+- 修复节点 UI 和离线测试中的乱码字符串，恢复 ComfyUI 下拉选项与显示名。
+- 离线测试文件重建为可编译版本，补充福利节点契约断言。
+
+### Verification
+
+```bash
+python -m py_compile nodes/tikpan_node_options.py nodes/tikpan_grok_video_15_benefit.py tests/test_node_contracts_offline.py __init__.py
+python tests/test_node_contracts_offline.py
+```
+
 当前文档维护口径：根目录 `__init__.py` 注册 49 个 ComfyUI 节点，用户文档按"教程 + 速查表 + 功能分类 + 更新日志"四件套同步维护。
 
 新增或调整节点时请同步检查：

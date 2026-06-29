@@ -32,12 +32,10 @@ from .nodes.tikpan_gpt5_mini_responses import TikpanGPT5MiniResponsesNode
 from .nodes.tikpan_grok_optimizer import TikpanGrokPromptOptimizerNode
 from .nodes.tikpan_veo_video import TikpanVeoVideoNode
 from .nodes.tikpan_gemini_omni_video import TikpanGeminiOmniVideoNode
-from .nodes.tikpan_gpt_image_node import TikpanGptImage2Node
-from .nodes.tikpan_gpt_image_2_gen import TikpanGptImage2GenNode
-from .nodes.tikpan_gpt_image_2_edit import TikpanGptImage2EditNode
 from .nodes.tikpan_gpt_image_2_official import TikpanGptImage2OfficialNode
 from .nodes.tikpan_gpt_image_2_official_edit_v2 import TikpanGptImage2OfficialEditV2
 from .nodes.tikpan_gpt_image_2_benefit import TikpanGptImage2BenefitNode
+from .nodes.tikpan_grok_video_15_benefit import TikpanGrokVideo15BenefitNode
 from .nodes.tikpan_grok_videos import TikpanGrokVideoNode
 from .nodes.tikpan_kling_motion_control import TikpanKlingMotionControlNode
 from .nodes.tikpan_vidu_video import TikpanVidu3ReferenceVideoNode, TikpanVidu3TurboVideoNode
@@ -85,14 +83,12 @@ NODE_CLASS_MAPPINGS = {
     "TikpanGemini35FlashNode": TikpanGemini35FlashNode,
     "TikpanGPT5MiniResponsesNode": TikpanGPT5MiniResponsesNode,
     "TikpanGrokPromptOptimizerNode": TikpanGrokPromptOptimizerNode,
-    "TikpanGptImage2Node": TikpanGptImage2Node,
     "TikpanVeoVideoNode": TikpanVeoVideoNode,
     "TikpanGeminiOmniVideoNode": TikpanGeminiOmniVideoNode,
-    "TikpanGptImage2GenNode": TikpanGptImage2GenNode,
-    "TikpanGptImage2EditNode": TikpanGptImage2EditNode,
     "TikpanGptImage2OfficialNode": TikpanGptImage2OfficialNode,
     "TikpanGptImage2OfficialEditV2": TikpanGptImage2OfficialEditV2,
     "TikpanGptImage2BenefitNode": TikpanGptImage2BenefitNode,
+    "TikpanGrokVideo15BenefitNode": TikpanGrokVideo15BenefitNode,
     "TikpanGrokVideoNode": TikpanGrokVideoNode,
     "TikpanKlingMotionControlNode": TikpanKlingMotionControlNode,
     "TikpanVidu3ReferenceVideoNode": TikpanVidu3ReferenceVideoNode,
@@ -120,9 +116,9 @@ NODE_CLASS_MAPPINGS = {
 
 # 3. 设置 ComfyUI 界面显示的华丽名称
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "TikpanHappyHorseI2VNode": "视频｜HappyHorse 1.0 图生视频 I2V",
-    "TikpanHappyHorseT2VNode": "视频｜HappyHorse 1.0 文生视频 T2V",
-    "TikpanHappyHorseR2VNode": "视频｜HappyHorse 1.0 参考生视频 R2V",
+    "TikpanHappyHorseI2VNode": "视频｜HappyHorse 1.1/1.0 图生视频 I2V",
+    "TikpanHappyHorseT2VNode": "视频｜HappyHorse 1.1/1.0 文生视频 T2V",
+    "TikpanHappyHorseR2VNode": "视频｜HappyHorse 1.1/1.0 参考生视频 R2V",
     "TikpanHappyHorseVideoEditNode": "视频｜HappyHorse 1.0 视频编辑",
     "TikpanExclusiveVideoNode": "视频｜Grok3 直出视频生成",
     "TikpanGrokImagineImageNode": "图片｜Grok Imagine Image 生图",
@@ -144,14 +140,12 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "TikpanGPT5MiniResponsesNode": "多模态｜GPT-5.4 Mini 推理",
     "TikpanGeminiOmniVideoNode": "视频｜Gemini Omni Flash 视频生成",
     "TikpanGrokPromptOptimizerNode": "提示词｜Grok 多图剧本重构",
-    "TikpanGptImage2Node": "图片｜GPT-Image-2-all 简易生图",
     "TikpanVeoVideoNode": "视频｜Veo 3.1 多模型视频生成",
-    "TikpanGptImage2GenNode": "图片｜GPT-Image-2-all 生图",
-    "TikpanGptImage2EditNode": "图片｜GPT-Image-2-all 修图",
     "TikpanGptImage2OfficialNode": "图片｜GPT-Image-2 官方生图",
     "TikpanGptImage2OfficialEditV2": "图片｜GPT-Image-2 官方修图 V2",
     "TikpanGptImage2BenefitNode": "图片｜GPT-Image-2 福利生图",
-    "TikpanGrokVideoNode": "视频｜Grok-Videos 视频生成",
+    "TikpanGrokVideo15BenefitNode": "福利｜Grok Video 1.5 单图生视频",
+    "TikpanGrokVideoNode": "视频｜Grok Video 1.0/1.5 视频生成",
     "TikpanKlingMotionControlNode": "视频｜Kling Motion Control 动作控制",
     "TikpanVidu3ReferenceVideoNode": "视频｜Vidu3 参考生视频",
     "TikpanVidu3TurboVideoNode": "视频｜Vidu3 Turbo 文生/图生/首尾帧",

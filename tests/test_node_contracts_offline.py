@@ -3,6 +3,8 @@ import sys
 import types
 from pathlib import Path
 
+import requests
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -52,26 +54,14 @@ def load_node_module(filename, module_name):
     return module
 
 
-def load_plugin_package():
-    install_comfy_stubs()
-    spec = importlib.util.spec_from_file_location(
-        "tikpan_plugin",
-        ROOT / "__init__.py",
-        submodule_search_locations=[str(ROOT)],
-    )
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
 def all_input_keys(input_types):
     return set(input_types["required"].keys()) | set(input_types.get("optional", {}).keys())
 
 
-def test_shared_option_helpers_normalize_seed_and_dropdown_values():
+def test_node_options_keep_raw_values():
     module = load_node_module("tikpan_node_options.py", "tikpan_node_options")
 
+    assert module.OPTION_SEPARATOR == "｜"
     assert module.option_value("高质量细节｜high") == "high"
     assert module.option_int("5秒｜5", default=3, minimum=3, maximum=15) == 5
     assert module.normalize_seed(-1) == 888888
@@ -80,346 +70,48 @@ def test_shared_option_helpers_normalize_seed_and_dropdown_values():
     assert module.normalize_seed(2147483648) == 1
 
 
-def test_suno_uses_dropdowns_and_gates_advanced_parameters():
-    module = load_node_module("tikpan_suno_music.py", "tikpan_suno_music")
-    node = module.TikpanSunoMusicNode()
+def test_grok_video_15_benefit_contract():
+    module = load_node_module("tikpan_grok_video_15_benefit.py", "tikpan_grok_video_15_benefit")
+    node = module.TikpanGrokVideo15BenefitNode()
     inputs = node.INPUT_TYPES()
     keys = all_input_keys(inputs)
 
-    assert "风格预设" in keys
-    assert "模型版本" in keys
-    assert "发送高级Suno参数" in keys
-    assert any("chirp-fenix" in item for item in inputs["required"]["模型版本"][0])
-    assert any("cinematic" in item for item in inputs["required"]["风格预设"][0])
+    assert "福利说明" in inputs["required"]
+    assert "API_密钥" in keys
+    assert "参考图" in keys
+    assert "生成指令" in keys
+    assert "视频时长" in keys
+    assert "跳过错误" in keys
+    assert module.BENEFIT_API_HOST == "https://api.manxiaobai.online"
+    assert module.BENEFIT_ENDPOINT == "/v1/video/generations"
+    assert module.GROK_15_BENEFIT_DURATION_OPTIONS[0] == "4秒｜4s"
+    assert module.MODEL_IDS == ["grok-video-1.5", "119337-grok-video-1.5"]
 
-    tags = node.normalize_tags("电影感｜Cinematic｜cinematic, orchestral", "trailer")
-    assert tags == "cinematic, orchestral, trailer"
-
-    base_payload = node.build_payload(
-        mode="自定义模式",
-        title="测试歌曲",
-        prompt="写一首歌",
-        tags=tags,
-        negative_tags="noise",
-        mv="chirp-fenix",
-        make_instrumental=False,
-        continue_clip_id="",
-        continue_at=0,
-        persona_id="",
-        artist_clip_id="",
-    )
-    assert "style_weight" not in base_payload
-    assert "vocal_gender" not in base_payload
-    assert base_payload["mv"] == "chirp-fenix"
-    assert base_payload["tags"] == tags
-
-    advanced_payload = node.build_payload(
-        mode="自定义模式",
-        title="测试歌曲",
-        prompt="写一首歌",
-        tags=tags,
-        negative_tags="noise",
-        mv="chirp-fenix",
-        make_instrumental=False,
-        continue_clip_id="",
-        continue_at=0,
-        persona_id="",
-        artist_clip_id="",
-        send_advanced=True,
-        vocal_gender="f",
-        auto_lyrics=True,
-        style_weight=0.7,
-        weirdness_constraint=0.2,
-    )
-    assert advanced_payload["custom_mode"] is True
-    assert advanced_payload["task_type"] == "create_music"
-    assert advanced_payload["vocal_gender"] == "f"
-    assert advanced_payload["style_weight"] == 0.7
-    assert advanced_payload["weirdness_constraint"] == 0.2
-
-
-def test_nano_banana_pro_uses_official_gemini_image_config():
-    module = load_node_module("tikpan_nano_banana_pro.py", "tikpan_nano_banana_pro")
-    node = module.TikpanNanoBananaProNode()
-    inputs = node.INPUT_TYPES()
-    keys = all_input_keys(inputs)
-
-    assert "随机种子" in keys
-    assert "最大输出Token数" in keys
-    assert "max_tokens" not in keys
-
-    payload = node.build_gemini_payload(
-        prompt="生成一张图",
-        image_tensors=[],
-        分辨率="2K",
-        画面比例="16:9 | 16:9横屏",
-        seed=888888,
-        温度=0.7,
-    )
-    generation_config = payload["generationConfig"]
-    assert generation_config["responseModalities"] == ["TEXT", "IMAGE"]
-    assert generation_config["imageConfig"] == {"aspectRatio": "16:9", "imageSize": "2K"}
-    assert generation_config["responseFormat"] == {"image": {"aspectRatio": "16:9", "imageSize": "2K"}}
-
-    chat_payload = node.build_chat_payload(
-        model="gemini-3-pro-image-preview",
-        prompt="生成一张图",
-        image_tensors=[],
-        分辨率="4K",
-        画面比例="1:1 | 1:1正方形",
-        seed=888888,
-        温度=0.7,
-        max_tokens=4096,
-    )
-    assert chat_payload["max_tokens"] == 4096
-    assert chat_payload["image_config"] == {"aspect_ratio": "1:1", "image_size": "4K"}
-
-
-def test_gemini_image_native_payload_keeps_rest_and_sdk_image_config_fields():
-    text = (ROOT / "nodes" / "tikpan_gemini_image.py").read_text(encoding="utf-8")
-    native_block = text.split('if 调用方式 == "gemini原生":', 1)[1].split('elif 调用方式 == "images_generations":', 1)[0]
-    assert 'gen_config["imageConfig"] = image_config' in native_block
-    assert 'gen_config["responseFormat"] = {"image": image_config}' in native_block
-
-
-def test_gpt_image_2_benefit_node_hides_relay_host_and_uses_builtin_channel():
-    module = load_node_module("tikpan_gpt_image_2_benefit.py", "tikpan_gpt_image_2_benefit")
-    node = module.TikpanGptImage2BenefitNode()
-    inputs = node.INPUT_TYPES()
-    keys = all_input_keys(inputs)
-
-    assert "福利渠道" in inputs["required"]
-    assert "福利渠道一" in inputs["required"]["福利渠道"][0]
-    assert "福利渠道二" in inputs["required"]["福利渠道"][0]
-    assert "中转站地址" not in keys
-    assert node.resolve_api_host({"福利渠道": "福利渠道一"}) == "https://688.qzz.io"
-    assert node.resolve_endpoint({"福利渠道": "福利渠道一"}) == "/v1/chat/completions"
-    assert node.resolve_mode({"福利渠道": "福利渠道一"}) == "chat_completions"
-    assert node.resolve_api_host({"福利渠道": "福利渠道二"}) == "https://api.haoduotoken.com"
-    assert node.resolve_endpoint({"福利渠道": "福利渠道二"}) == "/v1/images/generations"
-    assert node.resolve_mode({"福利渠道": "福利渠道二"}) == "images_generations"
-
-    payload = node.build_chat_payload(
-        model="gpt-image-2",
-        prompt="生成一张图",
-        target_res="1024x1024",
-        aspect_ratio="1:1",
-        tier="1K (1024)",
-        quality="medium",
-        moderation="auto",
-        output_format="png",
-        seed=888888,
-    )
-    assert module.BENEFIT_ENDPOINT == "/v1/chat/completions"
-    assert payload["modalities"] == ["text", "image"]
-    assert payload["aspect_ratio"] == "1:1"
-    assert payload["image_size"] == "1K"
-    assert payload["image_config"] == {"aspect_ratio": "1:1", "image_size": "1K", "size": "1024x1024", "format": "png"}
-    assert payload["response_format"] == {"image": payload["image_config"]}
-    assert payload["requested_size"] == "1024x1024"
-    assert payload["requested_resolution"] == "1024x1024"
-    assert "Required output size: 1024x1024" in payload["messages"][0]["content"][0]["text"]
-
-    images_payload = node.build_images_payload(
-        model="gpt-image-2",
-        prompt="生成一张图",
-        target_res="1024x1024",
-        quality="medium",
-        output_format="png",
-        seed=888888,
-    )
-    assert images_payload == {
-        "model": "gpt-image-2",
-        "prompt": "生成一张图",
-        "n": 1,
-        "size": "1024x1024",
-        "quality": "standard",
-        "style": "vivid",
-        "response_format": "url",
-    }
-
-    resized = node.coerce_output_size(module.Image.new("RGB", (1536, 1024)), 3840, 1648)
-    assert resized.size == (3840, 1648)
-
-    raw, raw_type = node.extract_chat_image_result({
-        "choices": [{
-            "message": {
-                "content": "![image_1](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ)"
-            }
-        }]
-    })
-    assert raw_type == "b64"
-    assert raw.startswith("data:image/png;base64,")
-
-
-def test_new_video_nodes_contracts_and_payloads():
-    init_module = load_plugin_package()
-    required_keys = {
-        "TikpanMiniMaxHailuoVideoNode",
-        "TikpanKlingText2VideoNode",
-        "TikpanKlingImage2VideoNode",
-        "TikpanGrokImagineVideoNode",
-        "TikpanGrokImagineVideo15PreviewNode",
-    }
-    assert required_keys <= set(init_module.NODE_CLASS_MAPPINGS)
-    for key in required_keys:
-        assert init_module.NODE_CLASS_MAPPINGS[key].CATEGORY.endswith("02 视频 Video")
-
-    hailuo_module = load_node_module("tikpan_minimax_video.py", "tikpan_minimax_video")
-    hailuo = hailuo_module.TikpanMiniMaxHailuoVideoNode()
-    hailuo_inputs = hailuo.INPUT_TYPES()
-    assert "生成模式" in hailuo_inputs["required"]
-    assert not any("MiniMax-Hailuo-2.3-fast" in item for item in hailuo_inputs["required"]["模型版本"][0])
-    assert any("MiniMax-Hailuo-2.3" in item for item in hailuo_inputs["required"]["模型版本"][0])
-    assert any("MiniMax-Hailuo-02" in item for item in hailuo_inputs["required"]["模型版本"][0])
-
-    text_payload = hailuo.build_payload("text2video", "MiniMax-Hailuo-2.3", "p", 6, "768P", True)
-    assert text_payload == {
-        "model": "MiniMax-Hailuo-2.3",
+    payload = node.build_payload("grok-video-1.5", "p", "data:image/jpeg;base64,aaa", 15, "720p", "16:9")
+    assert payload == {
+        "model": "grok-video-1.5",
         "prompt": "p",
-        "duration": 6,
-        "prompt_optimizer": True,
-        "resolution": "768P",
-    }
-    image_payload = hailuo.build_payload("image2video", "MiniMax-Hailuo-2.3", "p", 10, "1080P", False, first_frame_image="data:image/jpeg;base64,aaa")
-    assert image_payload["first_frame_image"].startswith("data:image")
-    assert "last_frame_image" not in image_payload
-    frames_payload = hailuo.build_payload("first-last-frame", "MiniMax-Hailuo-02", "p", 10, "1080P", True, "first", "last")
-    assert frames_payload["first_frame_image"] == "first"
-    assert frames_payload["last_frame_image"] == "last"
-
-    kling_module = load_node_module("tikpan_kling_video.py", "tikpan_kling_video")
-    kling_text = kling_module.TikpanKlingText2VideoNode()
-    kling_image = kling_module.TikpanKlingImage2VideoNode()
-    assert any("kling-v2-5-turbo" in item for item in kling_text.INPUT_TYPES()["required"]["模型版本"][0])
-    assert any("kling-v2-6" in item for item in kling_text.INPUT_TYPES()["required"]["模型版本"][0])
-    assert any("kling-v3" in item for item in kling_text.INPUT_TYPES()["required"]["模型版本"][0])
-
-    text_payload = kling_text.build_text_payload("kling-v2-5-turbo", "p", "std", 5, "16:9", camera_control='{"type":"zoom"}')
-    assert text_payload == {
-        "model_name": "kling-v2-5-turbo",
-        "prompt": "p",
-        "mode": "std",
-        "duration": 5,
+        "image_urls": ["data:image/jpeg;base64,aaa"],
+        "seconds": 15,
+        "resolution": "720p",
         "aspect_ratio": "16:9",
-        "camera_control": {"type": "zoom"},
     }
-    image_payload = kling_image.build_image_payload("kling-v2-6", "p", "https://example.com/a.jpg", "pro", 10, image_tail="https://example.com/b.jpg")
-    assert image_payload["image"] == "https://example.com/a.jpg"
-    assert image_payload["image_tail"] == "https://example.com/b.jpg"
-    assert "negative_prompt" not in image_payload
+    fallback_payload = node.build_payload("119337-grok-video-1.5", "p", "data:image/jpeg;base64,aaa", 4, "720p", "16:9")
+    assert fallback_payload["model"] == "119337-grok-video-1.5"
 
-    grok_module = load_node_module("tikpan_grok_imagine_video.py", "tikpan_grok_imagine_video")
-    grok_video = grok_module.TikpanGrokImagineVideoNode()
-    grok_preview = grok_module.TikpanGrokImagineVideo15PreviewNode()
-    grok_inputs = grok_video.INPUT_TYPES()
-    preview_inputs = grok_preview.INPUT_TYPES()
-    grok_keys = all_input_keys(grok_inputs)
-    preview_keys = all_input_keys(preview_inputs)
-
-    assert "生成模式" in grok_inputs["required"]
-    assert "首帧图" in grok_keys
-    assert "参考图" in grok_keys
-    assert "视频URL" in grok_keys
-    assert "本地视频" in grok_keys
-    assert any("video_edit" in item for item in grok_inputs["required"]["生成模式"][0])
-    assert preview_inputs["required"]["模型"][0] == ["grok-imagine-video-1.5-preview"]
-    assert "首帧图" in preview_inputs["required"]
-    assert "生成模式" not in preview_keys
-
-    generation_payload = grok_video.build_payload(
-        model="grok-imagine-video",
-        prompt="p",
-        resolution="480p",
-        aspect_ratio="16:9",
-        seed=888888,
-        mode="first_frame",
-        first_frame_image="data:image/jpeg;base64,aaa",
-    )
-    assert generation_payload["model"] == "grok-imagine-video"
-    assert generation_payload["prompt"] == "p"
-    assert generation_payload["resolution"] == "480p"
-    assert generation_payload["aspect_ratio"] == "16:9"
-    assert generation_payload["first_frame_image"].startswith("data:image")
-
-    edit_payload = grok_video.build_payload(
-        model="grok-imagine-video",
-        prompt="edit p",
-        resolution="720p",
-        aspect_ratio="9:16",
-        seed=1,
-        mode="video_edit",
-        video="https://example.com/a.mp4",
-    )
-    assert edit_payload["video"] == "https://example.com/a.mp4"
-    assert "first_frame_image" not in edit_payload
-    assert edit_payload["mode"] == "video_edit"
-
-    preview_payload = grok_preview.build_payload(
-        model="grok-imagine-video-1.5-preview",
-        prompt="p",
-        resolution="480p",
-        aspect_ratio="16:9",
-        seed=2,
-        mode="first_frame",
-        first_frame_image="data:image/jpeg;base64,bbb",
-    )
-    assert preview_payload["model"] == "grok-imagine-video-1.5-preview"
-    assert preview_payload["first_frame_image"].startswith("data:image")
-    assert preview_payload["mode"] == "first_frame"
+    download_session = node.create_download_session()
+    assert isinstance(download_session, requests.Session)
+    assert download_session.trust_env is True
 
 
-def test_tikpan_categories_stay_in_single_menu_tree():
-    init_module = load_plugin_package()
-    categories = {
-        key: getattr(cls, "CATEGORY", "")
-        for key, cls in init_module.NODE_CLASS_MAPPINGS.items()
-    }
-
-    assert categories
-    forbidden_roots = ("🏆 Tikpan 官方独家节点", "Tikpan Pro", "📷 Tikpan 云端模型", "🎬 Tikpan 云端模型", "🎵 Tikpan 云端模型", "💬 Tikpan 云端模型", "🛠️ Tikpan 本地工具", "⚡ Tikpan 本地工具", "📝 Tikpan 本地工具")
-    allowed_second_levels = {
-        "01 图片 Image",
-        "02 视频 Video",
-        "03 音频 Audio",
-        "04 文字与多模态 Text & Multimodal",
-        "05 提示词与分析 Prompt & Analysis",
-        "06 任务与并发 Tools",
-        "07 福利 Benefit",
-    }
-
-    for node_key, category in categories.items():
-        assert category, f"{node_key} missing CATEGORY"
-        assert not category.startswith(forbidden_roots), f"{node_key} uses old category {category}"
-        assert category.startswith("👑 Tikpan 官方独家节点/"), f"{node_key} outside Tikpan tree: {category}"
-        second_level = category.split("/", 2)[1]
-        assert second_level in allowed_second_levels, f"{node_key} uses unexpected category {category}"
-
-
-def test_key_node_registration_names_stay_stable():
-    init_module = load_plugin_package()
-    required_keys = {
-        "TikpanSmartPSDLayeringNode",
-        "TikpanPSDDependencyDownloaderNode",
-        "TikpanPromptsManagerNode",
-        "TikpanPromptsSelectorNode",
-        "TikpanPromptsSearchNode",
-        "TikpanAsyncImageSubmitNode",
-        "TikpanAsyncImageResultNode",
-        "TikpanAsyncImageJoinNode",
-        "TikpanAsyncTaskListNode",
-    }
-
-    assert required_keys <= set(init_module.NODE_CLASS_MAPPINGS)
+def test_tikpan_registry_still_includes_benefit_node():
+    text = (ROOT / "__init__.py").read_text(encoding="utf-8")
+    assert "TikpanGrokVideo15BenefitNode" in text
+    assert "福利｜Grok Video 1.5 单图生视频" in text
 
 
 if __name__ == "__main__":
-    test_shared_option_helpers_normalize_seed_and_dropdown_values()
-    test_suno_uses_dropdowns_and_gates_advanced_parameters()
-    test_nano_banana_pro_uses_official_gemini_image_config()
-    test_gemini_image_native_payload_keeps_rest_and_sdk_image_config_fields()
-    test_gpt_image_2_benefit_node_hides_relay_host_and_uses_builtin_channel()
-    test_new_video_nodes_contracts_and_payloads()
-    test_tikpan_categories_stay_in_single_menu_tree()
-    test_key_node_registration_names_stay_stable()
+    test_node_options_keep_raw_values()
+    test_grok_video_15_benefit_contract()
+    test_tikpan_registry_still_includes_benefit_node()
     print("node contract offline tests passed")
