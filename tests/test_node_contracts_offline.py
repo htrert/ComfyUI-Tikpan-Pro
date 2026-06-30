@@ -92,7 +92,7 @@ def test_grok_video_15_benefit_contract():
         "model": "grok-video-1.5",
         "prompt": "p",
         "image_urls": ["data:image/jpeg;base64,aaa"],
-        "seconds": 15,
+        "seconds": "15",
         "resolution": "720p",
         "aspect_ratio": "16:9",
     }

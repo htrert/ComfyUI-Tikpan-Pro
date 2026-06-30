@@ -165,7 +165,7 @@ class TikpanGrokVideo15BenefitNode:
             "model": model_id,
             "prompt": prompt,
             "image_urls": [image_data_url],
-            "seconds": int(duration),
+            "seconds": str(int(duration)),
             "resolution": str(resolution),
             "aspect_ratio": str(aspect_ratio),
         }

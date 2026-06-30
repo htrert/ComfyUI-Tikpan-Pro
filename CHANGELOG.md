@@ -2,6 +2,20 @@
 
 ## Documentation Maintenance Index
 
+## [v1.4.4] - 2026-06-30
+
+### Fixed - Grok Video 1.5 福利通道 seconds 字段类型
+
+- 将 `TikpanGrokVideo15BenefitNode` 的 `seconds` 改为字符串提交，修复 relay 返回 `invalid_json` / `cannot unmarshal number into Go struct field .Alias.seconds of type string`。
+- 同步更新离线契约测试，确认 `build_payload()` 输出的 `seconds` 为字符串。
+
+### Verification
+
+```bash
+python -m py_compile nodes/tikpan_grok_video_15_benefit.py tests/test_node_contracts_offline.py
+python tests/test_node_contracts_offline.py
+```
+
 ## [v1.4.3] - 2026-06-29
 
 ### Fixed - Grok Video 1.5 福利通道节点与离线契约
