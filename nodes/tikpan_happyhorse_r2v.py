@@ -41,7 +41,7 @@ from .tikpan_happyhorse_common import (
     normalize_resolution,
     video_from_path,
 )
-from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, normalize_seed, option_int, pick, VIDEO_DURATION_OPTIONS, WATERMARK_OPTIONS
+from .tikpan_node_options import API_HOST_OPTIONS, HAPPYHORSE_R2V_MODEL_OPTIONS, normalize_api_host, normalize_seed, option_int, option_value, pick, VIDEO_DURATION_OPTIONS, WATERMARK_OPTIONS
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -122,6 +122,7 @@ class TikpanHappyHorseR2VNode:
                 "💰_福利_💰": (["🔥 0.6元RMB兑1虚拟美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
                 "API_密钥": ("STRING", {"default": os.environ.get("TIKPAN_API_KEY", "sk-"), "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
+                "模型": (HAPPYHORSE_R2V_MODEL_OPTIONS, {"default": HAPPYHORSE_R2V_MODEL_OPTIONS[0], "tooltip": "选择 HappyHorse 参考生视频模型；1.1 为新版，保留 1.0 兼容旧工作流"}),
                 "生成指令": (
                     "STRING",
                     {
@@ -183,7 +184,7 @@ class TikpanHappyHorseR2VNode:
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
     CATEGORY = CATEGORY_VIDEO
-    DESCRIPTION = "📝 HappyHorse 1.0 参考生视频 R2V：最多 9 张参考图融合生成视频，保持主体一致性。适合 IP 角色短片、商品多视角动效。"
+    DESCRIPTION = "📝 HappyHorse 1.1/1.0 参考生视频 R2V：最多 9 张参考图融合生成视频，保持主体一致性。适合 IP 角色短片、商品多视角动效。"
 
     # ------------------------------------------------------------------
     # 图片处理
@@ -322,7 +323,7 @@ class TikpanHappyHorseR2VNode:
     # 任务提交
     # ------------------------------------------------------------------
 
-    def submit_task(self, session, api_key, prompt, image_urls, resolution, duration, watermark, seed):
+    def submit_task(self, session, api_key, model, prompt, image_urls, resolution, duration, watermark, seed):
         """提交异步视频生成任务"""
         base_url = getattr(self, "api_base_url", BASE_URL)
         url = f"{base_url}/alibailian/api/v1/services/aigc/video-generation/video-synthesis"
@@ -335,7 +336,7 @@ class TikpanHappyHorseR2VNode:
         media_list = [{"type": "reference", "url": u} for u in image_urls]
 
         payload = {
-            "model": "happyhorse-1.0-r2v",
+            "model": model,
             "input": {"prompt": prompt, "media": media_list},
             "parameters": {
                 "resolution": resolution,
@@ -504,6 +505,7 @@ class TikpanHappyHorseR2VNode:
             # 解析必要参数
             api_key = str(pick(kwargs, "API_密钥", "api_key", default="") or "").strip()
             self.api_base_url = normalize_api_host(pick(kwargs, "中转站地址", "api_host", default=API_HOST_OPTIONS[0]))
+            model = option_value(pick(kwargs, "模型", "model", default=HAPPYHORSE_R2V_MODEL_OPTIONS[0]), "happyhorse-1.1-r2v")
             prompt = str(pick(kwargs, "生成指令", "prompt", default="") or "").strip()
             mode = str(pick(kwargs, "执行方式", "mode", default="同步 (等待生成并下载)") or "同步 (等待生成并下载)")
             resolution = normalize_resolution(str(pick(kwargs, "清晰度", "resolution", default="1080P") or "1080P"))
@@ -537,7 +539,7 @@ class TikpanHappyHorseR2VNode:
             watermark_norm = normalize_watermark(watermark)
 
             print(f"\n{'='*60}", flush=True)
-            print("[HappyHorse-R2V] 🐴 HappyHorse 1.0 R2V 参考生视频", flush=True)
+            print(f"[HappyHorse-R2V] 🐴 HappyHorse R2V 参考生视频 | 模型: {model}", flush=True)
             print(f"[HappyHorse-R2V] 📝 {prompt[:100]}", flush=True)
             print(f"[HappyHorse-R2V] 📐 {resolution} | ⏱️ {duration}s | 水印:{'开启' if watermark_norm else '关闭'} | Seed:{seed}", flush=True)
             print(f"[HappyHorse-R2V] 🎛️ 模式: {mode}", flush=True)
@@ -556,7 +558,7 @@ class TikpanHappyHorseR2VNode:
             # 2. 提交任务 (10% → 20%)
             comfy.model_management.throw_exception_if_processing_interrupted()
             success, result = self.submit_task(
-                session, api_key, prompt, image_urls,
+                session, api_key, model, prompt, image_urls,
                 resolution, duration, watermark_norm, seed
             )
             if not success:
@@ -569,6 +571,7 @@ class TikpanHappyHorseR2VNode:
                 log = (
                     f"✅ 异步任务已提交\n"
                     f"🆔 任务 ID: {task_id}\n"
+                    f"🧠 模型: {model}\n"
                     f"📁 本地文件尚未生成，请使用「🔍 Tikpan：异步任务查询与下载」获取结果\n"
                     f"🖼️ 参考图: {len(image_urls)}张\n"
                     f"📐 分辨率: {resolution}\n"
@@ -603,6 +606,7 @@ class TikpanHappyHorseR2VNode:
             log_msg = (
                 f"✅ 视频生成成功\n"
                 f"🆔 任务 ID: {task_id}\n"
+                f"🧠 模型: {model}\n"
                 f"{'📁 本地: ' + dl_res if dl_ok else '⚠️ 下载失败: ' + dl_res}\n"
                 f"🔗 {video_url}\n"
                 f"🖼️ 参考图: {len(image_urls)}张\n"

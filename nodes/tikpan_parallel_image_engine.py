@@ -30,7 +30,6 @@ MODEL_OPTIONS = [
     "grok-imagine-image",
     "grok-imagine-image-pro",
     "gpt-image-2",
-    "gpt-image-2-all",
     "doubao-seedream-5-0-260128",
 ]
 

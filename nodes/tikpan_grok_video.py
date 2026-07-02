@@ -13,7 +13,17 @@ from PIL import Image
 import comfy.utils
 import comfy.model_management
 from .tikpan_happyhorse_common import video_from_path
-from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, normalize_seed
+from .tikpan_node_options import (
+    API_HOST_OPTIONS,
+    GROK_10_15_ASPECT_OPTIONS,
+    GROK_DURATION_OPTIONS,
+    GROK_VIDEO_MODEL_OPTIONS,
+    GROK_VIDEO_RESOLUTION_OPTIONS,
+    normalize_api_host,
+    normalize_seed,
+    option_int,
+    option_value,
+)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -28,10 +38,10 @@ class TikpanExclusiveVideoNode:
                 "Tikpan_API密钥": ("STRING", {"default": "sk-", "tooltip": "Tikpan 平台的 API 密钥，以 sk- 开头，从 https://tikpan.com 获取"}),
                 # 名字已同步为你画布上的输入名，强制连线防呆
                 "Grok3专属提示词": ("STRING", {"multiline": True, "forceInput": True, "tooltip": "Grok3 视频提示词；建议接 Grok 提示词优化节点输出"}),
-                # 🚀 10s 选项藏在这里！下拉选择它就是 10s 长视频！
-                "模型选择": (["grok-video-3", "grok-video-3-10s"], {"default": "grok-video-3", "tooltip": "grok-video-3 默认 6 秒；grok-video-3-10s 输出 10 秒长视频"}),
-                "比例": (["9:16", "16:9", "1:1", "4:3", "3:4", "21:9", "9:21"], {"default": "9:16", "tooltip": "视频比例：9:16 竖屏短视频，16:9 横屏，1:1 方屏"}),
-                "分辨率": (["1080P", "720P", "480P"], {"default": "720P", "tooltip": "视频分辨率：1080P 最清晰但更慢更贵；480P 最省"}),
+                "模型选择": (GROK_VIDEO_MODEL_OPTIONS + ["旧版 Grok Video 3｜grok-video-3", "旧版 Grok Video 3 10秒｜grok-video-3-10s"], {"default": GROK_VIDEO_MODEL_OPTIONS[0], "tooltip": "Grok 1.0 支持文生、单图和最多 7 张参考图；Grok 1.5 必须且只能 1 张参考图"}),
+                "视频时长": (GROK_DURATION_OPTIONS, {"default": "6秒｜6s", "tooltip": "Grok 1.0/1.5 支持 6/8/10/12/15 秒"}),
+                "比例": (GROK_10_15_ASPECT_OPTIONS, {"default": "9:16 竖屏｜9:16", "tooltip": "Grok 1.0 支持 16:9 / 9:16 / 1:1；Grok 1.5 仅支持 16:9 / 9:16"}),
+                "分辨率": (GROK_VIDEO_RESOLUTION_OPTIONS, {"default": GROK_VIDEO_RESOLUTION_OPTIONS[1], "tooltip": "Grok 1.0/1.5 支持 480p、720p"}),
                 "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xffffffffffffffff, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"}),
             },
             "optional": {
@@ -52,9 +62,9 @@ class TikpanExclusiveVideoNode:
     OUTPUT_NODE = True
     FUNCTION = "execute"
     CATEGORY = CATEGORY_VIDEO
-    DESCRIPTION = "📝 Grok3 直出视频生成：xAI Grok-Video-3，支持 6 秒/10 秒、1080P/720P/480P、最多 7 张参考图 + @img 锚点语法。配合 Grok 提示词优化节点效果更佳。"
+    DESCRIPTION = "📝 Grok 直出视频生成：支持 grok-video-1.0 / grok-video-1.5，时长 6/8/10/12/15 秒，480p/720p，最多 7 张参考图。配合 Grok 提示词优化节点效果更佳。"
 
-    def execute(self, 获取密钥请访问, Tikpan_API密钥, Grok3专属提示词, 模型选择, 比例, 分辨率, 随机种子=888888, **kwargs):
+    def execute(self, 获取密钥请访问, Tikpan_API密钥, Grok3专属提示词, 模型选择, 视频时长="6秒｜6s", 比例="9:16", 分辨率="720p", 随机种子=888888, **kwargs):
         comfy.model_management.throw_exception_if_processing_interrupted()
 
         if not Tikpan_API密钥 or len(Tikpan_API密钥) < 10:
@@ -62,6 +72,11 @@ class TikpanExclusiveVideoNode:
         verify_tls = bool(kwargs.get("校验HTTPS证书", True))
         api_base_url = f"{normalize_api_host(kwargs.get('中转站地址', API_HOST_OPTIONS[0]))}/v1"
         seed = normalize_seed(kwargs.get("seed", 随机种子), default=888888, maximum=2147483647)
+        model = option_value(模型选择, "grok-video-1.0")
+        duration = option_value(视频时长, "6s")
+        duration_seconds = option_int(duration, default=6, minimum=6, maximum=15)
+        aspect_ratio = option_value(比例, "9:16")
+        resolution = option_value(分辨率, "720p")
 
         headers = {"Authorization": f"Bearer {Tikpan_API密钥}", "Content-Type": "application/json"}
         session = requests.Session()
@@ -78,16 +93,33 @@ class TikpanExclusiveVideoNode:
                 p_img.save(buf, format="JPEG", quality=85)
                 imgs_b64.append(base64.b64encode(buf.getvalue()).decode("utf-8"))
 
-        # 2. 组装请求 (保持原厂底层协议绝对不变)
+        if model == "grok-video-1.5" and len(imgs_b64) != 1:
+            return ("❌ grok-video-1.5 必须且只能连接 1 张参考图", "无", "无", f"当前参考图数量: {len(imgs_b64)}", None)
+        if model == "grok-video-1.5" and aspect_ratio not in {"16:9", "9:16"}:
+            return ("❌ grok-video-1.5 仅支持 16:9 或 9:16", "无", "无", f"不支持的画面比例: {aspect_ratio}", None)
+        if model == "grok-video-1.0" and len(imgs_b64) > 1 and duration_seconds > 10:
+            return ("❌ grok-video-1.0 多参考图模式最长支持 10 秒", "无", "无", f"当前参考图数量: {len(imgs_b64)}，时长: {duration_seconds}s", None)
+
+        # 2. 组装请求
         payload = {
-            "model": 模型选择,
+            "model": model,
             "prompt": Grok3专属提示词,
-            "aspect_ratio": 比例,
-            "size": 分辨率,
+            "duration": duration_seconds if model in {"grok-video-1.0", "grok-video-1.5"} else duration,
+            "aspect_ratio": aspect_ratio,
+            "resolution": resolution,
+            "size": resolution,
             "seed": seed
         }
         if imgs_b64:
-            payload["images"] = [f"data:image/jpeg;base64,{b}" for b in imgs_b64]
+            images = [f"data:image/jpeg;base64,{b}" for b in imgs_b64]
+            if model in {"grok-video-1.0", "grok-video-1.5"}:
+                if len(images) == 1:
+                    payload["image"] = {"url": images[0]}
+                else:
+                    payload["reference_images"] = [{"url": image_url} for image_url in images]
+            else:
+                payload["images"] = images
+                payload["input_reference"] = images[0]
 
         # 3. 发起创建任务
         try:

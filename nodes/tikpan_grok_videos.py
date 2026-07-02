@@ -21,7 +21,18 @@ from .tikpan_happyhorse_common import (
     is_success_status,
     video_from_path,
 )
-from .tikpan_node_options import API_HOST_OPTIONS, normalize_api_host, GROK_ASPECT_OPTIONS, GROK_DURATION_OPTIONS, normalize_seed, option_value, pick
+from .tikpan_node_options import (
+    API_HOST_OPTIONS,
+    GROK_10_15_ASPECT_OPTIONS,
+    GROK_DURATION_OPTIONS,
+    GROK_VIDEO_MODEL_OPTIONS,
+    GROK_VIDEO_RESOLUTION_OPTIONS,
+    normalize_api_host,
+    normalize_seed,
+    option_int,
+    option_value,
+    pick,
+)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -31,14 +42,14 @@ API_BASE_URL = "https://tikpan.com/v1"
 class TikpanGrokVideoNode:
     """
     🎬 Tikpan：Grok-Videos 视频生成节点
-    模型：grok-videos
-    支持：文生视频、图生视频
-    时长：6秒、10秒
+    模型：grok-video-1.0 / grok-video-1.5 / grok-videos
+    支持：文生视频、图生视频、多参考图生视频
+    时长：6/8/10/12/15秒
     """
 
     @classmethod
     def INPUT_TYPES(cls):
-        return {
+        inputs = {
             "required": {
                 "💰_福利_💰": (["🔥 0.6元RMB兑1美元余额 | 全网底价 👉 https://tikpan.com"],),
                 "获取密钥请访问": (["👉 https://tikpan.com (官方授权Key获取点)"],),
@@ -51,30 +62,32 @@ class TikpanGrokVideoNode:
                         "tooltip": "描述你想生成的视频画面/动作/氛围，越具体越准确",
                     },
                 ),
-                "模型": (["grok-videos"], {"default": "grok-videos", "tooltip": "本节点使用的 Grok-Videos 视频模型"}),
+                "模型": (GROK_VIDEO_MODEL_OPTIONS, {"default": GROK_VIDEO_MODEL_OPTIONS[0], "tooltip": "Grok 1.0 支持文生、单图和最多 7 张参考图；Grok 1.5 必须且只能 1 张参考图"}),
                 "视频时长": (GROK_DURATION_OPTIONS, {"default": "6秒｜6s", "tooltip": "生成视频的秒数；越长越慢越贵"}),
-                "画面比例": (GROK_ASPECT_OPTIONS, {"default": "16:9 横屏｜16:9", "tooltip": "视频比例：16:9 横屏，9:16 竖屏短视频，1:1 方屏"}),
+                "分辨率": (GROK_VIDEO_RESOLUTION_OPTIONS, {"default": GROK_VIDEO_RESOLUTION_OPTIONS[1], "tooltip": "Grok 1.0/1.5 支持 480p、720p"}),
+                "画面比例": (GROK_10_15_ASPECT_OPTIONS, {"default": "16:9 横屏｜16:9", "tooltip": "Grok 1.0 支持 16:9 / 9:16 / 1:1；Grok 1.5 仅支持 16:9 / 9:16"}),
                 "随机种子": ("INT", {"default": 888888, "min": 0, "max": 0xFFFFFFFFFFFFFFFF, "tooltip": "同种子+同提示词可复现视频；改种子可换不同结果"}),
             },
             "optional": {
                 "中转站地址": (API_HOST_OPTIONS, {"default": API_HOST_OPTIONS[0], "tooltip": "Tikpan 中转站地址，一般保持默认即可"}),
-                "参考图1": ("IMAGE", {"tooltip": "可选参考图 1：图生视频时作为首帧/视觉参考"}),
-                "参考图2": ("IMAGE", {"tooltip": "可选参考图 2"}),
-                "参考图3": ("IMAGE", {"tooltip": "可选参考图 3"}),
-                "参考图4": ("IMAGE", {"tooltip": "可选参考图 4"}),
             },
         }
+        for i in range(1, 8):
+            inputs["optional"][f"参考图{i}"] = ("IMAGE", {"tooltip": f"参考图 {i}：Grok 1.0 最多 7 张；Grok 1.5 必须且只能连接 1 张"})
+        return inputs
 
     RETURN_TYPES = ("STRING", "STRING", "STRING", "VIDEO")
     RETURN_NAMES = ("📁_本地保存路径", "🎬_视频云端直链", "📄_渲染日志", "🎬_视频输出")
     OUTPUT_NODE = True
     FUNCTION = "generate_video"
     CATEGORY = CATEGORY_VIDEO
-    DESCRIPTION = "📝 Grok-Videos 视频生成：xAI 的多模式视频模型，6 秒/10 秒，支持纯文生视频或最多 4 张参考图图生视频。适合内容创作和广告短片。"
+    DESCRIPTION = "📝 Grok Video 视频生成：支持 grok-video-1.0 文生/单图/多参考图和 grok-video-1.5 单图生视频，时长 6/8/10/12/15 秒，480p/720p。适合内容创作和广告短片。"
 
     def normalize_size(self, aspect_ratio):
         s = str(aspect_ratio or "").strip()
-        if s in ["16:9", "9:16", "1024x1024"]:
+        if s in ["16:9", "9:16", "1:1", "1024x1024"]:
+            if s == "1:1":
+                return "1024x1024"
             return s
         return "16:9"
 
@@ -93,8 +106,10 @@ class TikpanGrokVideoNode:
         api_key = str(pick(kwargs, "API_密钥", "api_key", default="") or "").strip()
         api_base_url = f"{normalize_api_host(kwargs.get('中转站地址', API_HOST_OPTIONS[0]))}/v1"
         prompt = str(pick(kwargs, "生成指令", "prompt", default="") or "").strip()
-        model = pick(kwargs, "模型", "model", default="grok-videos") or "grok-videos"
+        model = option_value(pick(kwargs, "模型", "model", default=GROK_VIDEO_MODEL_OPTIONS[0]), "grok-video-1.0")
         duration = option_value(pick(kwargs, "视频时长", "duration", default="6秒｜6s"), "6s")
+        duration_seconds = option_int(duration, default=6, minimum=6, maximum=15)
+        resolution = option_value(pick(kwargs, "分辨率", "resolution", default=GROK_VIDEO_RESOLUTION_OPTIONS[1]), "720p")
         aspect_ratio = option_value(pick(kwargs, "画面比例", "aspect_ratio", default="16:9 横屏｜16:9"), "16:9")
         size = self.normalize_size(aspect_ratio)
         seed = normalize_seed(pick(kwargs, "随机种子", "seed", default=888888), default=888888)
@@ -110,11 +125,16 @@ class TikpanGrokVideoNode:
         if not duration or str(duration).strip() == "":
             duration = "6s"
 
-        print(f"[Tikpan-GrokVideo] 🚀 启动视频生成引擎 | 模型: {model} | 时长: {duration}", flush=True)
+        if model == "grok-video-1.5" and aspect_ratio not in {"16:9", "9:16"}:
+            return ("❌ grok-video-1.5 仅支持 16:9 或 9:16", "无", f"不支持的画面比例: {aspect_ratio}", None)
+        if model == "grok-video-1.0" and aspect_ratio not in {"16:9", "9:16", "1:1", "1024x1024"}:
+            return ("❌ grok-video-1.0 仅支持 16:9、9:16 或 1:1", "无", f"不支持的画面比例: {aspect_ratio}", None)
+
+        print(f"[Tikpan-GrokVideo] 🚀 启动视频生成引擎 | 模型: {model} | 时长: {duration_seconds}s | 分辨率: {resolution}", flush=True)
         print(f"[Tikpan-GrokVideo] 📐 画面比例: '{aspect_ratio}' -> size: '{size}' | Seed: {seed}", flush=True)
 
         images_b64 = []
-        for i in range(1, 5):
+        for i in range(1, 8):
             img_tensor = pick(kwargs, f"参考图{i}", f"ref_image_{i}", default=None)
             if img_tensor is not None:
                 try:
@@ -123,10 +143,17 @@ class TikpanGrokVideoNode:
                 except Exception as e:
                     print(f"[Tikpan-GrokVideo] ⚠️ 参考图_{i} 处理失败: {e}", flush=True)
 
+        if model == "grok-video-1.5" and len(images_b64) != 1:
+            return ("❌ grok-video-1.5 必须且只能连接 1 张参考图", "无", f"当前参考图数量: {len(images_b64)}", None)
+        if model == "grok-video-1.0" and len(images_b64) > 1 and duration_seconds > 10:
+            return ("❌ grok-video-1.0 多参考图模式最长支持 10 秒", "无", f"当前参考图数量: {len(images_b64)}，时长: {duration_seconds}s", None)
+
         payload = {
             "model": model,
             "prompt": prompt,
-            "duration": duration,
+            "duration": duration_seconds if model in {"grok-video-1.0", "grok-video-1.5"} else duration,
+            "resolution": resolution,
+            "aspect_ratio": "1:1" if size == "1024x1024" else size,
             "size": size,
             "seed": seed % 2147483647,
         }
@@ -134,8 +161,15 @@ class TikpanGrokVideoNode:
         print(f"[Tikpan-GrokVideo] 📤 发送Payload: {json.dumps(payload, ensure_ascii=False)}", flush=True)
 
         if images_b64:
-            payload["input_reference"] = images_b64[0]
-            print(f"[Tikpan-GrokVideo] 🖼️ 图生视频模式已启用（仅使用第1张参考图）", flush=True)
+            if model in {"grok-video-1.0", "grok-video-1.5"}:
+                if len(images_b64) == 1:
+                    payload["image"] = {"url": images_b64[0]}
+                else:
+                    payload["reference_images"] = [{"url": image_url} for image_url in images_b64]
+            else:
+                payload["input_reference"] = images_b64[0]
+                payload["images"] = images_b64
+            print(f"[Tikpan-GrokVideo] 🖼️ 图生/参考图模式已启用（{len(images_b64)} 张参考图）", flush=True)
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -236,8 +270,8 @@ class TikpanGrokVideoNode:
                         print(f"[Tikpan-GrokVideo] 💾 视频已保存到: {save_path}", flush=True)
 
                         log_text = (
-                            f"✅ 视频生成成功 | 模型: {model} | 时长: {duration} | "
-                            f"尺寸: {size} | Task ID: {task_id}"
+                            f"✅ 视频生成成功 | 模型: {model} | 时长: {duration_seconds}s | "
+                            f"分辨率: {resolution} | 尺寸: {size} | Task ID: {task_id}"
                         )
                         return (save_path, video_url, log_text, video_from_path(save_path))
 
