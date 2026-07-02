@@ -2,6 +2,24 @@
 
 ## Documentation Maintenance Index
 
+## [v1.4.4] - 2026-07-02
+
+### Added - 沧元算力独立节点目录
+
+- 新增 `08 沧元 Cangyuan` 菜单分类，固定使用 `https://ai.cangyuansuanli.cn` 中转站。
+- 新增沧元 `GPT-Image-2` 生图节点，按沧元规格将 `size` 作为画幅比例传入，并移除单模型下拉。
+- 新增沧元 Grok Video 1.5 单图生视频节点，固定 `grok-video-1.5`、`/v1/video/generations`、单参考图、480p/720p 与 16:9/9:16。
+- 新增沧元视频节点，按“一个模型一个节点”注册：`grok-video`、`veo-3-1`、`veo-3-1-fast`、`omni-fast`、`omni-fast-no-water`、`omni-v2v`、`omni-v2v-no-water` 以及 Seedance 2.0 全系列。
+- 视频节点共享沧元异步提交、轮询、下载逻辑，但每个 ComfyUI 节点固定自己的模型 ID，并只暴露该模型支持的参数和输入素材数量。
+- 按沧元 `/api/pricing` 复核模型参数：Veo 时长使用 1-30 秒整数，`grok-video` 多参考图任务按规格限制到最长 10 秒。
+
+### Verification
+
+```bash
+D:\ComfyUI-aki-v2\python\python.exe -m py_compile nodes\tikpan_categories.py nodes\tikpan_cangyuan_gpt_image_2.py nodes\tikpan_cangyuan_grok_video_15.py nodes\tikpan_cangyuan_video_models.py tests\test_node_contracts_offline.py __init__.py
+D:\ComfyUI-aki-v2\python\python.exe tests\test_node_contracts_offline.py
+```
+
 ## [v1.4.3] - 2026-06-29
 
 ### Fixed - Grok Video 1.5 福利通道节点与离线契约
