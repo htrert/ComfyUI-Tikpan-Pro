@@ -21,7 +21,7 @@ function App() {
     typeof window === "undefined" ? "workspace" : routeFromPath(window.location.pathname),
   );
   const [accountSection, setAccountSection] = useState<AccountSection>(() =>
-    typeof window !== "undefined" && window.location.pathname.startsWith("/admin") ? "admin-overview" : "assets",
+    typeof window !== "undefined" && window.location.pathname.startsWith("/admin") ? "admin-overview" : "projects",
   );
   const [templatePrompt, setTemplatePrompt] = useState("");
 

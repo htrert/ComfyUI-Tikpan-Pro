@@ -1,0 +1,18 @@
+{
+  "name": "tikpan-platform-api-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1079.0",
+    "pg": "^8.13.1"
+  },
+  "scripts": {
+    "dev": "node src/server.mjs",
+    "worker": "node src/worker.mjs",
+    "check": "node --check src/config.mjs && node --check src/secrets.mjs && node --check src/db/client.mjs && node --check src/storage/storageAdapters.mjs && node --check src/assets/mediaAssets.mjs && node --check src/providerAdapters/retry.mjs && node --check src/providerAdapters/index.mjs && node --check src/worker/taskWorker.mjs && node --check src/worker/queueWorker.mjs && node --check src/repositories/index.mjs && node --check src/repositories/assetMetadataRepository.mjs && node --check src/repositories/postgresAssetMetadataRepository.mjs && node --check src/repositories/auditRepository.mjs && node --check src/repositories/postgresAuditRepository.mjs && node --check src/repositories/mediaRepository.mjs && node --check src/repositories/postgresMediaRepository.mjs && node --check src/repositories/paymentProvidersRepository.mjs && node --check src/repositories/postgresPaymentProvidersRepository.mjs && node --check src/repositories/paymentOrdersRepository.mjs && node --check src/repositories/postgresPaymentOrdersRepository.mjs && node --check src/repositories/providerKeysRepository.mjs && node --check src/repositories/postgresProviderKeysRepository.mjs && node --check src/repositories/projectsRepository.mjs && node --check src/repositories/postgresProjectsRepository.mjs && node --check src/repositories/presetsRepository.mjs && node --check src/repositories/postgresCatalogRepository.mjs && node --check src/repositories/postgresBillingRepository.mjs && node --check src/repositories/postgresTasksRepository.mjs && node --check src/repositories/postgresApiKeysRepository.mjs && node --check src/repositories/postgresUsageRepository.mjs && node --check src/repositories/usersRepository.mjs && node --check src/repositories/postgresUsersRepository.mjs && node --check src/repositories/webhooksRepository.mjs && node --check src/repositories/postgresWebhooksRepository.mjs && node --check src/server.mjs && node --check src/worker.mjs && node --check src/store.mjs && node --check src/orchestrator.mjs && node --check scripts/check-storage.mjs && node --check scripts/check-alerts.mjs && node --check scripts/check-cangyuan-chat.mjs && node --check scripts/e2e-commercial-flow.mjs && node --check scripts/smoke-provider-key-concurrency.mjs && node scripts/check-storage.mjs && node scripts/check-db.mjs && node scripts/check-repositories.mjs && node scripts/check-alerts.mjs",
+    "e2e:commercial": "node scripts/e2e-commercial-flow.mjs",
+    "check:cangyuan": "node scripts/check-cangyuan-chat.mjs",
+    "smoke:provider-keys": "node scripts/smoke-provider-key-concurrency.mjs"
+  }
+}

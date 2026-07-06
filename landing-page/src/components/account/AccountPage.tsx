@@ -1,6 +1,7 @@
 import type { AccountSection, AppRoute, UserProfile } from "../../types";
 import { AccountSidebar } from "./AccountSidebar";
 import { AccountAssets } from "./AccountAssets";
+import { AccountProjects } from "./AccountProjects";
 import { AccountLibrary } from "./AccountLibrary";
 import { AccountPresets } from "./AccountPresets";
 import { AccountOrders } from "./AccountOrders";
@@ -24,6 +25,7 @@ export function AccountPage({ activeSection, user, onActiveSectionChange, onNavi
       <div className="mx-auto grid max-w-[1500px] gap-4 px-4 py-5 sm:px-6 lg:grid-cols-[260px_1fr] lg:py-8">
         <AccountSidebar activeSection={activeSection} user={user} onActiveSectionChange={onActiveSectionChange} />
         <section className="min-w-0">
+          {activeSection === "projects" && <AccountProjects onNavigate={onNavigate} />}
           {activeSection === "assets" && <AccountAssets user={user} onNavigate={onNavigate} />}
           {activeSection === "library" && <AccountLibrary onNavigate={onNavigate} />}
           {activeSection === "presets" && <AccountPresets />}

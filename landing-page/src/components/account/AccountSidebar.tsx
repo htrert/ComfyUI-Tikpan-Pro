@@ -1,10 +1,11 @@
-import { BookImage, GitBranch, LayoutDashboard, MonitorCog, ReceiptText, ServerCog, Settings, SlidersHorizontal, WalletCards } from "lucide-react";
+import { BookImage, FolderKanban, GitBranch, LayoutDashboard, MonitorCog, ReceiptText, ServerCog, Settings, SlidersHorizontal, WalletCards } from "lucide-react";
 import type { UserProfile } from "../../types";
 import type { AccountSection } from "../../types";
 import { cn } from "../../lib";
 import { GlassCard } from "../GlassCard";
 
 const baseSections: Array<{ key: AccountSection; label: string; icon: typeof WalletCards }> = [
+  { key: "projects", label: "Projects", icon: FolderKanban },
   { key: "assets", label: "我的资产", icon: WalletCards },
   { key: "library", label: "我的作品", icon: BookImage },
   { key: "presets", label: "创作预设", icon: SlidersHorizontal },

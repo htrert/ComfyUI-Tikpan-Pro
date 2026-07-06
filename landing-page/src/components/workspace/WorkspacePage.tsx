@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, Sparkles, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { type CreativeProject, listRemoteProjects } from "../../apiClient";
 import { capabilityTabs, creativeModels } from "../../appData";
 import type { CapabilityCategory, CreativeModel } from "../../types";
 import { cn } from "../../lib";
@@ -14,6 +15,38 @@ export function WorkspacePage({ templatePrompt }: { templatePrompt: string }) {
   const [selectedModelId, setSelectedModelId] = useState(creativeModels[0].id);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [generatedPrompt, setGeneratedPrompt] = useState("");
+  const [projects, setProjects] = useState<CreativeProject[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState(() =>
+    typeof window === "undefined" ? "" : window.localStorage.getItem("tikpan_selected_project_id") ?? "",
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProjects() {
+      try {
+        const remoteProjects = await listRemoteProjects(50);
+        if (cancelled) return;
+        setProjects(remoteProjects);
+        setSelectedProjectId((current) => {
+          if (current && remoteProjects.some((project) => project.id === current)) return current;
+          const firstProjectId = remoteProjects[0]?.id ?? "";
+          if (typeof window !== "undefined") {
+            if (firstProjectId) window.localStorage.setItem("tikpan_selected_project_id", firstProjectId);
+            else window.localStorage.removeItem("tikpan_selected_project_id");
+          }
+          return firstProjectId;
+        });
+      } catch {
+        if (!cancelled) setProjects([]);
+      }
+    }
+
+    void loadProjects();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredModels = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -34,6 +67,14 @@ export function WorkspacePage({ templatePrompt }: { templatePrompt: string }) {
   const selectModel = (model: CreativeModel) => {
     setSelectedModelId(model.id);
     setMobileSidebarOpen(false);
+  };
+
+  const selectProject = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    if (typeof window !== "undefined") {
+      if (projectId) window.localStorage.setItem("tikpan_selected_project_id", projectId);
+      else window.localStorage.removeItem("tikpan_selected_project_id");
+    }
   };
 
   const changeCategory = (nextCategory: CapabilityCategory) => {
@@ -78,7 +119,14 @@ export function WorkspacePage({ templatePrompt }: { templatePrompt: string }) {
 
           <section className="flex min-h-[calc(100vh-112px)] flex-col gap-4 pb-4 md:pb-6">
             <ResultPanel generatedPrompt={generatedPrompt} model={selectedModel} />
-            <PromptComposer initialPrompt={templatePrompt} model={selectedModel} onGenerate={setGeneratedPrompt} />
+            <PromptComposer
+              initialPrompt={templatePrompt}
+              model={selectedModel}
+              projects={projects}
+              selectedProjectId={selectedProjectId}
+              onGenerate={setGeneratedPrompt}
+              onProjectChange={selectProject}
+            />
           </section>
         </div>
       </div>

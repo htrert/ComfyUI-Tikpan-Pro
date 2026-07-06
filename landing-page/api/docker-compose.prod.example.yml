@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tikpan}
+      POSTGRES_USER: ${POSTGRES_USER:-tikpan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - tikpan_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: ${TIKPAN_API_IMAGE:?set TIKPAN_API_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${TIKPAN_API_PORT:-8787}:8787"
+    environment:
+      PORT: 8787
+      TIKPAN_STORE: postgres
+      DATABASE_URL: postgres://${POSTGRES_USER:-tikpan}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tikpan}
+      TIKPAN_WORKER_ENABLED: "false"
+      TIKPAN_PROVIDER_ADAPTER: ${TIKPAN_PROVIDER_ADAPTER:-mock}
+      TIKPAN_STORAGE_ADAPTER: ${TIKPAN_STORAGE_ADAPTER:-local}
+      TIKPAN_PROVIDER_SECRETS: ${TIKPAN_PROVIDER_SECRETS:-{}}
+      TIKPAN_ADMIN_TOKEN: ${TIKPAN_ADMIN_TOKEN:?set TIKPAN_ADMIN_TOKEN}
+      TIKPAN_SECRETS_ENCRYPTION_KEY: ${TIKPAN_SECRETS_ENCRYPTION_KEY:?set TIKPAN_SECRETS_ENCRYPTION_KEY}
+      CDN_PUBLIC_BASE_URL: ${CDN_PUBLIC_BASE_URL:-https://cdn.example.com}
+      OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-}
+      OBJECT_STORAGE_ACCESS_KEY_ID: ${OBJECT_STORAGE_ACCESS_KEY_ID:-}
+      OBJECT_STORAGE_SECRET_ACCESS_KEY: ${OBJECT_STORAGE_SECRET_ACCESS_KEY:-}
+      OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-auto}
+      OBJECT_STORAGE_FORCE_PATH_STYLE: ${OBJECT_STORAGE_FORCE_PATH_STYLE:-true}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health/readiness').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    image: ${TIKPAN_API_IMAGE:?set TIKPAN_API_IMAGE}
+    restart: unless-stopped
+    command: ["node", "src/worker.mjs"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TIKPAN_STORE: postgres
+      DATABASE_URL: postgres://${POSTGRES_USER:-tikpan}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tikpan}
+      TIKPAN_PROVIDER_ADAPTER: ${TIKPAN_PROVIDER_ADAPTER:-mock}
+      TIKPAN_STORAGE_ADAPTER: ${TIKPAN_STORAGE_ADAPTER:-local}
+      TIKPAN_PROVIDER_SECRETS: ${TIKPAN_PROVIDER_SECRETS:-{}}
+      TIKPAN_SECRETS_ENCRYPTION_KEY: ${TIKPAN_SECRETS_ENCRYPTION_KEY:?set TIKPAN_SECRETS_ENCRYPTION_KEY}
+      TIKPAN_WORKER_ID: ${TIKPAN_WORKER_ID:-worker-1}
+      TIKPAN_WORKER_POLL_INTERVAL_MS: ${TIKPAN_WORKER_POLL_INTERVAL_MS:-750}
+      TIKPAN_WORKER_LOCK_TTL_MS: ${TIKPAN_WORKER_LOCK_TTL_MS:-120000}
+      CDN_PUBLIC_BASE_URL: ${CDN_PUBLIC_BASE_URL:-https://cdn.example.com}
+      OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-}
+      OBJECT_STORAGE_ACCESS_KEY_ID: ${OBJECT_STORAGE_ACCESS_KEY_ID:-}
+      OBJECT_STORAGE_SECRET_ACCESS_KEY: ${OBJECT_STORAGE_SECRET_ACCESS_KEY:-}
+      OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-auto}
+      OBJECT_STORAGE_FORCE_PATH_STYLE: ${OBJECT_STORAGE_FORCE_PATH_STYLE:-true}
+
+volumes:
+  tikpan_pgdata:

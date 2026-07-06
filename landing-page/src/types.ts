@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 export type AppRoute = "workspace" | "explore" | "account" | "admin";
 
 export type AccountSection =
+  | "projects"
   | "assets"
   | "library"
   | "presets"

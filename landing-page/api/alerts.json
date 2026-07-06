@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "channels": {
+    "default": ["in_app"],
+    "critical": ["in_app", "email", "feishu"]
+  },
+  "rules": [
+    {
+      "id": "provider_key_consecutive_failures",
+      "name": "ProviderKey consecutive failures",
+      "severity": "warning",
+      "metric": "provider_key.consecutive_failures",
+      "operator": ">=",
+      "threshold": 3,
+      "window": "10m",
+      "channels": ["in_app", "feishu"],
+      "runbook": "docs/FAILURE_HANDLING.md#provider-error-policy"
+    },
+    {
+      "id": "provider_key_auth_failed",
+      "name": "ProviderKey auth failure",
+      "severity": "critical",
+      "metric": "provider_key.auth_failed",
+      "operator": ">=",
+      "threshold": 1,
+      "window": "5m",
+      "channels": ["in_app", "email", "feishu"],
+      "runbook": "docs/FAILURE_HANDLING.md#provider-error-policy"
+    },
+    {
+      "id": "channel_success_rate_low",
+      "name": "Channel success rate low",
+      "severity": "warning",
+      "metric": "channel.success_rate",
+      "operator": "<",
+      "threshold": 0.9,
+      "window": "15m",
+      "channels": ["in_app", "feishu"],
+      "runbook": "docs/ROUTING_STRATEGY.md#channel-health"
+    },
+    {
+      "id": "channel_latency_high",
+      "name": "Channel latency high",
+      "severity": "warning",
+      "metric": "channel.p95_latency_ms",
+      "operator": ">",
+      "threshold": 120000,
+      "window": "15m",
+      "channels": ["in_app", "feishu"],
+      "runbook": "docs/ROUTING_STRATEGY.md#channel-health"
+    },
+    {
+      "id": "task_queue_backlog",
+      "name": "Task queue backlog",
+      "severity": "warning",
+      "metric": "task.queue_depth",
+      "operator": ">",
+      "threshold": 100,
+      "window": "5m",
+      "channels": ["in_app", "feishu"],
+      "runbook": "docs/STATE_MACHINES.md#task"
+    },
+    {
+      "id": "refund_rate_high",
+      "name": "Refund rate high",
+      "severity": "warning",
+      "metric": "billing.refund_rate",
+      "operator": ">",
+      "threshold": 0.05,
+      "window": "30m",
+      "channels": ["in_app", "feishu"],
+      "runbook": "docs/FAILURE_HANDLING.md#wallet-failure-policy"
+    },
+    {
+      "id": "wallet_settlement_failure",
+      "name": "Wallet settlement failure",
+      "severity": "critical",
+      "metric": "billing.settlement_failures",
+      "operator": ">=",
+      "threshold": 1,
+      "window": "5m",
+      "channels": ["in_app", "email", "feishu"],
+      "runbook": "docs/FAILURE_HANDLING.md#wallet-failure-policy"
+    },
+    {
+      "id": "database_not_ready",
+      "name": "Database readiness failed",
+      "severity": "critical",
+      "metric": "database.ready",
+      "operator": "==",
+      "threshold": 0,
+      "window": "1m",
+      "channels": ["in_app", "email", "feishu"],
+      "runbook": "DEPLOYMENT.md"
+    },
+    {
+      "id": "provider_key_lease_reclaimed",
+      "name": "ProviderKey lease reclaimed",
+      "severity": "info",
+      "metric": "provider_key.lease_reclaimed",
+      "operator": ">=",
+      "threshold": 1,
+      "window": "10m",
+      "channels": ["in_app"],
+      "runbook": "docs/FAILURE_HANDLING.md#providerkey-lease-failure-policy"
+    }
+  ]
+}

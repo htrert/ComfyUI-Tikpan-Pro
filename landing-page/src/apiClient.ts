@@ -86,6 +86,8 @@ export type RemoteTaskRecord = {
   batch_id?: string | null;
   batch_title?: string | null;
   batch_item_id?: string | null;
+  project_id?: string | null;
+  project_name?: string | null;
   input?: StudioInput;
   route_mode?: RouteMode;
   progress?: number;
@@ -248,6 +250,14 @@ type GenerationAssetsResponse = {
 
 type GenerationAssetResponse = {
   data: GenerationAsset;
+};
+
+type CreativeProjectsResponse = {
+  data: CreativeProject[];
+};
+
+type CreativeProjectResponse = {
+  data: CreativeProject;
 };
 
 type PaymentOrderConfirmResponse = {
@@ -776,6 +786,8 @@ export type CreativePresetInput = {
 export type GenerationAsset = {
   id: string;
   task_id: string;
+  project_id?: string | null;
+  project_name?: string | null;
   model: string;
   model_name: string;
   modality: PlatformModel["modality"];
@@ -812,6 +824,52 @@ export type GenerationAssetPatch = {
   review_status?: GenerationAsset["review_status"];
   tags?: string[];
   collections?: string[];
+};
+
+export type ManualProjectAssetInput = {
+  title: string;
+  source_url: string;
+  mime_type: string;
+  tags?: string[];
+  note?: string;
+};
+
+export type CreativeProjectStats = {
+  tasks_total: number;
+  tasks_completed: number;
+  tasks_failed: number;
+  tasks_active: number;
+  assets_total: number;
+  token_spend: number;
+};
+
+export type CreativeProject = {
+  id: string;
+  user_id: string;
+  name: string;
+  type: "general" | "image_campaign" | "video_storyboard" | "audio_album" | "agent_workspace";
+  status: "draft" | "active" | "archived";
+  description: string;
+  cover_url: string | null;
+  tags: string[];
+  settings: Record<string, unknown>;
+  stats: CreativeProjectStats;
+  tasks?: RemoteTaskRecord[];
+  assets?: GenerationAsset[];
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+};
+
+export type CreativeProjectInput = {
+  id?: string;
+  name: string;
+  type?: CreativeProject["type"];
+  status?: CreativeProject["status"];
+  description?: string;
+  cover_url?: string | null;
+  tags?: string[];
+  settings?: Record<string, unknown>;
 };
 
 export type UserSessionInput = {
@@ -1278,11 +1336,13 @@ export async function quoteRemoteTask({
 export async function createRemoteTask({
   model,
   input,
+  projectId,
   routeMode,
   apiKey,
 }: {
   model: PlatformModel;
   input: StudioInput;
+  projectId?: string | null;
   routeMode: RouteMode;
   apiKey?: string | null;
 }): Promise<OrchestratedTask> {
@@ -1294,6 +1354,7 @@ export async function createRemoteTask({
     body: JSON.stringify({
       model: model.id,
       input,
+      project_id: projectId || undefined,
       routing: {
         mode: routeMode,
       },
@@ -1312,10 +1373,12 @@ export async function createRemoteTask({
 export async function createRemoteTaskBatch({
   apiKey,
   items,
+  projectId,
   title,
 }: {
   apiKey?: string | null;
   items: RemoteTaskBatchInputItem[];
+  projectId?: string | null;
   title?: string;
 }): Promise<RemoteTaskBatchResult> {
   const response = await fetch(`${apiBaseUrl}/v1/task-batches`, {
@@ -1325,6 +1388,7 @@ export async function createRemoteTaskBatch({
     }),
     body: JSON.stringify({
       title,
+      project_id: projectId || undefined,
       items: items.map((item) => ({
         id: item.id,
         model: item.model.id,
@@ -2539,6 +2603,76 @@ export async function listRemoteAssets(limit = 50, options: ApiAuthOptions = {})
   return (payload as GenerationAssetsResponse).data;
 }
 
+export async function listRemoteProjects(limit = 50, options: ApiAuthOptions = {}): Promise<CreativeProject[]> {
+  const response = await fetch(`${apiBaseUrl}/v1/projects?limit=${encodeURIComponent(String(limit))}`, {
+    headers: apiHeaders(options.apiKey),
+  });
+  const payload = (await response.json()) as CreativeProjectsResponse | ProblemDetails;
+
+  if (!response.ok) {
+    throw new Error(formatProblem(payload as ProblemDetails));
+  }
+
+  return (payload as CreativeProjectsResponse).data;
+}
+
+export async function getRemoteProject(projectId: string, options: ApiAuthOptions = {}): Promise<CreativeProject> {
+  const response = await fetch(`${apiBaseUrl}/v1/projects/${encodeURIComponent(projectId)}`, {
+    headers: apiHeaders(options.apiKey),
+  });
+  const payload = (await response.json()) as CreativeProjectResponse | ProblemDetails;
+
+  if (!response.ok) {
+    throw new Error(formatProblem(payload as ProblemDetails));
+  }
+
+  return (payload as CreativeProjectResponse).data;
+}
+
+export async function saveRemoteProject(
+  input: CreativeProjectInput,
+  options: ApiAuthOptions = {},
+): Promise<CreativeProject> {
+  const response = await fetch(
+    input.id ? `${apiBaseUrl}/v1/projects/${encodeURIComponent(input.id)}` : `${apiBaseUrl}/v1/projects`,
+    {
+      method: input.id ? "PATCH" : "POST",
+      headers: apiHeaders(options.apiKey, {
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify(input),
+    },
+  );
+  const payload = (await response.json()) as CreativeProjectResponse | ProblemDetails;
+
+  if (!response.ok) {
+    throw new Error(formatProblem(payload as ProblemDetails));
+  }
+
+  return (payload as CreativeProjectResponse).data;
+}
+
+export async function createRemoteProjectAsset(
+  projectId: string,
+  input: ManualProjectAssetInput,
+  options: ApiAuthOptions = {},
+): Promise<GenerationAsset> {
+  const response = await fetch(`${apiBaseUrl}/v1/projects/${encodeURIComponent(projectId)}/assets`, {
+    method: "POST",
+    headers: apiHeaders(options.apiKey, {
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify(input),
+  });
+  const payload = (await response.json()) as GenerationAssetResponse | ProblemDetails;
+
+  if (!response.ok) {
+    throw new Error(formatProblem(payload as ProblemDetails));
+  }
+
+  return (payload as GenerationAssetResponse).data;
+}
+
 export async function updateRemoteAsset(
   taskId: string,
   patch: GenerationAssetPatch,
@@ -2601,7 +2735,8 @@ function mapApiTaskToPreview(
   previousTask?: OrchestratedTask,
 ): OrchestratedTask {
   const task = response.data;
-  const failed = task.status === "failed";
+  const terminal = isTerminalTaskStatus(task.status);
+  const failed = isFailedTaskStatus(task.status);
   const outputUrls = task.output?.publicUrls ?? task.output?.public_urls ?? previousTask?.lifecycle?.outputUrls;
   const routeReason =
     task.internal?.route_score?.[0]?.reasons?.join("；") ??
@@ -2615,10 +2750,10 @@ function mapApiTaskToPreview(
     routeMode,
     lifecycle: {
       apiStatus: task.status,
-      progress: task.progress ?? previousTask?.lifecycle?.progress ?? (task.status === "completed" ? 100 : 0),
+      progress: task.progress ?? previousTask?.lifecycle?.progress ?? (isSucceededTaskStatus(task.status) ? 100 : 0),
       currentStep: task.current_step ?? previousTask?.lifecycle?.currentStep ?? null,
       outputUrls,
-      isTerminal: ["completed", "failed", "cancelled", "expired"].includes(task.status),
+      isTerminal: terminal,
     },
     worker: task.worker
       ? {
@@ -2647,6 +2782,18 @@ function mapApiTaskToPreview(
       attempts: mapApiAttempts(task.attempts) ?? previousTask?.internal.attempts,
     },
   };
+}
+
+function isSucceededTaskStatus(status: string) {
+  return status === "completed" || status === "succeeded";
+}
+
+function isFailedTaskStatus(status: string) {
+  return ["failed", "cancelled", "canceled", "expired", "refunded"].includes(status);
+}
+
+function isTerminalTaskStatus(status: string) {
+  return isSucceededTaskStatus(status) || isFailedTaskStatus(status);
 }
 
 function mapApiAttempts(attempts: ApiTaskResponse["data"]["attempts"]): TaskAttempt[] | undefined {
