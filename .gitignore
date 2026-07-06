@@ -3,14 +3,28 @@ __pycache__/
 
 recovery/
 tmp_test_output/
+release_build/
 
-# web_app 和 experiments 已迁移到独立仓库，不在此追踪
+# Frontend / local runtime output
+node_modules/
+dist/
+*.log
+*.tsbuildinfo
+
+# Local browser research screenshots and generated working notes
+chrome-*.png
+DESIGN.md
+
+# Local operator tools that are not part of the ComfyUI node package
+tools/
+
+# Standalone local repositories; keep them on disk but not in this parent repo.
 web_app/
 experiments/
 
 docs/assets/wechat-cover-v1.0.1.png
 
-# 飞书同步脚本相关 - 含 App Secret 等敏感凭证，绝不提交
+# Feishu / WeChat sync secrets and caches
 .feishu_config.json
 *.feishu_config.json
 .wechat_config.json
@@ -18,7 +32,7 @@ docs/assets/wechat-cover-v1.0.1.png
 .feishu/
 feishu_token_cache.json
 
-# 通用敏感文件保护
+# Generic sensitive files
 .env
 .env.*
 !.env.example
