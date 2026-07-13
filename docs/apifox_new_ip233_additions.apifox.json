@@ -1,0 +1,2267 @@
+{
+  "apifoxProject": "1.0.0",
+  "$schema": {
+    "app": "apifox",
+    "type": "project",
+    "version": "1.2.0"
+  },
+  "info": {
+    "name": "??????? API?????",
+    "description": "??????? API??????? {{baseUrl}}???????????"
+  },
+  "projectSetting": {},
+  "apiCollection": [
+    {
+      "name": "???",
+      "id": 45008032,
+      "auth": {
+        "type": "bearer",
+        "bearer": {
+          "token": "{{YOUR_API_KEY}}"
+        }
+      },
+      "securityScheme": {},
+      "parentId": 0,
+      "serverId": "",
+      "description": "???????????? API ? Apifox ???????????????????",
+      "identityPattern": {
+        "httpApi": {
+          "type": "methodAndPath",
+          "bodyType": ""
+        }
+      },
+      "shareSettings": {},
+      "visibility": "SHARED",
+      "moduleId": 2102810,
+      "preProcessors": [
+        {
+          "id": "inheritProcessors",
+          "type": "inheritProcessors",
+          "data": {}
+        }
+      ],
+      "postProcessors": [
+        {
+          "id": "inheritProcessors",
+          "type": "inheritProcessors",
+          "data": {}
+        }
+      ],
+      "inheritPostProcessors": {},
+      "inheritPreProcessors": {},
+      "items": [
+        {
+          "name": "????",
+          "id": 910000001,
+          "auth": {},
+          "securityScheme": {},
+          "parentId": 0,
+          "serverId": "",
+          "description": "",
+          "identityPattern": {
+            "httpApi": {
+              "type": "inherit",
+              "bodyType": "",
+              "fields": []
+            }
+          },
+          "shareSettings": {},
+          "visibility": "INHERITED",
+          "moduleId": 2102810,
+          "preProcessors": [
+            {
+              "id": "inheritProcessors",
+              "type": "inheritProcessors",
+              "data": {}
+            }
+          ],
+          "postProcessors": [
+            {
+              "id": "inheritProcessors",
+              "type": "inheritProcessors",
+              "data": {}
+            }
+          ],
+          "inheritPostProcessors": {},
+          "inheritPreProcessors": {},
+          "items": [
+            {
+              "name": "GPT Image-2-C",
+              "id": 910000002,
+              "auth": {},
+              "securityScheme": {},
+              "parentId": 910000001,
+              "serverId": "",
+              "description": "",
+              "identityPattern": {
+                "httpApi": {
+                  "type": "inherit",
+                  "bodyType": "",
+                  "fields": []
+                }
+              },
+              "shareSettings": {},
+              "visibility": "INHERITED",
+              "moduleId": 2102810,
+              "preProcessors": [
+                {
+                  "id": "inheritProcessors",
+                  "type": "inheritProcessors",
+                  "data": {}
+                }
+              ],
+              "postProcessors": [
+                {
+                  "id": "inheritProcessors",
+                  "type": "inheritProcessors",
+                  "data": {}
+                }
+              ],
+              "inheritPostProcessors": {},
+              "inheritPreProcessors": {},
+              "items": [
+                {
+                  "name": "???? gpt-image-2-c",
+                  "api": {
+                    "id": "900000005",
+                    "type": "http",
+                    "name": null,
+                    "method": "post",
+                    "path": "/v1/images/generations",
+                    "description": "?? gpt-image-2-all ??????????????? gpt-image-2-c???????????? {{baseUrl}}???????????",
+                    "status": "released",
+                    "serverId": "",
+                    "moduleId": 2102810,
+                    "auth": {},
+                    "securityScheme": {},
+                    "tags": [],
+                    "visibility": "INHERITED",
+                    "operationId": "",
+                    "sourceUrl": "",
+                    "oasExtensions": "",
+                    "customApiFields": {},
+                    "commonParameters": {},
+                    "commonResponseStatus": {},
+                    "advancedSettings": {},
+                    "mockScript": {},
+                    "mocks": [],
+                    "cases": [],
+                    "codeSamples": [],
+                    "preProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "postProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "inheritPostProcessors": {},
+                    "inheritPreProcessors": {},
+                    "requestBody": {
+                      "type": "application/json",
+                      "parameters": [],
+                      "jsonSchema": {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string",
+                            "description": "??? gpt-image-2-c",
+                            "enum": [
+                              "gpt-image-2-c"
+                            ]
+                          },
+                          "prompt": {
+                            "type": "string",
+                            "description": "???"
+                          },
+                          "size": {
+                            "type": "string",
+                            "description": "??????? 1024x1024?1536x1024?1024x1536"
+                          },
+                          "n": {
+                            "type": "integer",
+                            "description": "????",
+                            "minimum": 1,
+                            "maximum": 10
+                          },
+                          "image": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "???? URL ?????? gpt-image-2-all ??"
+                          },
+                          "response_format": {
+                            "type": "string",
+                            "enum": [
+                              "url",
+                              "b64_json"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "model",
+                          "prompt"
+                        ],
+                        "x-apifox-orders": [
+                          "model",
+                          "prompt",
+                          "size",
+                          "n",
+                          "image",
+                          "response_format"
+                        ]
+                      },
+                      "required": true,
+                      "mediaType": "",
+                      "examples": [
+                        {
+                          "name": "????",
+                          "value": "{\n    \"model\": \"gpt-image-2-c\",\n    \"prompt\": \"???????\",\n    \"size\": \"1024x1024\",\n    \"n\": 1\n}",
+                          "mediaType": "application/json"
+                        },
+                        {
+                          "name": "????",
+                          "value": "{\n    \"model\": \"gpt-image-2-c\",\n    \"prompt\": \"???????????????\",\n    \"size\": \"1536x1024\",\n    \"n\": 1,\n    \"image\": [\n        \"https://example.com/reference-a.png\",\n        \"https://example.com/reference-b.png\"\n    ]\n}",
+                          "mediaType": "application/json"
+                        }
+                      ],
+                      "oasExtensions": ""
+                    },
+                    "parameters": {
+                      "query": [],
+                      "path": [],
+                      "cookie": [],
+                      "header": [
+                        {
+                          "id": "900000002",
+                          "name": "Content-Type",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000003",
+                          "name": "Accept",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000004",
+                          "name": "Authorization",
+                          "required": false,
+                          "description": "API Key",
+                          "example": "Bearer {{apiKey}}",
+                          "type": "string",
+                          "enable": true
+                        }
+                      ]
+                    },
+                    "responses": [
+                      {
+                        "id": "900000001",
+                        "code": 200,
+                        "name": "??",
+                        "headers": [],
+                        "jsonSchema": {
+                          "type": "object",
+                          "properties": {
+                            "created": {
+                              "type": "integer"
+                            },
+                            "data": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "url": {
+                                    "type": "string"
+                                  },
+                                  "b64_json": {
+                                    "type": "string"
+                                  },
+                                  "revised_prompt": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "required": [
+                            "created",
+                            "data"
+                          ],
+                          "x-apifox-orders": [
+                            "created",
+                            "data"
+                          ]
+                        },
+                        "itemSchema": {},
+                        "description": "",
+                        "contentType": "json",
+                        "mediaType": "",
+                        "oasExtensions": ""
+                      }
+                    ],
+                    "responseChildren": [],
+                    "responseExamples": [
+                      {
+                        "name": "????",
+                        "data": "{\n    \"created\": 1776909189,\n    \"data\": [\n        {\n            \"url\": \"https://example.com/generated.webp\",\n            \"revised_prompt\": \"\"\n        }\n    ]\n}",
+                        "responseId": "900000001",
+                        "description": "",
+                        "oasKey": "",
+                        "oasExtensions": ""
+                      }
+                    ]
+                  }
+                },
+                {
+                  "name": "???? gpt-image-2-c",
+                  "api": {
+                    "id": "900000010",
+                    "type": "http",
+                    "name": null,
+                    "method": "post",
+                    "path": "/v1/chat/completions",
+                    "description": "?? gpt-image-2-all ?????????????? messages.content ?? image_url data URI ? URL ???",
+                    "status": "released",
+                    "serverId": "",
+                    "moduleId": 2102810,
+                    "auth": {},
+                    "securityScheme": {},
+                    "tags": [],
+                    "visibility": "INHERITED",
+                    "operationId": "",
+                    "sourceUrl": "",
+                    "oasExtensions": "",
+                    "customApiFields": {},
+                    "commonParameters": {},
+                    "commonResponseStatus": {},
+                    "advancedSettings": {},
+                    "mockScript": {},
+                    "mocks": [],
+                    "cases": [],
+                    "codeSamples": [],
+                    "preProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "postProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "inheritPostProcessors": {},
+                    "inheritPreProcessors": {},
+                    "requestBody": {
+                      "type": "application/json",
+                      "parameters": [],
+                      "jsonSchema": {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string",
+                            "description": "??? gpt-image-2-c",
+                            "enum": [
+                              "gpt-image-2-c"
+                            ]
+                          },
+                          "messages": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            },
+                            "description": "OpenAI chat ?????content ???? text ? image_url"
+                          },
+                          "size": {
+                            "type": "string",
+                            "description": "????"
+                          },
+                          "quality": {
+                            "type": "string",
+                            "description": "????"
+                          }
+                        },
+                        "required": [
+                          "model",
+                          "messages"
+                        ],
+                        "x-apifox-orders": [
+                          "model",
+                          "messages",
+                          "size",
+                          "quality"
+                        ]
+                      },
+                      "required": true,
+                      "mediaType": "",
+                      "examples": [
+                        {
+                          "name": "??",
+                          "value": "{\n    \"model\": \"gpt-image-2-c\",\n    \"messages\": [\n        {\n            \"role\": \"user\",\n            \"content\": [\n                {\n                    \"type\": \"text\",\n                    \"text\": \"??????????????\"\n                },\n                {\n                    \"type\": \"image_url\",\n                    \"image_url\": {\n                        \"url\": \"data:image/png;base64,{{base64Image}}\"\n                    }\n                }\n            ]\n        }\n    ],\n    \"size\": \"1024x1024\",\n    \"quality\": \"hd\"\n}",
+                          "mediaType": "application/json"
+                        }
+                      ],
+                      "oasExtensions": ""
+                    },
+                    "parameters": {
+                      "query": [],
+                      "path": [],
+                      "cookie": [],
+                      "header": [
+                        {
+                          "id": "900000007",
+                          "name": "Content-Type",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000008",
+                          "name": "Accept",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000009",
+                          "name": "Authorization",
+                          "required": false,
+                          "description": "API Key",
+                          "example": "Bearer {{apiKey}}",
+                          "type": "string",
+                          "enable": true
+                        }
+                      ]
+                    },
+                    "responses": [
+                      {
+                        "id": "900000006",
+                        "code": 200,
+                        "name": "??",
+                        "headers": [],
+                        "jsonSchema": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "itemSchema": {},
+                        "description": "",
+                        "contentType": "json",
+                        "mediaType": "",
+                        "oasExtensions": ""
+                      }
+                    ],
+                    "responseChildren": [],
+                    "responseExamples": [
+                      {
+                        "name": "????",
+                        "data": "{\n    \"id\": \"chatcmpl-example\",\n    \"object\": \"chat.completion\",\n    \"model\": \"gpt-image-2-c\",\n    \"choices\": []\n}",
+                        "responseId": "900000006",
+                        "description": "",
+                        "oasKey": "",
+                        "oasExtensions": ""
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "????",
+          "id": 910000010,
+          "auth": {},
+          "securityScheme": {},
+          "parentId": 0,
+          "serverId": "",
+          "description": "",
+          "identityPattern": {
+            "httpApi": {
+              "type": "inherit",
+              "bodyType": "",
+              "fields": []
+            }
+          },
+          "shareSettings": {},
+          "visibility": "INHERITED",
+          "moduleId": 2102810,
+          "preProcessors": [
+            {
+              "id": "inheritProcessors",
+              "type": "inheritProcessors",
+              "data": {}
+            }
+          ],
+          "postProcessors": [
+            {
+              "id": "inheritProcessors",
+              "type": "inheritProcessors",
+              "data": {}
+            }
+          ],
+          "inheritPostProcessors": {},
+          "inheritPreProcessors": {},
+          "items": [
+            {
+              "name": "Grok Video",
+              "id": 910000011,
+              "auth": {},
+              "securityScheme": {},
+              "parentId": 910000010,
+              "serverId": "",
+              "description": "",
+              "identityPattern": {
+                "httpApi": {
+                  "type": "inherit",
+                  "bodyType": "",
+                  "fields": []
+                }
+              },
+              "shareSettings": {},
+              "visibility": "INHERITED",
+              "moduleId": 2102810,
+              "preProcessors": [
+                {
+                  "id": "inheritProcessors",
+                  "type": "inheritProcessors",
+                  "data": {}
+                }
+              ],
+              "postProcessors": [
+                {
+                  "id": "inheritProcessors",
+                  "type": "inheritProcessors",
+                  "data": {}
+                }
+              ],
+              "inheritPostProcessors": {},
+              "inheritPreProcessors": {},
+              "items": [
+                {
+                  "name": "???? grok-video / grok-video-1.5",
+                  "api": {
+                    "id": "900000015",
+                    "type": "http",
+                    "name": null,
+                    "method": "post",
+                    "path": "/v1/video/generations",
+                    "description": "grok-video ?????????????grok-video-1.5 ????? 1 ??????? 16:9 / 9:16 ? 480p / 720p?",
+                    "status": "released",
+                    "serverId": "",
+                    "moduleId": 2102810,
+                    "auth": {},
+                    "securityScheme": {},
+                    "tags": [],
+                    "visibility": "INHERITED",
+                    "operationId": "",
+                    "sourceUrl": "",
+                    "oasExtensions": "",
+                    "customApiFields": {},
+                    "commonParameters": {},
+                    "commonResponseStatus": {},
+                    "advancedSettings": {},
+                    "mockScript": {},
+                    "mocks": [],
+                    "cases": [],
+                    "codeSamples": [],
+                    "preProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "postProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "inheritPostProcessors": {},
+                    "inheritPreProcessors": {},
+                    "requestBody": {
+                      "type": "application/json",
+                      "parameters": [],
+                      "jsonSchema": {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string",
+                            "enum": [
+                              "grok-video",
+                              "grok-video-1.5"
+                            ]
+                          },
+                          "prompt": {
+                            "type": "string",
+                            "description": "???"
+                          },
+                          "seconds": {
+                            "type": "integer",
+                            "description": "?????grok-video-1.5 ?? 4/6/8/10/12/15 ?"
+                          },
+                          "resolution": {
+                            "type": "string",
+                            "enum": [
+                              "480p",
+                              "720p"
+                            ]
+                          },
+                          "aspect_ratio": {
+                            "type": "string",
+                            "enum": [
+                              "16:9",
+                              "9:16"
+                            ]
+                          },
+                          "image_urls": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "???? URL?grok-video-1.5 ????? 1 ?"
+                          }
+                        },
+                        "required": [
+                          "model",
+                          "prompt"
+                        ],
+                        "x-apifox-orders": [
+                          "model",
+                          "prompt",
+                          "seconds",
+                          "resolution",
+                          "aspect_ratio",
+                          "image_urls"
+                        ]
+                      },
+                      "required": true,
+                      "mediaType": "",
+                      "examples": [
+                        {
+                          "name": "grok-video",
+                          "value": "{\n    \"model\": \"grok-video\",\n    \"prompt\": \"A cinematic shot of a red sports car driving through rainy neon streets at night\",\n    \"seconds\": 6,\n    \"resolution\": \"720p\",\n    \"aspect_ratio\": \"16:9\",\n    \"image_urls\": [\n        \"https://example.com/reference.png\"\n    ]\n}",
+                          "mediaType": "application/json"
+                        },
+                        {
+                          "name": "grok-video-1.5",
+                          "value": "{\n    \"model\": \"grok-video-1.5\",\n    \"prompt\": \"Gentle camera push-in, water flowing\",\n    \"seconds\": 4,\n    \"resolution\": \"720p\",\n    \"aspect_ratio\": \"16:9\",\n    \"image_urls\": [\n        \"https://example.com/product.png\"\n    ]\n}",
+                          "mediaType": "application/json"
+                        }
+                      ],
+                      "oasExtensions": ""
+                    },
+                    "parameters": {
+                      "query": [],
+                      "path": [],
+                      "cookie": [],
+                      "header": [
+                        {
+                          "id": "900000012",
+                          "name": "Content-Type",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000013",
+                          "name": "Accept",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000014",
+                          "name": "Authorization",
+                          "required": false,
+                          "description": "API Key",
+                          "example": "Bearer {{apiKey}}",
+                          "type": "string",
+                          "enable": true
+                        }
+                      ]
+                    },
+                    "responses": [
+                      {
+                        "id": "900000011",
+                        "code": 200,
+                        "name": "??",
+                        "headers": [],
+                        "jsonSchema": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "status_update_time": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "status"
+                          ],
+                          "x-apifox-orders": [
+                            "id",
+                            "status",
+                            "status_update_time"
+                          ]
+                        },
+                        "itemSchema": {},
+                        "description": "",
+                        "contentType": "json",
+                        "mediaType": "",
+                        "oasExtensions": ""
+                      }
+                    ],
+                    "responseChildren": [],
+                    "responseExamples": [
+                      {
+                        "name": "????",
+                        "data": "{\n    \"id\": \"grok:299604b7-c5ea-47b5-bc64-c06f300f0d27\",\n    \"status\": \"processing\",\n    \"status_update_time\": 1764522528\n}",
+                        "responseId": "900000011",
+                        "description": "",
+                        "oasKey": "",
+                        "oasExtensions": ""
+                      }
+                    ]
+                  }
+                },
+                {
+                  "name": "?? Grok ????",
+                  "api": {
+                    "id": "900000021",
+                    "type": "http",
+                    "name": null,
+                    "method": "get",
+                    "path": "/v1/video/generations/{task_id}",
+                    "description": "?? grok-video / grok-video-1.5 ?????",
+                    "status": "released",
+                    "serverId": "",
+                    "moduleId": 2102810,
+                    "auth": {},
+                    "securityScheme": {},
+                    "tags": [],
+                    "visibility": "INHERITED",
+                    "operationId": "",
+                    "sourceUrl": "",
+                    "oasExtensions": "",
+                    "customApiFields": {},
+                    "commonParameters": {},
+                    "commonResponseStatus": {},
+                    "advancedSettings": {},
+                    "mockScript": {},
+                    "mocks": [],
+                    "cases": [],
+                    "codeSamples": [],
+                    "preProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "postProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "inheritPostProcessors": {},
+                    "inheritPreProcessors": {},
+                    "requestBody": {
+                      "type": "none",
+                      "parameters": [],
+                      "required": true,
+                      "mediaType": "",
+                      "examples": [],
+                      "oasExtensions": ""
+                    },
+                    "parameters": {
+                      "query": [],
+                      "path": [
+                        {
+                          "id": "900000016",
+                          "name": "task_id",
+                          "example": "grok:299604b7-c5ea-47b5-bc64-c06f300f0d27",
+                          "required": true,
+                          "description": "??????? id",
+                          "enable": true,
+                          "type": "string"
+                        }
+                      ],
+                      "cookie": [],
+                      "header": [
+                        {
+                          "id": "900000018",
+                          "name": "Content-Type",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000019",
+                          "name": "Accept",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000020",
+                          "name": "Authorization",
+                          "required": false,
+                          "description": "API Key",
+                          "example": "Bearer {{apiKey}}",
+                          "type": "string",
+                          "enable": true
+                        }
+                      ]
+                    },
+                    "responses": [
+                      {
+                        "id": "900000017",
+                        "code": 200,
+                        "name": "??",
+                        "headers": [],
+                        "jsonSchema": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "itemSchema": {},
+                        "description": "",
+                        "contentType": "json",
+                        "mediaType": "",
+                        "oasExtensions": ""
+                      }
+                    ],
+                    "responseChildren": [],
+                    "responseExamples": [
+                      {
+                        "name": "????",
+                        "data": "{\n    \"id\": \"grok:299604b7-c5ea-47b5-bc64-c06f300f0d27\",\n    \"status\": \"completed\",\n    \"video_url\": \"https://example.com/result.mp4\"\n}",
+                        "responseId": "900000017",
+                        "description": "",
+                        "oasKey": "",
+                        "oasExtensions": ""
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "seedance-2-0",
+              "id": 910000012,
+              "auth": {},
+              "securityScheme": {},
+              "parentId": 910000010,
+              "serverId": "",
+              "description": "",
+              "identityPattern": {
+                "httpApi": {
+                  "type": "inherit",
+                  "bodyType": "",
+                  "fields": []
+                }
+              },
+              "shareSettings": {},
+              "visibility": "INHERITED",
+              "moduleId": 2102810,
+              "preProcessors": [
+                {
+                  "id": "inheritProcessors",
+                  "type": "inheritProcessors",
+                  "data": {}
+                }
+              ],
+              "postProcessors": [
+                {
+                  "id": "inheritProcessors",
+                  "type": "inheritProcessors",
+                  "data": {}
+                }
+              ],
+              "inheritPostProcessors": {},
+              "inheritPreProcessors": {},
+              "items": [
+                {
+                  "name": "???? Seedance 2.0 ??",
+                  "api": {
+                    "id": "900000026",
+                    "type": "http",
+                    "name": null,
+                    "method": "post",
+                    "path": "/v1/videos",
+                    "description": "OpenAI ??????????? seedance-2.0?mini?fast?480p/720p/1080p/4k ????????",
+                    "status": "released",
+                    "serverId": "",
+                    "moduleId": 2102810,
+                    "auth": {},
+                    "securityScheme": {},
+                    "tags": [],
+                    "visibility": "INHERITED",
+                    "operationId": "",
+                    "sourceUrl": "",
+                    "oasExtensions": "",
+                    "customApiFields": {},
+                    "commonParameters": {},
+                    "commonResponseStatus": {},
+                    "advancedSettings": {},
+                    "mockScript": {},
+                    "mocks": [],
+                    "cases": [],
+                    "codeSamples": [],
+                    "preProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "postProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "inheritPostProcessors": {},
+                    "inheritPreProcessors": {},
+                    "requestBody": {
+                      "type": "application/json",
+                      "parameters": [],
+                      "jsonSchema": {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string",
+                            "enum": [
+                              "seedance-2.0",
+                              "seedance-2.0-mini-480p",
+                              "seedance-2.0-mini-720p",
+                              "seedance-2.0-fast-480p",
+                              "seedance-2.0-fast-720p",
+                              "seedance-2.0-480p",
+                              "seedance-2.0-720p",
+                              "seedance-2.0-1080p",
+                              "seedance-2.0-4k",
+                              "veo-3-1",
+                              "veo-3-1-fast",
+                              "omni-fast",
+                              "omni-fast-no-water",
+                              "omni-v2v",
+                              "omni-v2v-no-water"
+                            ]
+                          },
+                          "prompt": {
+                            "type": "string",
+                            "description": "???"
+                          },
+                          "duration": {
+                            "type": "integer",
+                            "description": "????"
+                          },
+                          "seconds": {
+                            "type": "integer",
+                            "description": "??????????? seconds"
+                          },
+                          "aspect_ratio": {
+                            "type": "string",
+                            "enum": [
+                              "16:9",
+                              "9:16",
+                              "1:1"
+                            ]
+                          },
+                          "resolution": {
+                            "type": "string",
+                            "description": "?????? 720p?1080p?4k"
+                          },
+                          "images": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "???? URL ??"
+                          },
+                          "video_url": {
+                            "type": "string",
+                            "description": "???????? URL"
+                          },
+                          "videos": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "???????? URL ??"
+                          }
+                        },
+                        "required": [
+                          "model",
+                          "prompt"
+                        ],
+                        "x-apifox-orders": [
+                          "model",
+                          "prompt",
+                          "duration",
+                          "seconds",
+                          "aspect_ratio",
+                          "resolution",
+                          "images",
+                          "video_url",
+                          "videos"
+                        ]
+                      },
+                      "required": true,
+                      "mediaType": "",
+                      "examples": [
+                        {
+                          "name": "Seedance 720p",
+                          "value": "{\n    \"model\": \"seedance-2.0-720p\",\n    \"prompt\": \"A cinematic short video with smooth motion and realistic lighting\",\n    \"duration\": 6,\n    \"aspect_ratio\": \"16:9\",\n    \"resolution\": \"720p\",\n    \"image_url\": \"https://example.com/reference.png\",\n    \"reference_image_urls\": [\n        \"https://example.com/reference.png\"\n    ]\n}",
+                          "mediaType": "application/json"
+                        }
+                      ],
+                      "oasExtensions": ""
+                    },
+                    "parameters": {
+                      "query": [],
+                      "path": [],
+                      "cookie": [],
+                      "header": [
+                        {
+                          "id": "900000023",
+                          "name": "Content-Type",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000024",
+                          "name": "Accept",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000025",
+                          "name": "Authorization",
+                          "required": false,
+                          "description": "API Key",
+                          "example": "Bearer {{apiKey}}",
+                          "type": "string",
+                          "enable": true
+                        }
+                      ]
+                    },
+                    "responses": [
+                      {
+                        "id": "900000022",
+                        "code": 200,
+                        "name": "??",
+                        "headers": [],
+                        "jsonSchema": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "object": {
+                              "type": "string"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "progress": {
+                              "type": "integer"
+                            },
+                            "video_url": {
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "type": "integer"
+                            },
+                            "completed_at": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "status"
+                          ],
+                          "x-apifox-orders": [
+                            "id",
+                            "object",
+                            "model",
+                            "status",
+                            "progress",
+                            "video_url",
+                            "created_at",
+                            "completed_at"
+                          ]
+                        },
+                        "itemSchema": {},
+                        "description": "",
+                        "contentType": "json",
+                        "mediaType": "",
+                        "oasExtensions": ""
+                      }
+                    ],
+                    "responseChildren": [],
+                    "responseExamples": [
+                      {
+                        "name": "????",
+                        "data": "{\n    \"id\": \"video_55cb73b3-60af-40c8-95fd-eae8fd758ade\",\n    \"object\": \"video\",\n    \"model\": \"seedance-2.0-720p\",\n    \"status\": \"queued\",\n    \"progress\": 0,\n    \"created_at\": 1762336916,\n    \"seconds\": \"6\",\n    \"size\": \"1280x720\"\n}",
+                        "responseId": "900000022",
+                        "description": "",
+                        "oasKey": "",
+                        "oasExtensions": ""
+                      }
+                    ]
+                  }
+                },
+                {
+                  "name": "?? OpenAI ????",
+                  "api": {
+                    "id": "900000032",
+                    "type": "http",
+                    "name": null,
+                    "method": "get",
+                    "path": "/v1/videos/{id}",
+                    "description": "?? Seedance 2.0 ???????",
+                    "status": "released",
+                    "serverId": "",
+                    "moduleId": 2102810,
+                    "auth": {},
+                    "securityScheme": {},
+                    "tags": [],
+                    "visibility": "INHERITED",
+                    "operationId": "",
+                    "sourceUrl": "",
+                    "oasExtensions": "",
+                    "customApiFields": {},
+                    "commonParameters": {},
+                    "commonResponseStatus": {},
+                    "advancedSettings": {},
+                    "mockScript": {},
+                    "mocks": [],
+                    "cases": [],
+                    "codeSamples": [],
+                    "preProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "postProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "inheritPostProcessors": {},
+                    "inheritPreProcessors": {},
+                    "requestBody": {
+                      "type": "none",
+                      "parameters": [],
+                      "required": true,
+                      "mediaType": "",
+                      "examples": [],
+                      "oasExtensions": ""
+                    },
+                    "parameters": {
+                      "query": [],
+                      "path": [
+                        {
+                          "id": "900000027",
+                          "name": "id",
+                          "example": "video_55cb73b3-60af-40c8-95fd-eae8fd758ade",
+                          "required": true,
+                          "description": "??????? id",
+                          "enable": true,
+                          "type": "string"
+                        }
+                      ],
+                      "cookie": [],
+                      "header": [
+                        {
+                          "id": "900000029",
+                          "name": "Content-Type",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000030",
+                          "name": "Accept",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000031",
+                          "name": "Authorization",
+                          "required": false,
+                          "description": "API Key",
+                          "example": "Bearer {{apiKey}}",
+                          "type": "string",
+                          "enable": true
+                        }
+                      ]
+                    },
+                    "responses": [
+                      {
+                        "id": "900000028",
+                        "code": 200,
+                        "name": "??",
+                        "headers": [],
+                        "jsonSchema": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "object": {
+                              "type": "string"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "progress": {
+                              "type": "integer"
+                            },
+                            "video_url": {
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "type": "integer"
+                            },
+                            "completed_at": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "status"
+                          ],
+                          "x-apifox-orders": [
+                            "id",
+                            "object",
+                            "model",
+                            "status",
+                            "progress",
+                            "video_url",
+                            "created_at",
+                            "completed_at"
+                          ]
+                        },
+                        "itemSchema": {},
+                        "description": "",
+                        "contentType": "json",
+                        "mediaType": "",
+                        "oasExtensions": ""
+                      }
+                    ],
+                    "responseChildren": [],
+                    "responseExamples": [
+                      {
+                        "name": "????",
+                        "data": "{\n    \"id\": \"video_5c6a605a-30c0-4a6a-9dbd-d1d6cfdd9980\",\n    \"object\": \"video\",\n    \"model\": \"seedance-2.0-720p\",\n    \"status\": \"completed\",\n    \"progress\": 100,\n    \"video_url\": \"https://example.com/result.mp4\",\n    \"created_at\": 1761622232,\n    \"completed_at\": 1761622385\n}",
+                        "responseId": "900000028",
+                        "description": "",
+                        "oasKey": "",
+                        "oasExtensions": ""
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Veo 3.1",
+              "id": 910000013,
+              "auth": {},
+              "securityScheme": {},
+              "parentId": 910000010,
+              "serverId": "",
+              "description": "",
+              "identityPattern": {
+                "httpApi": {
+                  "type": "inherit",
+                  "bodyType": "",
+                  "fields": []
+                }
+              },
+              "shareSettings": {},
+              "visibility": "INHERITED",
+              "moduleId": 2102810,
+              "preProcessors": [
+                {
+                  "id": "inheritProcessors",
+                  "type": "inheritProcessors",
+                  "data": {}
+                }
+              ],
+              "postProcessors": [
+                {
+                  "id": "inheritProcessors",
+                  "type": "inheritProcessors",
+                  "data": {}
+                }
+              ],
+              "inheritPostProcessors": {},
+              "inheritPreProcessors": {},
+              "items": [
+                {
+                  "name": "???? veo-3-1 / veo-3-1-fast",
+                  "api": {
+                    "id": "900000037",
+                    "type": "http",
+                    "name": null,
+                    "method": "post",
+                    "path": "/v1/videos",
+                    "description": "OpenAI ??????????? veo-3-1 ? veo-3-1-fast?",
+                    "status": "released",
+                    "serverId": "",
+                    "moduleId": 2102810,
+                    "auth": {},
+                    "securityScheme": {},
+                    "tags": [],
+                    "visibility": "INHERITED",
+                    "operationId": "",
+                    "sourceUrl": "",
+                    "oasExtensions": "",
+                    "customApiFields": {},
+                    "commonParameters": {},
+                    "commonResponseStatus": {},
+                    "advancedSettings": {},
+                    "mockScript": {},
+                    "mocks": [],
+                    "cases": [],
+                    "codeSamples": [],
+                    "preProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "postProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "inheritPostProcessors": {},
+                    "inheritPreProcessors": {},
+                    "requestBody": {
+                      "type": "application/json",
+                      "parameters": [],
+                      "jsonSchema": {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string",
+                            "enum": [
+                              "seedance-2.0",
+                              "seedance-2.0-mini-480p",
+                              "seedance-2.0-mini-720p",
+                              "seedance-2.0-fast-480p",
+                              "seedance-2.0-fast-720p",
+                              "seedance-2.0-480p",
+                              "seedance-2.0-720p",
+                              "seedance-2.0-1080p",
+                              "seedance-2.0-4k",
+                              "veo-3-1",
+                              "veo-3-1-fast",
+                              "omni-fast",
+                              "omni-fast-no-water",
+                              "omni-v2v",
+                              "omni-v2v-no-water"
+                            ]
+                          },
+                          "prompt": {
+                            "type": "string",
+                            "description": "???"
+                          },
+                          "duration": {
+                            "type": "integer",
+                            "description": "????"
+                          },
+                          "seconds": {
+                            "type": "integer",
+                            "description": "??????????? seconds"
+                          },
+                          "aspect_ratio": {
+                            "type": "string",
+                            "enum": [
+                              "16:9",
+                              "9:16",
+                              "1:1"
+                            ]
+                          },
+                          "resolution": {
+                            "type": "string",
+                            "description": "?????? 720p?1080p?4k"
+                          },
+                          "images": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "???? URL ??"
+                          },
+                          "video_url": {
+                            "type": "string",
+                            "description": "???????? URL"
+                          },
+                          "videos": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "???????? URL ??"
+                          }
+                        },
+                        "required": [
+                          "model",
+                          "prompt"
+                        ],
+                        "x-apifox-orders": [
+                          "model",
+                          "prompt",
+                          "duration",
+                          "seconds",
+                          "aspect_ratio",
+                          "resolution",
+                          "images",
+                          "video_url",
+                          "videos"
+                        ]
+                      },
+                      "required": true,
+                      "mediaType": "",
+                      "examples": [
+                        {
+                          "name": "Veo 3.1 Fast",
+                          "value": "{\n    \"model\": \"veo-3-1-fast\",\n    \"prompt\": \"A drone shot over a futuristic coastal city\",\n    \"duration\": 8,\n    \"aspect_ratio\": \"16:9\",\n    \"resolution\": \"1080p\",\n    \"generate_audio\": true,\n    \"reference_mode\": \"frame\",\n    \"images\": [\n        \"https://example.com/reference.png\"\n    ]\n}",
+                          "mediaType": "application/json"
+                        }
+                      ],
+                      "oasExtensions": ""
+                    },
+                    "parameters": {
+                      "query": [],
+                      "path": [],
+                      "cookie": [],
+                      "header": [
+                        {
+                          "id": "900000034",
+                          "name": "Content-Type",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000035",
+                          "name": "Accept",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000036",
+                          "name": "Authorization",
+                          "required": false,
+                          "description": "API Key",
+                          "example": "Bearer {{apiKey}}",
+                          "type": "string",
+                          "enable": true
+                        }
+                      ]
+                    },
+                    "responses": [
+                      {
+                        "id": "900000033",
+                        "code": 200,
+                        "name": "??",
+                        "headers": [],
+                        "jsonSchema": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "object": {
+                              "type": "string"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "progress": {
+                              "type": "integer"
+                            },
+                            "video_url": {
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "type": "integer"
+                            },
+                            "completed_at": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "status"
+                          ],
+                          "x-apifox-orders": [
+                            "id",
+                            "object",
+                            "model",
+                            "status",
+                            "progress",
+                            "video_url",
+                            "created_at",
+                            "completed_at"
+                          ]
+                        },
+                        "itemSchema": {},
+                        "description": "",
+                        "contentType": "json",
+                        "mediaType": "",
+                        "oasExtensions": ""
+                      }
+                    ],
+                    "responseChildren": [],
+                    "responseExamples": [
+                      {
+                        "name": "????",
+                        "data": "{\n    \"id\": \"video_55cb73b3-60af-40c8-95fd-eae8fd758ade\",\n    \"object\": \"video\",\n    \"model\": \"veo-3-1-fast\",\n    \"status\": \"queued\",\n    \"progress\": 0,\n    \"created_at\": 1762336916,\n    \"seconds\": \"8\",\n    \"size\": \"1280x720\"\n}",
+                        "responseId": "900000033",
+                        "description": "",
+                        "oasKey": "",
+                        "oasExtensions": ""
+                      }
+                    ]
+                  }
+                },
+                {
+                  "name": "?? OpenAI ????",
+                  "api": {
+                    "id": "900000043",
+                    "type": "http",
+                    "name": null,
+                    "method": "get",
+                    "path": "/v1/videos/{id}",
+                    "description": "?? Veo 3.1 ???????",
+                    "status": "released",
+                    "serverId": "",
+                    "moduleId": 2102810,
+                    "auth": {},
+                    "securityScheme": {},
+                    "tags": [],
+                    "visibility": "INHERITED",
+                    "operationId": "",
+                    "sourceUrl": "",
+                    "oasExtensions": "",
+                    "customApiFields": {},
+                    "commonParameters": {},
+                    "commonResponseStatus": {},
+                    "advancedSettings": {},
+                    "mockScript": {},
+                    "mocks": [],
+                    "cases": [],
+                    "codeSamples": [],
+                    "preProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "postProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "inheritPostProcessors": {},
+                    "inheritPreProcessors": {},
+                    "requestBody": {
+                      "type": "none",
+                      "parameters": [],
+                      "required": true,
+                      "mediaType": "",
+                      "examples": [],
+                      "oasExtensions": ""
+                    },
+                    "parameters": {
+                      "query": [],
+                      "path": [
+                        {
+                          "id": "900000038",
+                          "name": "id",
+                          "example": "video_55cb73b3-60af-40c8-95fd-eae8fd758ade",
+                          "required": true,
+                          "description": "??????? id",
+                          "enable": true,
+                          "type": "string"
+                        }
+                      ],
+                      "cookie": [],
+                      "header": [
+                        {
+                          "id": "900000040",
+                          "name": "Content-Type",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000041",
+                          "name": "Accept",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000042",
+                          "name": "Authorization",
+                          "required": false,
+                          "description": "API Key",
+                          "example": "Bearer {{apiKey}}",
+                          "type": "string",
+                          "enable": true
+                        }
+                      ]
+                    },
+                    "responses": [
+                      {
+                        "id": "900000039",
+                        "code": 200,
+                        "name": "??",
+                        "headers": [],
+                        "jsonSchema": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "object": {
+                              "type": "string"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "progress": {
+                              "type": "integer"
+                            },
+                            "video_url": {
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "type": "integer"
+                            },
+                            "completed_at": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "status"
+                          ],
+                          "x-apifox-orders": [
+                            "id",
+                            "object",
+                            "model",
+                            "status",
+                            "progress",
+                            "video_url",
+                            "created_at",
+                            "completed_at"
+                          ]
+                        },
+                        "itemSchema": {},
+                        "description": "",
+                        "contentType": "json",
+                        "mediaType": "",
+                        "oasExtensions": ""
+                      }
+                    ],
+                    "responseChildren": [],
+                    "responseExamples": [
+                      {
+                        "name": "????",
+                        "data": "{\n    \"id\": \"video_5c6a605a-30c0-4a6a-9dbd-d1d6cfdd9980\",\n    \"object\": \"video\",\n    \"model\": \"veo-3-1-fast\",\n    \"status\": \"completed\",\n    \"progress\": 100,\n    \"video_url\": \"https://example.com/result.mp4\",\n    \"created_at\": 1761622232,\n    \"completed_at\": 1761622385\n}",
+                        "responseId": "900000039",
+                        "description": "",
+                        "oasKey": "",
+                        "oasExtensions": ""
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Omni",
+              "id": 910000014,
+              "auth": {},
+              "securityScheme": {},
+              "parentId": 910000010,
+              "serverId": "",
+              "description": "",
+              "identityPattern": {
+                "httpApi": {
+                  "type": "inherit",
+                  "bodyType": "",
+                  "fields": []
+                }
+              },
+              "shareSettings": {},
+              "visibility": "INHERITED",
+              "moduleId": 2102810,
+              "preProcessors": [
+                {
+                  "id": "inheritProcessors",
+                  "type": "inheritProcessors",
+                  "data": {}
+                }
+              ],
+              "postProcessors": [
+                {
+                  "id": "inheritProcessors",
+                  "type": "inheritProcessors",
+                  "data": {}
+                }
+              ],
+              "inheritPostProcessors": {},
+              "inheritPreProcessors": {},
+              "items": [
+                {
+                  "name": "???? Omni / Omni V2V",
+                  "api": {
+                    "id": "900000048",
+                    "type": "http",
+                    "name": null,
+                    "method": "post",
+                    "path": "/v1/videos",
+                    "description": "OpenAI ??????????? omni-fast?omni-fast-no-water?omni-v2v?omni-v2v-no-water?",
+                    "status": "released",
+                    "serverId": "",
+                    "moduleId": 2102810,
+                    "auth": {},
+                    "securityScheme": {},
+                    "tags": [],
+                    "visibility": "INHERITED",
+                    "operationId": "",
+                    "sourceUrl": "",
+                    "oasExtensions": "",
+                    "customApiFields": {},
+                    "commonParameters": {},
+                    "commonResponseStatus": {},
+                    "advancedSettings": {},
+                    "mockScript": {},
+                    "mocks": [],
+                    "cases": [],
+                    "codeSamples": [],
+                    "preProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "postProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "inheritPostProcessors": {},
+                    "inheritPreProcessors": {},
+                    "requestBody": {
+                      "type": "application/json",
+                      "parameters": [],
+                      "jsonSchema": {
+                        "type": "object",
+                        "properties": {
+                          "model": {
+                            "type": "string",
+                            "enum": [
+                              "seedance-2.0",
+                              "seedance-2.0-mini-480p",
+                              "seedance-2.0-mini-720p",
+                              "seedance-2.0-fast-480p",
+                              "seedance-2.0-fast-720p",
+                              "seedance-2.0-480p",
+                              "seedance-2.0-720p",
+                              "seedance-2.0-1080p",
+                              "seedance-2.0-4k",
+                              "veo-3-1",
+                              "veo-3-1-fast",
+                              "omni-fast",
+                              "omni-fast-no-water",
+                              "omni-v2v",
+                              "omni-v2v-no-water"
+                            ]
+                          },
+                          "prompt": {
+                            "type": "string",
+                            "description": "???"
+                          },
+                          "duration": {
+                            "type": "integer",
+                            "description": "????"
+                          },
+                          "seconds": {
+                            "type": "integer",
+                            "description": "??????????? seconds"
+                          },
+                          "aspect_ratio": {
+                            "type": "string",
+                            "enum": [
+                              "16:9",
+                              "9:16",
+                              "1:1"
+                            ]
+                          },
+                          "resolution": {
+                            "type": "string",
+                            "description": "?????? 720p?1080p?4k"
+                          },
+                          "images": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "???? URL ??"
+                          },
+                          "video_url": {
+                            "type": "string",
+                            "description": "???????? URL"
+                          },
+                          "videos": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "???????? URL ??"
+                          }
+                        },
+                        "required": [
+                          "model",
+                          "prompt"
+                        ],
+                        "x-apifox-orders": [
+                          "model",
+                          "prompt",
+                          "duration",
+                          "seconds",
+                          "aspect_ratio",
+                          "resolution",
+                          "images",
+                          "video_url",
+                          "videos"
+                        ]
+                      },
+                      "required": true,
+                      "mediaType": "",
+                      "examples": [
+                        {
+                          "name": "Omni ?/????",
+                          "value": "{\n    \"model\": \"omni-fast\",\n    \"prompt\": \"Animate the scene with natural subject motion\",\n    \"aspect_ratio\": \"16:9\",\n    \"image_url\": \"https://example.com/reference.png\"\n}",
+                          "mediaType": "application/json"
+                        },
+                        {
+                          "name": "Omni V2V",
+                          "value": "{\n    \"model\": \"omni-v2v\",\n    \"prompt\": \"Restyle this video into a cinematic night scene\",\n    \"video_url\": \"https://example.com/source.mp4\",\n    \"aspect_ratio\": \"16:9\"\n}",
+                          "mediaType": "application/json"
+                        }
+                      ],
+                      "oasExtensions": ""
+                    },
+                    "parameters": {
+                      "query": [],
+                      "path": [],
+                      "cookie": [],
+                      "header": [
+                        {
+                          "id": "900000045",
+                          "name": "Content-Type",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000046",
+                          "name": "Accept",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000047",
+                          "name": "Authorization",
+                          "required": false,
+                          "description": "API Key",
+                          "example": "Bearer {{apiKey}}",
+                          "type": "string",
+                          "enable": true
+                        }
+                      ]
+                    },
+                    "responses": [
+                      {
+                        "id": "900000044",
+                        "code": 200,
+                        "name": "??",
+                        "headers": [],
+                        "jsonSchema": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "object": {
+                              "type": "string"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "progress": {
+                              "type": "integer"
+                            },
+                            "video_url": {
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "type": "integer"
+                            },
+                            "completed_at": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "status"
+                          ],
+                          "x-apifox-orders": [
+                            "id",
+                            "object",
+                            "model",
+                            "status",
+                            "progress",
+                            "video_url",
+                            "created_at",
+                            "completed_at"
+                          ]
+                        },
+                        "itemSchema": {},
+                        "description": "",
+                        "contentType": "json",
+                        "mediaType": "",
+                        "oasExtensions": ""
+                      }
+                    ],
+                    "responseChildren": [],
+                    "responseExamples": [
+                      {
+                        "name": "????",
+                        "data": "{\n    \"id\": \"video_55cb73b3-60af-40c8-95fd-eae8fd758ade\",\n    \"object\": \"video\",\n    \"model\": \"omni-fast\",\n    \"status\": \"queued\",\n    \"progress\": 0,\n    \"created_at\": 1762336916,\n    \"seconds\": \"10\",\n    \"size\": \"1280x720\"\n}",
+                        "responseId": "900000044",
+                        "description": "",
+                        "oasKey": "",
+                        "oasExtensions": ""
+                      }
+                    ]
+                  }
+                },
+                {
+                  "name": "?? OpenAI ????",
+                  "api": {
+                    "id": "900000054",
+                    "type": "http",
+                    "name": null,
+                    "method": "get",
+                    "path": "/v1/videos/{id}",
+                    "description": "?? Omni / Omni V2V ?????",
+                    "status": "released",
+                    "serverId": "",
+                    "moduleId": 2102810,
+                    "auth": {},
+                    "securityScheme": {},
+                    "tags": [],
+                    "visibility": "INHERITED",
+                    "operationId": "",
+                    "sourceUrl": "",
+                    "oasExtensions": "",
+                    "customApiFields": {},
+                    "commonParameters": {},
+                    "commonResponseStatus": {},
+                    "advancedSettings": {},
+                    "mockScript": {},
+                    "mocks": [],
+                    "cases": [],
+                    "codeSamples": [],
+                    "preProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "postProcessors": [
+                      {
+                        "id": "inheritProcessors",
+                        "type": "inheritProcessors",
+                        "data": {}
+                      }
+                    ],
+                    "inheritPostProcessors": {},
+                    "inheritPreProcessors": {},
+                    "requestBody": {
+                      "type": "none",
+                      "parameters": [],
+                      "required": true,
+                      "mediaType": "",
+                      "examples": [],
+                      "oasExtensions": ""
+                    },
+                    "parameters": {
+                      "query": [],
+                      "path": [
+                        {
+                          "id": "900000049",
+                          "name": "id",
+                          "example": "video_55cb73b3-60af-40c8-95fd-eae8fd758ade",
+                          "required": true,
+                          "description": "??????? id",
+                          "enable": true,
+                          "type": "string"
+                        }
+                      ],
+                      "cookie": [],
+                      "header": [
+                        {
+                          "id": "900000051",
+                          "name": "Content-Type",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000052",
+                          "name": "Accept",
+                          "required": true,
+                          "description": "",
+                          "example": "application/json",
+                          "type": "string",
+                          "enable": true
+                        },
+                        {
+                          "id": "900000053",
+                          "name": "Authorization",
+                          "required": false,
+                          "description": "API Key",
+                          "example": "Bearer {{apiKey}}",
+                          "type": "string",
+                          "enable": true
+                        }
+                      ]
+                    },
+                    "responses": [
+                      {
+                        "id": "900000050",
+                        "code": 200,
+                        "name": "??",
+                        "headers": [],
+                        "jsonSchema": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "object": {
+                              "type": "string"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "progress": {
+                              "type": "integer"
+                            },
+                            "video_url": {
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "type": "integer"
+                            },
+                            "completed_at": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "status"
+                          ],
+                          "x-apifox-orders": [
+                            "id",
+                            "object",
+                            "model",
+                            "status",
+                            "progress",
+                            "video_url",
+                            "created_at",
+                            "completed_at"
+                          ]
+                        },
+                        "itemSchema": {},
+                        "description": "",
+                        "contentType": "json",
+                        "mediaType": "",
+                        "oasExtensions": ""
+                      }
+                    ],
+                    "responseChildren": [],
+                    "responseExamples": [
+                      {
+                        "name": "????",
+                        "data": "{\n    \"id\": \"video_5c6a605a-30c0-4a6a-9dbd-d1d6cfdd9980\",\n    \"object\": \"video\",\n    \"model\": \"omni-fast\",\n    \"status\": \"completed\",\n    \"progress\": 100,\n    \"video_url\": \"https://example.com/result.mp4\",\n    \"created_at\": 1761622232,\n    \"completed_at\": 1761622385\n}",
+                        "responseId": "900000050",
+                        "description": "",
+                        "oasKey": "",
+                        "oasExtensions": ""
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "socketCollection": [],
+  "docCollection": [],
+  "webSocketCollection": [],
+  "socketIOCollection": [],
+  "mcpClientCollection": [],
+  "responseCollection": [],
+  "schemaCollection": [],
+  "securitySchemeCollection": [],
+  "oasComponentCollection": [],
+  "requestCollection": [],
+  "apiTestCaseCollection": [],
+  "testCaseReferences": [],
+  "environments": [
+    {
+      "name": "Private",
+      "id": 910000100,
+      "variables": [
+        {
+          "name": "baseUrl",
+          "value": "{{baseUrl}}",
+          "type": "string",
+          "enabled": true
+        },
+        {
+          "name": "apiKey",
+          "value": "{{apiKey}}",
+          "type": "string",
+          "enabled": true
+        }
+      ]
+    }
+  ],
+  "commonScripts": [],
+  "databaseConnections": [],
+  "globalVariables": [],
+  "commonParameters": null,
+  "customFunctions": [],
+  "projectTestCaseCategories": [],
+  "projectTestCaseTags": [],
+  "projectAssociations": [],
+  "moduleSettings": []
+}

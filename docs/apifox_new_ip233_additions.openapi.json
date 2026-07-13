@@ -1,0 +1,719 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "新增模型 API（隐藏上游域名）",
+    "version": "1.0.0",
+    "description": "用于导入 Apifox 的新增模型接口文档。公开文档中只使用 {{baseUrl}} 或相对路径，不展示真实上游地址。"
+  },
+  "servers": [
+    {
+      "url": "{{baseUrl}}",
+      "description": "私有环境变量，请在 Apifox 环境中配置真实根地址"
+    }
+  ],
+  "tags": [
+    {
+      "name": "GPT Image 2 C",
+      "description": "旧版 gpt-image-2-all 兼容节点恢复版，模型名改为 gpt-image-2-c"
+    },
+    {
+      "name": "Grok Video",
+      "description": "grok-video / grok-video-1.5 视频生成"
+    },
+    {
+      "name": "Seedance 2.0",
+      "description": "Seedance 2.0 系列视频生成"
+    },
+    {
+      "name": "Veo 3.1",
+      "description": "Veo 3.1 系列视频生成"
+    },
+    {
+      "name": "Omni",
+      "description": "Omni 文/图生视频与 Omni V2V 视频转视频"
+    }
+  ],
+  "paths": {
+    "/v1/images/generations": {
+      "post": {
+        "tags": [
+          "GPT Image 2 C"
+        ],
+        "summary": "创建图片 gpt-image-2-c",
+        "description": "旧版 gpt-image-2-all 兼容生图入口恢复版。公开文档不要写真实上游域名。",
+        "operationId": "createGptImage2CImage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageGenerationRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "基础生图",
+                  "value": {
+                    "model": "gpt-image-2-c",
+                    "prompt": "电影感城市夜景",
+                    "size": "1024x1024",
+                    "n": 1
+                  }
+                },
+                "multi_reference": {
+                  "summary": "多参考图",
+                  "value": {
+                    "model": "gpt-image-2-c",
+                    "prompt": "将参考图主体合并到同一张海报里",
+                    "size": "1536x1024",
+                    "n": 1,
+                    "image": [
+                      "https://example.com/reference-a.png",
+                      "https://example.com/reference-b.png"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageGenerationResponse"
+                },
+                "example": {
+                  "created": 1776909189,
+                  "data": [
+                    {
+                      "url": "https://example.com/generated.webp",
+                      "revised_prompt": ""
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/chat/completions": {
+      "post": {
+        "tags": [
+          "GPT Image 2 C"
+        ],
+        "summary": "编辑图片 gpt-image-2-c",
+        "description": "旧版 gpt-image-2-all 兼容修图入口恢复版。图片通过 message content 中的 image_url data URI 或 URL 传入。",
+        "operationId": "editGptImage2CImage",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatImageEditRequest"
+              },
+              "example": {
+                "model": "gpt-image-2-c",
+                "messages": [
+                  {
+                    "role": "user",
+                    "content": [
+                      {
+                        "type": "text",
+                        "text": "把背景换成海边，主体保持一致"
+                      },
+                      {
+                        "type": "image_url",
+                        "image_url": {
+                          "url": "data:image/png;base64,{{base64Image}}"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "size": "1024x1024",
+                "quality": "hd"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "编辑成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatImageEditResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/video/generations": {
+      "post": {
+        "tags": [
+          "Grok Video"
+        ],
+        "summary": "创建视频 grok-video / grok-video-1.5",
+        "description": "grok-video 支持文生、单图、多参考图；grok-video-1.5 必须且只能 1 张参考图，支持 16:9 / 9:16 与 480p / 720p。",
+        "operationId": "createGrokVideo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrokVideoGenerationRequest"
+              },
+              "examples": {
+                "grok_video": {
+                  "summary": "grok-video",
+                  "value": {
+                    "model": "grok-video",
+                    "prompt": "A cinematic shot of a red sports car driving through rainy neon streets at night",
+                    "seconds": 6,
+                    "resolution": "720p",
+                    "aspect_ratio": "16:9",
+                    "image_urls": [
+                      "https://example.com/reference.png"
+                    ]
+                  }
+                },
+                "grok_video_1_5": {
+                  "summary": "grok-video-1.5",
+                  "value": {
+                    "model": "grok-video-1.5",
+                    "prompt": "Gentle camera push-in, water flowing",
+                    "seconds": 4,
+                    "resolution": "720p",
+                    "aspect_ratio": "16:9",
+                    "image_urls": [
+                      "https://example.com/product.png"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "任务创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoTaskResponse"
+                },
+                "example": {
+                  "id": "grok:299604b7-c5ea-47b5-bc64-c06f300f0d27",
+                  "status": "processing",
+                  "status_update_time": 1764522528
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/video/generations/{task_id}": {
+      "get": {
+        "tags": [
+          "Grok Video"
+        ],
+        "summary": "查询 Grok 视频任务",
+        "operationId": "getGrokVideoGeneration",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "创建任务返回的 id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "任务状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoTaskResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/videos": {
+      "post": {
+        "tags": [
+          "Seedance 2.0",
+          "Veo 3.1",
+          "Omni"
+        ],
+        "summary": "创建视频 Seedance 2.0 / Veo 3.1 / Omni",
+        "description": "OpenAI 风格视频任务入口，覆盖当前自定义节点中新增的 Seedance 2.0、Veo 3.1、Omni 和 Omni V2V 模型。",
+        "operationId": "createOpenAIVideo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenAIVideoCreateRequest"
+              },
+              "examples": {
+                "seedance": {
+                  "summary": "Seedance 2.0",
+                  "value": {
+                    "model": "seedance-2.0-720p",
+                    "prompt": "A cinematic short video with smooth motion and realistic lighting",
+                    "duration": 6,
+                    "aspect_ratio": "16:9",
+                    "resolution": "720p",
+                    "image_url": "https://example.com/reference.png",
+                    "reference_image_urls": [
+                      "https://example.com/reference.png"
+                    ]
+                  }
+                },
+                "veo": {
+                  "summary": "Veo 3.1 Fast",
+                  "value": {
+                    "model": "veo-3-1-fast",
+                    "prompt": "A drone shot over a futuristic coastal city",
+                    "duration": 8,
+                    "aspect_ratio": "16:9",
+                    "resolution": "1080p",
+                    "generate_audio": true,
+                    "reference_mode": "frame",
+                    "images": [
+                      "https://example.com/reference.png"
+                    ]
+                  }
+                },
+                "omni": {
+                  "summary": "Omni 文/图生视频",
+                  "value": {
+                    "model": "omni-fast",
+                    "prompt": "Animate the scene with natural subject motion",
+                    "aspect_ratio": "16:9",
+                    "image_url": "https://example.com/reference.png"
+                  }
+                },
+                "omni_v2v": {
+                  "summary": "Omni V2V 视频转视频",
+                  "value": {
+                    "model": "omni-v2v",
+                    "prompt": "Restyle this video into a cinematic night scene",
+                    "video_url": "https://example.com/source.mp4",
+                    "aspect_ratio": "16:9"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "任务创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIVideoTask"
+                },
+                "example": {
+                  "id": "video_55cb73b3-60af-40c8-95fd-eae8fd758ade",
+                  "object": "video",
+                  "model": "veo-3-1-fast",
+                  "status": "queued",
+                  "progress": 0,
+                  "created_at": 1762336916,
+                  "seconds": "8",
+                  "size": "1280x720"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/videos/{id}": {
+      "get": {
+        "tags": [
+          "Seedance 2.0",
+          "Veo 3.1",
+          "Omni"
+        ],
+        "summary": "查询 OpenAI 视频任务",
+        "operationId": "getOpenAIVideo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "创建任务返回的 id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "任务状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAIVideoTask"
+                },
+                "example": {
+                  "id": "video_5c6a605a-30c0-4a6a-9dbd-d1d6cfdd9980",
+                  "object": "video",
+                  "model": "seedance-2.0-720p",
+                  "status": "completed",
+                  "progress": 100,
+                  "video_url": "https://example.com/result.mp4",
+                  "created_at": 1761622232,
+                  "completed_at": 1761622385
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API Key"
+      }
+    },
+    "schemas": {
+      "ImageGenerationRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "prompt"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "gpt-image-2-c"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "size": {
+            "type": "string",
+            "example": "1024x1024"
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 1
+          },
+          "image": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "参考图片 URL 数组"
+          },
+          "response_format": {
+            "type": "string",
+            "enum": [
+              "url",
+              "b64_json"
+            ]
+          }
+        }
+      },
+      "ImageGenerationResponse": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "b64_json": {
+                  "type": "string"
+                },
+                "revised_prompt": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ChatImageEditRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "messages"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "gpt-image-2-c"
+            ]
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "role",
+                "content"
+              ],
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "example": "user"
+                },
+                "content": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "size": {
+            "type": "string",
+            "example": "1024x1024"
+          },
+          "quality": {
+            "type": "string",
+            "example": "hd"
+          }
+        }
+      },
+      "ChatImageEditResponse": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "GrokVideoGenerationRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "prompt"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "grok-video",
+              "grok-video-1.5"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "seconds": {
+            "type": "integer",
+            "minimum": 4,
+            "maximum": 15
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "480p",
+              "720p"
+            ]
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "enum": [
+              "16:9",
+              "9:16"
+            ]
+          },
+          "image_urls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        }
+      },
+      "VideoTaskResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "status_update_time": {
+            "type": "integer"
+          }
+        }
+      },
+      "VideoTaskResult": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "OpenAIVideoCreateRequest": {
+        "type": "object",
+        "required": [
+          "model",
+          "prompt"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "seedance-2.0",
+              "seedance-2.0-mini-480p",
+              "seedance-2.0-mini-720p",
+              "seedance-2.0-fast-480p",
+              "seedance-2.0-fast-720p",
+              "seedance-2.0-480p",
+              "seedance-2.0-720p",
+              "seedance-2.0-1080p",
+              "seedance-2.0-4k",
+              "veo-3-1",
+              "veo-3-1-fast",
+              "omni-fast",
+              "omni-fast-no-water",
+              "omni-v2v",
+              "omni-v2v-no-water"
+            ]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "seconds": {
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "enum": [
+              "16:9",
+              "9:16",
+              "1:1"
+            ]
+          },
+          "resolution": {
+            "type": "string",
+            "example": "720p"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "video_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        }
+      },
+      "OpenAIVideoTask": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string",
+            "example": "video"
+          },
+          "model": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "integer"
+          },
+          "video_url": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "completed_at": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

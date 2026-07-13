@@ -10,29 +10,19 @@ from .tikpan_gpt_image_recovery import make_idempotency_key, safe_json_for_log, 
 from .tikpan_node_options import normalize_seed, option_value, pick
 
 
-CANGYUAN_API_HOST = "https://ai.cangyuansuanli.cn"
+CANGYUAN_API_HOST = "https://new.ip233.com"
 CANGYUAN_IMAGE_ENDPOINT = "/v1/images/generations"
 CANGYUAN_IMAGE_MODEL = "gpt-image-2"
 CANGYUAN_IMAGE_ASPECT_OPTIONS = [
-    "16:9 横屏｜16:9",
-    "9:16 竖屏｜9:16",
     "1:1 方形｜1:1",
-    "4:3 横屏｜4:3",
-    "3:4 竖屏｜3:4",
     "3:2 横屏｜3:2",
     "2:3 竖屏｜2:3",
-    "21:9 超宽屏｜21:9",
     "自动｜auto",
 ]
 CANGYUAN_IMAGE_SIZE_HINTS = {
-    "16:9": (1536, 864),
-    "9:16": (864, 1536),
     "1:1": (1024, 1024),
-    "4:3": (1536, 1152),
-    "3:4": (1152, 1536),
     "3:2": (1536, 1024),
     "2:3": (1024, 1536),
-    "21:9": (1536, 656),
     "auto": (1024, 1024),
 }
 
@@ -42,9 +32,9 @@ class TikpanCangyuanGptImage2Node(TikpanGptImage2OfficialNode):
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "沧元说明": (["沧元算力 gpt-image-2 | size 按画幅比例传入"],),
-                "获取密钥请访问": (["https://ai.cangyuansuanli.cn"],),
-                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "沧元算力 API Key，以 sk- 开头。"}),
+                "new.ip233.com说明": (["gpt-image-2 | JSON 异步生图 | 支持 1:1、3:2、2:3、auto，单次 1-10 张"],),
+                "获取密钥请访问": (["https://new.ip233.com"],),
+                "API_密钥": ("STRING", {"default": "sk-", "tooltip": "new.ip233.com API Key，以 sk- 开头。"}),
                 "生成指令": (
                     "STRING",
                     {
@@ -55,13 +45,15 @@ class TikpanCangyuanGptImage2Node(TikpanGptImage2OfficialNode):
                 ),
                 "画面比例": (
                     CANGYUAN_IMAGE_ASPECT_OPTIONS,
-                    {"default": CANGYUAN_IMAGE_ASPECT_OPTIONS[2], "tooltip": "沧元 gpt-image-2 的 size 字段传比例值，如 1:1、16:9。"},
+                    {"default": CANGYUAN_IMAGE_ASPECT_OPTIONS[0], "tooltip": "模型广场仅开放 1:1、3:2、2:3、auto。"},
                 ),
-                "生成张数": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1, "tooltip": "沧元模型广场规格：1-10 张。"}),
+                "生成张数": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1, "tooltip": "new.ip233.com 模型广场规格：1-10 张。"}),
             },
             "optional": {
                 "随机种子": ("INT", {"default": 888888, "min": 0, "max": 2147483647, "step": 1}),
-                "校验HTTPS证书": ("BOOLEAN", {"default": False, "tooltip": "是否校验沧元站点 HTTPS 证书。"}),
+                "最长等待秒数": ("INT", {"default": 360, "min": 30, "max": 7200, "step": 30, "tooltip": "异步任务最多等待多久。"}),
+                "查询间隔秒数": ("INT", {"default": 5, "min": 5, "max": 60, "step": 1}),
+                "校验HTTPS证书": ("BOOLEAN", {"default": False, "tooltip": "是否校验 new.ip233.com 站点 HTTPS 证书。"}),
                 "跳过错误": ("BOOLEAN", {"default": False, "tooltip": "开启后接口异常时返回黑图，避免工作流中断。"}),
             },
         }
@@ -70,7 +62,7 @@ class TikpanCangyuanGptImage2Node(TikpanGptImage2OfficialNode):
     RETURN_NAMES = ("🖼️_生成结果图", "📄_渲染日志")
     FUNCTION = "generate"
     CATEGORY = CATEGORY_CANGYUAN
-    DESCRIPTION = "沧元算力 gpt-image-2 生图：POST /v1/images/generations，size 按比例传入。"
+    DESCRIPTION = "new.ip233.com gpt-image-2 生图：POST /v1/images/generations，size 按比例传入。"
 
     def generate(self, **kwargs):
         start_time = time.time()
@@ -80,13 +72,15 @@ class TikpanCangyuanGptImage2Node(TikpanGptImage2OfficialNode):
         aspect_ratio = option_value(pick(kwargs, "画面比例", "aspect_ratio", default="1:1"), "1:1")
         count = int(pick(kwargs, "生成张数", "n", default=1) or 1)
         seed = normalize_seed(pick(kwargs, "随机种子", "seed", default=888888), default=888888)
+        max_wait = int(pick(kwargs, "最长等待秒数", "max_wait_seconds", default=360) or 360)
+        poll_interval = int(pick(kwargs, "查询间隔秒数", "poll_interval", default=5) or 5)
         verify_tls = bool(pick(kwargs, "校验HTTPS证书", "verify_tls", default=False))
         skip_error = bool(pick(kwargs, "跳过错误", "skip_error", default=False))
         width, height = CANGYUAN_IMAGE_SIZE_HINTS.get(aspect_ratio, (1024, 1024))
 
         try:
             if not api_key or api_key == "sk-" or len(api_key) < 10:
-                return (self.black_image(width, height), "❌ 请填写有效的沧元 API 密钥")
+                return (self.black_image(width, height), "❌ 请填写有效的 new.ip233.com API 密钥")
             if not prompt:
                 return (self.black_image(width, height), "❌ 生成指令不能为空")
             if aspect_ratio not in CANGYUAN_IMAGE_SIZE_HINTS:
@@ -98,11 +92,13 @@ class TikpanCangyuanGptImage2Node(TikpanGptImage2OfficialNode):
                 "prompt": prompt,
                 "size": aspect_ratio,
                 "n": count,
+                "async": True,
+                "stream": False,
                 "seed": int(seed) & 0x7fffffff,
             }
-            idempotency_key = make_idempotency_key("cangyuan-images/generations", payload)
+            idempotency_key = make_idempotency_key("new-ip233-images/generations", payload)
             save_recovery_record(
-                "cangyuan_image_generation",
+                "new_ip233_image_generation",
                 idempotency_key,
                 "pending",
                 endpoint=CANGYUAN_IMAGE_ENDPOINT,
@@ -118,7 +114,7 @@ class TikpanCangyuanGptImage2Node(TikpanGptImage2OfficialNode):
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                     "Accept": "application/json",
-                    "User-Agent": "Tikpan-ComfyUI-Cangyuan-GPT-Image-2/1.0",
+                    "User-Agent": "Tikpan-ComfyUI-new-ip233-GPT-Image-2/1.0",
                     "Idempotency-Key": idempotency_key,
                 },
                 timeout=(15, 300),
@@ -126,7 +122,7 @@ class TikpanCangyuanGptImage2Node(TikpanGptImage2OfficialNode):
             )
 
             if response.status_code != 200:
-                msg = f"❌ 沧元图片任务请求失败 | HTTP {response.status_code} | {self.safe_response_text(response, 1600)}"
+                msg = f"❌ new.ip233.com 图片任务请求失败 | HTTP {response.status_code} | {self.safe_response_text(response, 1600)}"
                 if not skip_error:
                     raise RuntimeError(msg)
                 return (self.black_image(width, height), msg)
@@ -134,13 +130,13 @@ class TikpanCangyuanGptImage2Node(TikpanGptImage2OfficialNode):
             try:
                 res_json = response.json()
             except Exception:
-                msg = f"❌ 沧元图片接口返回非 JSON：{self.safe_response_text(response, 1600)}"
+                msg = f"❌ new.ip233.com 图片接口返回非 JSON：{self.safe_response_text(response, 1600)}"
                 if not skip_error:
                     raise RuntimeError(msg)
                 return (self.black_image(width, height), msg)
 
             save_recovery_record(
-                "cangyuan_image_generation",
+                "new_ip233_image_generation",
                 idempotency_key,
                 "response_received",
                 endpoint=CANGYUAN_IMAGE_ENDPOINT,
@@ -150,12 +146,16 @@ class TikpanCangyuanGptImage2Node(TikpanGptImage2OfficialNode):
             if isinstance(res_json, dict) and res_json.get("error"):
                 err_obj = res_json.get("error")
                 err_text = err_obj.get("message") if isinstance(err_obj, dict) else str(err_obj)
-                msg = f"❌ 沧元图片接口拒绝：{err_text}"
+                msg = f"❌ new.ip233.com 图片接口拒绝：{err_text}"
                 if not skip_error:
                     raise RuntimeError(msg)
                 return (self.black_image(width, height), msg)
 
             image_refs = self.extract_image_results(res_json)
+            task_id = self.extract_task_id(res_json)
+            if not image_refs and task_id:
+                res_json = self.poll_image_task(session, api_key, task_id, max_wait, poll_interval, verify_tls)
+                image_refs = self.extract_image_results(res_json)
             if not image_refs:
                 msg = f"⚠️ 未找到有效图像数据。接口返回：{json.dumps(res_json, ensure_ascii=False)[:1600]}"
                 if not skip_error:
@@ -174,14 +174,14 @@ class TikpanCangyuanGptImage2Node(TikpanGptImage2OfficialNode):
             final_tensor = torch.cat(tensors, dim=0)
             elapsed = round(time.time() - start_time, 2)
             log_text = (
-                f"✅ 沧元 gpt-image-2 渲染成功 | endpoint={CANGYUAN_IMAGE_ENDPOINT} | "
+                f"✅ new.ip233.com gpt-image-2 渲染成功 | endpoint={CANGYUAN_IMAGE_ENDPOINT} | "
                 f"比例/size={aspect_ratio} | 张数={len(tensors)} | seed={int(seed) & 0x7fffffff} | 耗时={elapsed}s"
             )
             if urls:
                 log_text += f" | 上游图片链接: {urls[0]}"
 
             save_recovery_record(
-                "cangyuan_image_generation",
+                "new_ip233_image_generation",
                 idempotency_key,
                 "success",
                 endpoint=CANGYUAN_IMAGE_ENDPOINT,
@@ -190,10 +190,64 @@ class TikpanCangyuanGptImage2Node(TikpanGptImage2OfficialNode):
             )
             return (final_tensor, log_text)
         except Exception as exc:
-            msg = f"❌ 沧元图片节点异常: {exc}"
+            msg = f"❌ new.ip233.com 图片节点异常: {exc}"
             if not skip_error:
                 raise
             return (self.black_image(width, height), msg)
+
+    def extract_task_id(self, data):
+        if isinstance(data, dict):
+            for key in ("id", "task_id", "taskId", "request_id", "operation_id", "operationId"):
+                value = data.get(key)
+                if value:
+                    return str(value).strip()
+            for key in ("data", "result", "output", "task", "operation"):
+                found = self.extract_task_id(data.get(key))
+                if found:
+                    return found
+        elif isinstance(data, list):
+            for item in data:
+                found = self.extract_task_id(item)
+                if found:
+                    return found
+        elif isinstance(data, str) and data.strip():
+            return data.strip()
+        return ""
+
+    def poll_image_task(self, session, api_key, task_id, max_wait, poll_interval, verify_tls):
+        task = str(task_id or "").strip()
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+            "User-Agent": "Tikpan-ComfyUI-new-ip233-GPT-Image-2/1.0",
+        }
+        start_time = time.time()
+        last_json = {}
+        while time.time() - start_time < max_wait:
+            time.sleep(poll_interval)
+            for url in (
+                f"{CANGYUAN_API_HOST}{CANGYUAN_IMAGE_ENDPOINT}/{task}",
+                f"{CANGYUAN_API_HOST}{CANGYUAN_IMAGE_ENDPOINT}/query?id={task}",
+            ):
+                try:
+                    response = session.get(url, headers=headers, timeout=(15, 60), verify=verify_tls)
+                    if response.status_code in {404, 405}:
+                        continue
+                    if response.status_code >= 400:
+                        continue
+                    data = response.json()
+                    last_json = data
+                    if self.extract_image_results(data):
+                        return data
+                    status = str(data.get("status") or data.get("state") or "").lower() if isinstance(data, dict) else ""
+                    if status in {"failed", "error", "cancelled", "canceled"}:
+                        raise RuntimeError(f"图片任务失败：{json.dumps(data, ensure_ascii=False)[:1600]}")
+                    break
+                except RuntimeError:
+                    raise
+                except Exception:
+                    continue
+        raise RuntimeError(f"图片任务轮询超时：task_id={task} | last={json.dumps(last_json, ensure_ascii=False)[:1200]}")
 
     def extract_image_results(self, res_json):
         results = []
@@ -236,4 +290,4 @@ class TikpanCangyuanGptImage2Node(TikpanGptImage2OfficialNode):
 
 
 NODE_CLASS_MAPPINGS = {"TikpanCangyuanGptImage2Node": TikpanCangyuanGptImage2Node}
-NODE_DISPLAY_NAME_MAPPINGS = {"TikpanCangyuanGptImage2Node": "沧元｜GPT-Image-2 生图"}
+NODE_DISPLAY_NAME_MAPPINGS = {"TikpanCangyuanGptImage2Node": "new.ip233.com｜GPT-Image-2 生图"}
