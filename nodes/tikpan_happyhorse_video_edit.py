@@ -202,6 +202,7 @@ class TikpanHappyHorseVideoEditNode:
 
     def upload_video(self, session, api_key, video_path, pbar):
         """上传本地视频，返回 URL，并更新进度条"""
+        base_url = getattr(self, "api_base_url", BASE_URL)
         video_filename = os.path.basename(video_path)
         ext = os.path.splitext(video_filename)[1].lower()
         mime_types = {
@@ -231,6 +232,7 @@ class TikpanHappyHorseVideoEditNode:
         upload_headers = {"Authorization": f"Bearer {api_key}"}
         files = {"file": (video_filename, video_bytes, mime_type)}
         upload_endpoints = [
+            "https://imageproxy.tikpan.com/api/upload",
             f"{base_url}/alibailian/api/v1/upload",
             f"{base_url}/v1/upload",
             f"{base_url}/upload",
@@ -327,6 +329,8 @@ class TikpanHappyHorseVideoEditNode:
 
     def upload_single_image(self, session, api_key, img_tensor, index, pbar, total_images, completed):
         """上传单张参考图片，返回 URL"""
+        base_url = getattr(self, "api_base_url", BASE_URL)
+
         try:
             pil_img = self.tensor_to_pil(img_tensor)
             buf = BytesIO()
@@ -342,6 +346,7 @@ class TikpanHappyHorseVideoEditNode:
         upload_headers = {"Authorization": f"Bearer {api_key}"}
         files = {"file": (f"ref_{index}.jpg", img_bytes, "image/jpeg")}
         upload_endpoints = [
+            "https://imageproxy.tikpan.com/api/upload",
             f"{base_url}/alibailian/api/v1/upload",
             f"{base_url}/v1/upload",
             f"{base_url}/upload",
@@ -461,14 +466,13 @@ class TikpanHappyHorseVideoEditNode:
 
         media_list = [{"type": "video", "url": video_url}]
         for ref_url in reference_urls:
-            media_list.append({"type": "reference", "url": ref_url})
+            media_list.append({"type": "reference_image", "url": ref_url})
 
         payload = {
             "model": "happyhorse-1.0-video-edit",
             "input": {"prompt": prompt, "media": media_list},
             "parameters": {
                 "resolution": resolution,
-                "duration": duration,
                 "watermark": watermark,
             },
         }

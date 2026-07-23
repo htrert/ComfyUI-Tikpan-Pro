@@ -2,6 +2,13 @@
 
 ## Documentation Maintenance Index
 
+## [v1.4.7] - 2026-07-23
+
+### Fixed
+
+- Fixed optional seed handling in the official GPT-Image-2 node.
+- Fixed HappyHorse local media uploads and aligned R2V/Video-Edit payloads with the upstream API schema.
+
 ## [v1.4.5] - 2026-07-02
 
 ### Added - ??????????

@@ -216,9 +216,11 @@ class TikpanHappyHorseI2VNode:
             raise RuntimeError(f"图片转换失败: {e}")
 
         # 尝试多个上传端点（/alibailian/api/v1/upload 放第一个，最接近阿里百炼标准）
+        base_url = getattr(self, "api_base_url", BASE_URL)
         upload_headers = {"Authorization": f"Bearer {api_key}"}
         files = {"file": ("frame.jpg", img_bytes, "image/jpeg")}
         upload_endpoints = [
+            "https://imageproxy.tikpan.com/api/upload",
             f"{base_url}/alibailian/api/v1/upload",
             f"{base_url}/v1/upload",
             f"{base_url}/upload",

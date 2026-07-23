@@ -137,6 +137,76 @@ def test_cangyuan_gpt_image_2_contract():
     assert "16:9" not in module.CANGYUAN_IMAGE_SIZE_HINTS
 
 
+def test_official_gpt_image_2_optional_seed_log_format():
+    module = load_node_module(
+        "tikpan_gpt_image_2_official.py",
+        "tikpan_gpt_image_2_official",
+    )
+
+    assert module.format_seed_for_log(None) == "auto"
+    assert module.format_seed_for_log(2147483648) == 0
+    assert module.format_seed_for_log(-1) == 2147483647
+
+
+def test_happyhorse_media_payload_matches_official_schema():
+    class FakeResponse:
+        status_code = 200
+        text = ""
+
+        def json(self):
+            return {"output": {"task_id": "task-1"}}
+
+    class FakeSession:
+        def __init__(self):
+            self.calls = []
+
+        def post(self, url, **kwargs):
+            self.calls.append((url, kwargs))
+            return FakeResponse()
+
+    r2v_module = load_node_module("tikpan_happyhorse_r2v.py", "tikpan_happyhorse_r2v")
+    r2v_session = FakeSession()
+    r2v_node = r2v_module.TikpanHappyHorseR2VNode()
+    assert r2v_node.submit_task(
+        r2v_session,
+        "sk-test",
+        "happyhorse-1.1-r2v",
+        "prompt",
+        ["https://example.com/ref.png"],
+        "720P",
+        5,
+        False,
+        1,
+    ) == (True, "task-1")
+    assert r2v_session.calls[0][1]["json"]["input"]["media"] == [
+        {"type": "reference_image", "url": "https://example.com/ref.png"}
+    ]
+
+    edit_module = load_node_module(
+        "tikpan_happyhorse_video_edit.py",
+        "tikpan_happyhorse_video_edit",
+    )
+    edit_session = FakeSession()
+    edit_node = edit_module.TikpanHappyHorseVideoEditNode()
+    assert edit_node.submit_task(
+        edit_session,
+        "sk-test",
+        "prompt",
+        "https://example.com/video.mp4",
+        ["https://example.com/ref.png"],
+        "720P",
+        5,
+        False,
+        1,
+    ) == (True, "task-1")
+    edit_payload = edit_session.calls[0][1]["json"]
+    assert edit_payload["input"]["media"] == [
+        {"type": "video", "url": "https://example.com/video.mp4"},
+        {"type": "reference_image", "url": "https://example.com/ref.png"},
+    ]
+    assert "duration" not in edit_payload["parameters"]
+
+
 def test_cangyuan_grok_video_15_contract():
     module = load_node_module("tikpan_cangyuan_grok_video_15.py", "tikpan_cangyuan_grok_video_15")
     node = module.TikpanCangyuanGrokVideo15Node()

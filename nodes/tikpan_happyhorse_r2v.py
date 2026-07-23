@@ -198,6 +198,8 @@ class TikpanHappyHorseR2VNode:
 
     def upload_single_image(self, session, api_key, img_tensor, index, pbar, total_images, completed):
         """上传单张图片，返回 URL（带进度反馈）"""
+        base_url = getattr(self, "api_base_url", BASE_URL)
+
         try:
             pil_img = self.tensor_to_pil(img_tensor)
             buf = BytesIO()
@@ -214,6 +216,7 @@ class TikpanHappyHorseR2VNode:
         upload_headers = {"Authorization": f"Bearer {api_key}"}
         files = {"file": (f"ref_{index}.jpg", img_bytes, "image/jpeg")}
         upload_endpoints = [
+            "https://imageproxy.tikpan.com/api/upload",
             f"{base_url}/alibailian/api/v1/upload",
             f"{base_url}/v1/upload",
             f"{base_url}/upload",
@@ -333,7 +336,7 @@ class TikpanHappyHorseR2VNode:
             "X-DashScope-Async": "enable",
         }
 
-        media_list = [{"type": "reference", "url": u} for u in image_urls]
+        media_list = [{"type": "reference_image", "url": u} for u in image_urls]
 
         payload = {
             "model": model,

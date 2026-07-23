@@ -41,6 +41,11 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 API_BASE_URL = "https://tikpan.com"
 
 
+def format_seed_for_log(seed):
+    """Return a stable log value for an optional seed."""
+    return (seed & 0x7fffffff) if seed is not None else "auto"
+
+
 class TikpanGptImage2OfficialNode:
     @classmethod
     def INPUT_TYPES(cls):
@@ -351,7 +356,7 @@ class TikpanGptImage2OfficialNode:
             final_tensor = torch.from_numpy(final_np)[None, ...]
 
             cost_time = round(time.time() - start_time, 2)
-            final_seed = seed & 0x7fffffff
+            final_seed = format_seed_for_log(seed)
             log_text = (
                 f"✅ 渲染成功 | 模型: {model} | 比例: {aspect_ratio} | 尺寸: {target_res} | "
                 f"质量: {quality} | 格式: {output_format} | seed: {final_seed} | 耗时: {cost_time}s"
